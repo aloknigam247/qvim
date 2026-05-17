@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "qvim",
+  "version": "0.1.0",
+  "description": "Neovim GUI client built with Qt 6 / QML.",
+  "dependencies": [
+    {
+      "name": "qtbase",
+      "default-features": false,
+      "features": ["gui", "widgets"]
+    },
+    "qtdeclarative",
+    "qtquickcontrols2",
+    "msgpack"
+  ]
+}

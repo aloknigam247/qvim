@@ -1,0 +1,49 @@
+set(QVIM_TEST_DLL_PATH       "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/bin")
+set(QVIM_TEST_QPA_PLUGIN_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/Qt6/plugins/platforms")
+set(QVIM_TEST_QML_IMPORT_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/Qt6/qml")
+cmake_path(NATIVE_PATH QVIM_TEST_DLL_PATH        QVIM_TEST_DLL_PATH_NATIVE)
+cmake_path(NATIVE_PATH QVIM_TEST_QPA_PLUGIN_DIR  QVIM_TEST_QPA_PLUGIN_DIR_NATIVE)
+cmake_path(NATIVE_PATH QVIM_TEST_QML_IMPORT_DIR  QVIM_TEST_QML_IMPORT_DIR_NATIVE)
+
+function(qvim_add_test name)
+    qt_add_executable(${name} ${ARGN})
+    target_link_libraries(${name} PRIVATE qvim_lib Qt6::Test)
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES
+        TIMEOUT 60
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
+    )
+endfunction()
+
+# Tier 1 — unit / model (guiless)
+qvim_add_test(test_grid_model       unit/test_grid_model.cpp)
+qvim_add_test(test_highlight_table  unit/test_highlight_table.cpp)
+qvim_add_test(test_msgpack_rpc      unit/test_msgpack_rpc.cpp)
+qvim_add_test(test_input_handler    unit/test_input_handler.cpp)
+
+# Tier 2 — integration (offscreen QPA, real nvim --embed)
+qvim_add_test(test_attach_and_render integration/test_attach_and_render.cpp)
+qvim_add_test(test_insert_and_quit   integration/test_insert_and_quit.cpp)
+qvim_add_test(test_resize            integration/test_resize.cpp)
+qvim_add_test(test_tabline           integration/test_tabline.cpp)
+qvim_add_test(test_popupmenu         integration/test_popupmenu.cpp)
+qvim_add_test(test_cmdline           integration/test_cmdline.cpp)
+
+foreach(t test_attach_and_render test_insert_and_quit test_resize test_tabline test_popupmenu test_cmdline)
+    set_tests_properties(${t} PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE}"
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
+    )
+endforeach()
+
+# Tier 3 — QML tests (qmltest)
+qt_add_executable(test_qml qml/main_qmltest.cpp)
+target_link_libraries(test_qml PRIVATE qvim_lib qvim_libplugin Qt6::QuickTest Qt6::Qml)
+add_test(NAME test_qml
+    COMMAND test_qml -input ${CMAKE_CURRENT_SOURCE_DIR}/qml
+)
+set_tests_properties(test_qml PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE}"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
+    TIMEOUT 30
+)
