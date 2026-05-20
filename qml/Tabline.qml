@@ -26,8 +26,8 @@ Rectangle {
                 anchors.centerIn: parent
                 text: model.name
                 color: model.isCurrent ? "#ffffff" : "#bbbbbb"
-                font.family: "JetBrains Mono Nerd Font"
-                font.pointSize: 14
+                font.family: $connector.guifontFamily
+                font.pointSize: $connector.guifontSize
             }
 
             MouseArea {

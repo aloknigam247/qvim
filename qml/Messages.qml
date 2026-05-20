@@ -45,8 +45,8 @@ Item {
                     color: bubble.kind === "echoerr" || bubble.kind === "emsg" ? "#ff8080"
                          : bubble.kind === "wmsg"                              ? "#ffd080"
                          :                                                       "#d4d4d4"
-                    font.family: "JetBrains Mono Nerd Font"
-                    font.pointSize: 14
+                    font.family: $connector.guifontFamily
+                    font.pointSize: $connector.guifontSize
                 }
 
                 Timer {
@@ -71,22 +71,22 @@ Item {
             visible: $connector.messages.mode.length > 0
             text: $connector.messages.mode
             color: "#9cdcfe"
-            font.family: "JetBrains Mono Nerd Font"
-            font.pointSize: 14
+            font.family: $connector.guifontFamily
+            font.pointSize: $connector.guifontSize
         }
         Text {
             visible: $connector.messages.cmd.length > 0
             text: $connector.messages.cmd
             color: "#d4d4d4"
-            font.family: "JetBrains Mono Nerd Font"
-            font.pointSize: 14
+            font.family: $connector.guifontFamily
+            font.pointSize: $connector.guifontSize
         }
         Text {
             visible: $connector.messages.ruler.length > 0
             text: $connector.messages.ruler
             color: "#808080"
-            font.family: "JetBrains Mono Nerd Font"
-            font.pointSize: 14
+            font.family: $connector.guifontFamily
+            font.pointSize: $connector.guifontSize
         }
     }
 }

@@ -31,6 +31,11 @@ bool MsgpackRpc::startEmbeddedNvim(const QString& nvimExe, const QStringList& ex
     m_process->setProcessChannelMode(QProcess::SeparateChannels);
 
     QStringList args;
+    // Announce ourselves to init.vim *before* it is sourced so users can do
+    // `if exists("g:qvim")` at the top level — same pattern neovide uses with
+    // its `--cmd "let g:neovide = v:true"`. The value v:true (not 1) matches
+    // neovide so consumers can compare identically.
+    args << QStringLiteral("--cmd") << QStringLiteral("let g:qvim = v:true");
     args << QStringLiteral("--embed");
     args.append(extraArgs);
 

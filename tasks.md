@@ -1,5 +1,7 @@
+- [ ] DOCS: add claude contexts
 - [ ] FEAT(arguments): accept file path as arguments like vim
 - [ ] FEAT(arguments): accepts all valid vim arguments
 - [ ] FEAT(ui): app icon
 - [ ] PERF: editor launching is slow
 - [ ] REFACTOR: move header files into include directory
+- [ ] PERF: cursor movement is slow

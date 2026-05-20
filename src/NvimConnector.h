@@ -31,8 +31,15 @@ class NvimConnector : public QObject {
     Q_PROPERTY(qvim::PopupMenuModel*  popupmenu  READ popupmenu  CONSTANT)
     Q_PROPERTY(qvim::CmdlineModel*    cmdline    READ cmdline    CONSTANT)
     Q_PROPERTY(QString                title      READ title      NOTIFY titleChanged)
-    Q_PROPERTY(QString                guifont    READ guifont    NOTIFY guifontChanged)
-    Q_PROPERTY(bool                   attached   READ attached   NOTIFY attachedChanged)
+    Q_PROPERTY(QString                guifont       READ guifont       NOTIFY guifontChanged)
+    // Parsed convenience accessors so any QML overlay can do
+    //   font.family: $connector.guifontFamily
+    //   font.pointSize: $connector.guifontSize
+    // without re-implementing the `Family:hN` parser. Both notify on
+    // guifontChanged so bindings re-evaluate when nvim's option_set fires.
+    Q_PROPERTY(QString                guifontFamily READ guifontFamily NOTIFY guifontChanged)
+    Q_PROPERTY(qreal                  guifontSize   READ guifontSize   NOTIFY guifontChanged)
+    Q_PROPERTY(bool                   attached      READ attached      NOTIFY attachedChanged)
 
 public:
     explicit NvimConnector(QObject* parent = nullptr);
@@ -48,9 +55,11 @@ public:
     TablineModel*   tabline()    const { return m_tabline; }
     PopupMenuModel* popupmenu()  const { return m_popupmenu; }
     CmdlineModel*   cmdline()    const { return m_cmdline; }
-    QString         title()      const { return m_title; }
-    QString         guifont()    const { return m_guifont; }
-    bool            attached()   const { return m_attached; }
+    QString         title()         const { return m_title; }
+    QString         guifont()       const { return m_guifont; }
+    QString         guifontFamily() const;
+    qreal           guifontSize()   const;
+    bool            attached()      const { return m_attached; }
 
     Q_INVOKABLE void input(const QString& keys);
     Q_INVOKABLE void inputMouse(const QString& button, const QString& action,

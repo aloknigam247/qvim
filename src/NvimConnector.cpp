@@ -51,6 +51,45 @@ bool NvimConnector::start(const QString& nvimExe) {
     return m_rpc->startEmbeddedNvim(nvimExe);
 }
 
+namespace {
+// Same parsing the GridItem uses for its own font selection. Centralised here
+// so QML overlays can bind via Q_PROPERTY without duplicating the regex.
+// Defaults match the qvim-wide hardcoded fallback (JetBrains Mono Nerd Font,
+// 14pt) so overlays render sensibly before nvim's first option_set arrives.
+constexpr qreal kDefaultGuifontSize = 14.0;
+const QString   kDefaultGuifontFamily = QStringLiteral("JetBrains Mono Nerd Font");
+
+void parseGuifontImpl(const QString& guifont, QString& family, qreal& size) {
+    if (guifont.isEmpty()) return;
+    const auto parts = guifont.split(QLatin1Char(':'));
+    if (parts.isEmpty()) return;
+    family = parts.first();
+    family.replace(QLatin1Char('_'), QLatin1Char(' '));
+    for (int i = 1; i < parts.size(); ++i) {
+        const QString p = parts.at(i);
+        if (p.startsWith(QLatin1Char('h')) && p.size() > 1) {
+            bool ok = false;
+            const qreal v = p.mid(1).toDouble(&ok);
+            if (ok) size = v;
+        }
+    }
+}
+} // namespace
+
+QString NvimConnector::guifontFamily() const {
+    QString family = kDefaultGuifontFamily;
+    qreal size = kDefaultGuifontSize;
+    parseGuifontImpl(m_guifont, family, size);
+    return family;
+}
+
+qreal NvimConnector::guifontSize() const {
+    QString family = kDefaultGuifontFamily;
+    qreal size = kDefaultGuifontSize;
+    parseGuifontImpl(m_guifont, family, size);
+    return size;
+}
+
 bool NvimConnector::attachUi(int cols, int rows) {
     m_rpc->request(QStringLiteral("nvim_ui_attach"),
         [cols, rows](msgpack::packer<msgpack::sbuffer>& pk) {
