@@ -19,6 +19,7 @@ class GridItem : public QQuickPaintedItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(qvim::NvimConnector* connector READ connector WRITE setConnector NOTIFY connectorChanged)
+    Q_PROPERTY(int     gridId    READ gridId    WRITE setGridId    NOTIFY gridIdChanged)
     Q_PROPERTY(QString fontName  READ fontName  WRITE setFontName  NOTIFY fontChanged)
     Q_PROPERTY(qreal   fontSize  READ fontSize  WRITE setFontSize  NOTIFY fontChanged)
     Q_PROPERTY(qreal   cellWidth  READ cellWidth  NOTIFY fontChanged)
@@ -32,6 +33,9 @@ public:
 
     NvimConnector* connector() const { return m_conn; }
     void setConnector(NvimConnector* c);
+
+    int  gridId() const { return m_gridId; }
+    void setGridId(int id);
 
     QString fontName() const { return m_fontName; }
     void setFontName(const QString& name);
@@ -50,6 +54,7 @@ public:
 
 signals:
     void connectorChanged();
+    void gridIdChanged();
     void fontChanged();
     void debugOverlayChanged();
 
@@ -76,8 +81,9 @@ private:
     void sendMouse(QMouseEvent* ev, QEvent::Type type);
 
     QPointer<NvimConnector> m_conn;
+    int      m_gridId       = 1;
     QString  m_fontName     = QStringLiteral("JetBrains Mono Nerd Font");
-    qreal    m_fontSize     = 11.0;
+    qreal    m_fontSize     = 14.0;
     QFont    m_font;
     qreal    m_cellWidth    = 8.0;
     qreal    m_cellHeight   = 16.0;

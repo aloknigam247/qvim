@@ -5,12 +5,16 @@
 #include "ModeInfo.h"
 #include "InputHandler.h"
 
-#include <QPainter>
-#include <QPainterPath>
+#include <QElapsedTimer>
+#include <QHash>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QWheelEvent>
+#include <QPainter>
+#include <QPainterPath>
 #include <QRegularExpression>
+#include <QWheelEvent>
+#include <QtGlobal>
+#include <climits>
 
 namespace qvim {
 
@@ -45,6 +49,13 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::blinkTick);
     m_blinkTimer.setInterval(500);
     m_blinkTimer.start();
+}
+
+void GridItem::setGridId(int id) {
+    if (m_gridId == id) return;
+    m_gridId = id;
+    emit gridIdChanged();
+    update();
 }
 
 void GridItem::setConnector(NvimConnector* c) {
@@ -143,9 +154,12 @@ int GridItem::rowAt(qreal y) const {
 
 void GridItem::maybeResizeUi() {
     if (!m_conn || width() <= 0 || height() <= 0) return;
+    // Only the global grid (id=1) drives nvim_ui_try_resize — sub-grids are
+    // sized by nvim via win_pos/grid_resize, not by us.
+    if (m_gridId != 1) return;
     const int cols = std::max(10, static_cast<int>(width()  / m_cellWidth));
     const int rows = std::max(3,  static_cast<int>(height() / m_cellHeight));
-    if (auto* g = grid(); g && (g->cols() != cols || g->rows() != rows)) {
+    if (auto* g = grid(); g && (g->gridCols(1) != cols || g->gridRows(1) != rows)) {
         m_conn->tryResize(cols, rows);
     }
 }
@@ -168,13 +182,34 @@ void GridItem::paint(QPainter* painter) {
         painter->fillRect(boundingRect(), Qt::black);
         return;
     }
+
+    // Optional micro-benchmark: enable with QVIM_PROFILE_PAINT=1.
+    static const bool kProfilePaint = qEnvironmentVariableIntValue("QVIM_PROFILE_PAINT") != 0;
+    QElapsedTimer paintTimer;
+    if (kProfilePaint) paintTimer.start();
+
     painter->setRenderHint(QPainter::TextAntialiasing, true);
     painter->setFont(m_font);
 
     painter->fillRect(boundingRect(), h->defaultBg());
 
-    const int cols = g->cols();
-    const int rows = g->rows();
+    const int cols = g->gridCols(m_gridId);
+    const int rows = g->gridRows(m_gridId);
+    const QColor defaultBg = h->defaultBg();
+
+    // Lazy cache of per-hl_id QFont. Building a QFont and calling
+    // setBold/setItalic/setUnderline/setStrikeOut on every run is expensive
+    // (QFontPrivate detach + re-resolve). Cache keyed by hl_id is safe because
+    // HighlightTable::changed() triggers a repaint (i.e. a fresh paint() call,
+    // so the cache stays consistent within a single frame).
+    QHash<int, QFont> fontCache;
+    fontCache.reserve(32);
+
+    // Track last applied painter state to avoid redundant setFont/setPen calls
+    // both within a row and across consecutive rows.
+    int     lastHlIdFont = INT_MIN;
+    int     lastHlIdPen  = INT_MIN;
+    QColor  lastPenColor;
 
     for (int r = 0; r < rows; ++r) {
         const qreal y = r * m_cellHeight;
@@ -184,35 +219,55 @@ void GridItem::paint(QPainter* painter) {
 
         int c = 0;
         while (c < cols) {
-            const Cell& start = g->cell(r, c);
+            const Cell& start = g->cell(m_gridId, r, c);
             const int runHl = start.hlId;
             int runEnd = c + 1;
-            while (runEnd < cols && g->cell(r, runEnd).hlId == runHl) ++runEnd;
+            while (runEnd < cols && g->cell(m_gridId, r, runEnd).hlId == runHl) ++runEnd;
 
-            HlAttr a = h->resolved(runHl);
+            const HlAttr a = h->resolved(runHl);
             const QRectF runRect(c * m_cellWidth, y, (runEnd - c) * m_cellWidth, m_cellHeight);
-            if (a.bg != h->defaultBg()) {
+            if (a.bg != defaultBg) {
                 painter->fillRect(runRect, a.bg);
             }
 
             QString runText;
             runText.reserve(runEnd - c);
             for (int cc = c; cc < runEnd; ++cc) {
-                const Cell& cell = g->cell(r, cc);
+                const Cell& cell = g->cell(m_gridId, r, cc);
+                // Right-half markers of double-width glyphs contribute no glyph
+                // of their own; the left cell's glyph already spans both columns.
+                if (cell.doubleWidth) continue;
                 runText += cell.text.isEmpty() ? QChar(' ') : cell.text;
             }
 
-            QFont rf = m_font;
-            rf.setBold(a.bold);
-            rf.setItalic(a.italic);
-            rf.setUnderline(a.underline);
-            rf.setStrikeOut(a.strikethrough);
-            painter->setFont(rf);
-            painter->setPen(a.fg);
+            // Only rebuild/apply font when the hl_id (and therefore the font
+            // attribute set) actually changes. painter->save()/restore() per
+            // row does NOT invalidate our cached state because we re-apply
+            // before drawing whenever lastHlIdFont != runHl.
+            if (runHl != lastHlIdFont) {
+                auto it = fontCache.find(runHl);
+                if (it == fontCache.end()) {
+                    QFont rf = m_font;
+                    rf.setBold(a.bold);
+                    rf.setItalic(a.italic);
+                    rf.setUnderline(a.underline);
+                    rf.setStrikeOut(a.strikethrough);
+                    it = fontCache.insert(runHl, rf);
+                }
+                painter->setFont(it.value());
+                lastHlIdFont = runHl;
+            }
+            if (runHl != lastHlIdPen || a.fg != lastPenColor) {
+                painter->setPen(a.fg);
+                lastHlIdPen = runHl;
+                lastPenColor = a.fg;
+            }
             painter->drawText(QPointF(c * m_cellWidth, y + m_baseline), runText);
 
             if (a.undercurl) {
                 painter->setPen(a.sp);
+                lastPenColor = a.sp;
+                lastHlIdPen = INT_MIN; // force pen re-apply on next text run
                 const qreal yy = y + m_cellHeight - 1.5;
                 QPainterPath path;
                 path.moveTo(runRect.left(), yy);
@@ -226,15 +281,36 @@ void GridItem::paint(QPainter* painter) {
             c = runEnd;
         }
         painter->restore();
+        // QPainter::restore() reverts font/pen to whatever was active before
+        // the matching save(). Invalidate the cached "last applied" state so
+        // the next row re-applies on its first run.
+        lastHlIdFont = INT_MIN;
+        lastHlIdPen  = INT_MIN;
+        lastPenColor = QColor();
     }
 
-    // Cursor
-    if (m_cursorOn || !mode() || !mode()->cursorStyleEnabled()) {
-        const int cr = g->cursorRow();
-        const int cc = g->cursorCol();
+    if (kProfilePaint) {
+        const qint64 ns = paintTimer.nsecsElapsed();
+        qDebug("qvim paint: %lld us (%dx%d, %d hl entries cached)",
+               ns / 1000, cols, rows, fontCache.size());
+    }
+
+    // Cursor — only render on the active grid (per ext_multigrid: the cursor
+    // lives on exactly one grid at a time, whichever was the last
+    // grid_cursor_goto target).
+    const bool isActive = (g->activeGrid() == m_gridId);
+    if (isActive && (m_cursorOn || !mode() || !mode()->cursorStyleEnabled())) {
+        const int cr = g->cursorRowOf(m_gridId);
+        const int cc = g->cursorColOf(m_gridId);
         if (cr >= 0 && cr < rows && cc >= 0 && cc < cols) {
             HlAttr a = h->resolved(mode() ? mode()->attrId() : 0);
+            // Cursor colour resolution mirrors traditional vim: prefer the
+            // cursor highlight's bg, but if it's invalid OR matches the editor
+            // background (so the cursor would render invisibly on the canvas)
+            // fall back to defaultFg. Catches colorschemes that leave the
+            // `Cursor` group's bg unset or set to the editor bg.
             QColor curColor = a.bg.isValid() ? a.bg : h->defaultFg();
+            if (curColor == h->defaultBg()) curColor = h->defaultFg();
             QRectF rect(cc * m_cellWidth, cr * m_cellHeight, m_cellWidth, m_cellHeight);
             const CursorShape shape = mode() ? static_cast<CursorShape>(mode()->cursorShapeInt())
                                              : CursorShape::Block;
@@ -246,7 +322,7 @@ void GridItem::paint(QPainter* painter) {
             }
             painter->fillRect(rect, curColor);
             if (shape == CursorShape::Block && m_cursorOn) {
-                const Cell& cell = g->cell(cr, cc);
+                const Cell& cell = g->cell(m_gridId, cr, cc);
                 if (!cell.text.isEmpty()) {
                     painter->setPen(h->defaultBg());
                     painter->setFont(m_font);
@@ -262,7 +338,7 @@ void GridItem::paint(QPainter* painter) {
         QFont overlayFont = m_font;
         overlayFont.setBold(true);
         painter->setFont(overlayFont);
-        const QString dump = g->dumpAscii();
+        const QString dump = g->dumpAscii(m_gridId);
         int rr = 0;
         for (const QString& line : dump.split(QLatin1Char('\n'))) {
             painter->drawText(QPointF(0, rr * m_cellHeight + m_baseline), line);
@@ -295,7 +371,7 @@ void GridItem::sendMouse(QMouseEvent* ev, QEvent::Type type) {
     if (!m.valid) return;
     const int row = rowAt(ev->position().y());
     const int col = colAt(ev->position().x());
-    m_conn->inputMouse(m.button, m.action, m.modifier, 0, row, col);
+    m_conn->inputMouse(m.button, m.action, m.modifier, m_gridId, row, col);
 }
 
 void GridItem::mousePressEvent(QMouseEvent* ev)   { sendMouse(ev, QEvent::MouseButtonPress);  forceActiveFocus(); ev->accept(); }
@@ -308,7 +384,7 @@ void GridItem::wheelEvent(QWheelEvent* ev) {
     if (dir.isEmpty()) { ev->ignore(); return; }
     const int row = rowAt(ev->position().y());
     const int col = colAt(ev->position().x());
-    m_conn->inputMouse(QStringLiteral("wheel"), dir, QString(), 0, row, col);
+    m_conn->inputMouse(QStringLiteral("wheel"), dir, QString(), m_gridId, row, col);
     ev->accept();
 }
 

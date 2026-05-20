@@ -33,9 +33,9 @@ void ClipboardBridge::installYankAutocmd() {
     m_conn->execLua(QString::fromUtf8(kLua));
 }
 
-void ClipboardBridge::onCustomNotification(const QString& method, qvim::ObjectHandlePtr params) {
-    if (method != QStringLiteral("qvim_yank")) return;
-    const msgpack::object& obj = paramsView(params);
+void ClipboardBridge::onCustomNotification(const qvim::Notification& note) {
+    if (note.method != QStringLiteral("qvim_yank")) return;
+    const msgpack::object& obj = note.params();
     if (obj.type != msgpack::type::ARRAY || obj.via.array.size < 1) return;
 
     const msgpack::object& linesObj = obj.via.array.ptr[0];

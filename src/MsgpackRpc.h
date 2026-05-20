@@ -24,6 +24,24 @@ using RpcResult       = std::expected<ObjectHandlePtr, RpcError>;
 using RpcCallback     = std::function<void(RpcResult)>;
 using PackFn          = std::function<void(msgpack::packer<msgpack::sbuffer>&)>;
 
+// Notification carries an RPC notification across signal/slot boundaries.
+// `handle` keeps the msgpack arena alive; `params()` returns the already-
+// extracted params object from the [type, method, params] envelope.
+// Returns a nil object if the handle is missing/malformed — receivers should
+// still validate the shape they expect.
+struct Notification {
+    QString          method;
+    ObjectHandlePtr  handle;
+
+    const msgpack::object& params() const noexcept {
+        static const msgpack::object kNil{};
+        if (!handle) return kNil;
+        const msgpack::object& root = handle->get();
+        if (root.type != msgpack::type::ARRAY || root.via.array.size < 3) return kNil;
+        return root.via.array.ptr[2];
+    }
+};
+
 class MsgpackRpc : public QObject {
     Q_OBJECT
 public:
@@ -38,7 +56,7 @@ public:
     bool isRunning() const;
 
 signals:
-    void notification(const QString& method, qvim::ObjectHandlePtr params);
+    void notification(const qvim::Notification& note);
     void disconnected();
     void error(const QString& message);
 
@@ -59,15 +77,7 @@ private:
 
 inline std::string toStd(const QString& s) { return s.toStdString(); }
 
-// Extracts the params object from a notification handle wrapping [type, method, params].
-inline const msgpack::object& paramsView(const ObjectHandlePtr& msg) {
-    static const msgpack::object kNil{};
-    if (!msg) return kNil;
-    const msgpack::object& root = msg->get();
-    if (root.type != msgpack::type::ARRAY || root.via.array.size < 3) return kNil;
-    return root.via.array.ptr[2];
-}
-
 } // namespace qvim
 
 Q_DECLARE_METATYPE(qvim::ObjectHandlePtr)
+Q_DECLARE_METATYPE(qvim::Notification)

@@ -23,7 +23,7 @@ public slots:
     void pasteFromClipboard();
 
 private slots:
-    void onCustomNotification(const QString& method, qvim::ObjectHandlePtr params);
+    void onCustomNotification(const qvim::Notification& note);
 
 private:
     void installYankAutocmd();

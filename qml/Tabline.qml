@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import Qvim 1.0
 
 Rectangle {
@@ -27,7 +26,8 @@ Rectangle {
                 anchors.centerIn: parent
                 text: model.name
                 color: model.isCurrent ? "#ffffff" : "#bbbbbb"
-                font.pointSize: 10
+                font.family: "JetBrains Mono Nerd Font"
+                font.pointSize: 14
             }
 
             MouseArea {

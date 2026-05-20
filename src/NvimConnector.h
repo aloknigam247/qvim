@@ -10,6 +10,7 @@
 #include "MsgpackRpc.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
+#include "MessagesModel.h"
 #include "ModeInfo.h"
 #include "TablineModel.h"
 #include "PopupMenuModel.h"
@@ -24,6 +25,7 @@ class NvimConnector : public QObject {
 
     Q_PROPERTY(qvim::GridModel*       grid       READ grid       CONSTANT)
     Q_PROPERTY(qvim::HighlightTable*  highlights READ highlights CONSTANT)
+    Q_PROPERTY(qvim::MessagesModel*   messages   READ messages   CONSTANT)
     Q_PROPERTY(qvim::ModeInfo*        modeInfo   READ modeInfo   CONSTANT)
     Q_PROPERTY(qvim::TablineModel*    tabline    READ tabline    CONSTANT)
     Q_PROPERTY(qvim::PopupMenuModel*  popupmenu  READ popupmenu  CONSTANT)
@@ -41,6 +43,7 @@ public:
 
     GridModel*      grid()       const { return m_grid; }
     HighlightTable* highlights() const { return m_hl; }
+    MessagesModel*  messages()   const { return m_messages; }
     ModeInfo*       modeInfo()   const { return m_mode; }
     TablineModel*   tabline()    const { return m_tabline; }
     PopupMenuModel* popupmenu()  const { return m_popupmenu; }
@@ -64,10 +67,10 @@ signals:
     void flush();   // emitted after each redraw batch — UI should repaint here
     void bell();
     void disconnected();
-    void customNotification(const QString& method, qvim::ObjectHandlePtr params);
+    void customNotification(const qvim::Notification& note);
 
 private slots:
-    void onNotification(const QString& method, qvim::ObjectHandlePtr params);
+    void onNotification(const qvim::Notification& note);
     void onRpcDisconnected();
 
 private:
@@ -77,6 +80,7 @@ private:
     MsgpackRpc*     m_rpc       = nullptr;
     GridModel*      m_grid      = nullptr;
     HighlightTable* m_hl        = nullptr;
+    MessagesModel*  m_messages  = nullptr;
     ModeInfo*       m_mode      = nullptr;
     TablineModel*   m_tabline   = nullptr;
     PopupMenuModel* m_popupmenu = nullptr;

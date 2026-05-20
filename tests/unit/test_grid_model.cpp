@@ -100,6 +100,42 @@ private slots:
         QCOMPARE(g.cursorCol(), 3);
     }
 
+    void wideGlyphMarksRightHalf() {
+        // A wide glyph (CJK) is emitted by Neovim as the glyph followed by an
+        // entry with empty text marking the trailing half. The model should
+        // record the left cell with the glyph and doubleWidth=false, and the
+        // right cell as an empty string with doubleWidth=true.
+        GridModel g;
+        g.resize(4, 1);
+        auto cells = packGridLineCells({{"\xE5\xAD\x97", 1, -1}, {"", 1, -1}, {"a", 1, -1}});
+        g.applyLine(0, 0, cells.get());
+        QCOMPARE(g.cell(0, 0).text, QString::fromUtf8("\xE5\xAD\x97"));
+        QCOMPARE(g.cell(0, 0).doubleWidth, false);
+        QCOMPARE(g.cell(0, 1).text, QStringLiteral(""));
+        QCOMPARE(g.cell(0, 1).doubleWidth, true);
+        QCOMPARE(g.cell(0, 2).text, QStringLiteral("a"));
+        QCOMPARE(g.cell(0, 2).doubleWidth, false);
+    }
+
+    void consecutiveEmptyEntriesAreBlanks() {
+        // Two consecutive empty-text entries that do not follow a non-empty
+        // glyph must both be treated as legitimate blanks, not right-half
+        // markers. Only an empty entry immediately following a non-empty cell
+        // is the trailing half of a wide glyph.
+        GridModel g;
+        g.resize(4, 1);
+        auto cells = packGridLineCells({{"", 1, -1}, {"", 1, -1}, {"x", 1, -1}, {"", 1, -1}});
+        g.applyLine(0, 0, cells.get());
+        QCOMPARE(g.cell(0, 0).text, QStringLiteral(" "));
+        QCOMPARE(g.cell(0, 0).doubleWidth, false);
+        QCOMPARE(g.cell(0, 1).text, QStringLiteral(" "));
+        QCOMPARE(g.cell(0, 1).doubleWidth, false);
+        QCOMPARE(g.cell(0, 2).text, QStringLiteral("x"));
+        QCOMPARE(g.cell(0, 2).doubleWidth, false);
+        QCOMPARE(g.cell(0, 3).text, QStringLiteral(""));
+        QCOMPARE(g.cell(0, 3).doubleWidth, true);
+    }
+
     void dumpAsciiSnapshot() {
         GridModel g;
         g.resize(3, 2);

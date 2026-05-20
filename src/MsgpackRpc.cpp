@@ -31,7 +31,7 @@ bool MsgpackRpc::startEmbeddedNvim(const QString& nvimExe, const QStringList& ex
     m_process->setProcessChannelMode(QProcess::SeparateChannels);
 
     QStringList args;
-    args << QStringLiteral("--embed") << QStringLiteral("--clean");
+    args << QStringLiteral("--embed");
     args.append(extraArgs);
 
     connect(m_process.get(), &QProcess::readyReadStandardOutput, this, &MsgpackRpc::onReadyRead);
@@ -135,10 +135,10 @@ void MsgpackRpc::dispatchUnpacked(ObjectHandlePtr handle) {
     }
 
     if (type == kMsgTypeNotification && arr.size == 3) {
-        const QString method = QString::fromStdString(arr.ptr[1].as<std::string>());
-        // Contract: 'params' wraps the full [type, method, params] message.
-        // Receivers extract the params object via paramsView(params).
-        emit notification(method, handle);
+        QString method = QString::fromStdString(arr.ptr[1].as<std::string>());
+        // The handle keeps the msgpack arena alive; Notification::params()
+        // extracts the params object lazily on demand.
+        emit notification(Notification{std::move(method), std::move(handle)});
         return;
     }
 

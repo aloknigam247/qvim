@@ -15,16 +15,16 @@ Rectangle {
         Text {
             text: $connector.cmdline.firstChar.length > 0 ? $connector.cmdline.firstChar : ""
             color: "#9cdcfe"
-            font.family: "Cascadia Mono"
-            font.pointSize: 11
+            font.family: "JetBrains Mono Nerd Font"
+            font.pointSize: 14
             anchors.verticalCenter: parent.verticalCenter
         }
 
         Text {
             text: $connector.cmdline.prompt
             color: "#d4d4d4"
-            font.family: "Cascadia Mono"
-            font.pointSize: 11
+            font.family: "JetBrains Mono Nerd Font"
+            font.pointSize: 14
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -32,8 +32,8 @@ Rectangle {
             id: contentText
             text: $connector.cmdline.content
             color: "#d4d4d4"
-            font.family: "Cascadia Mono"
-            font.pointSize: 11
+            font.family: "JetBrains Mono Nerd Font"
+            font.pointSize: 14
             anchors.verticalCenter: parent.verticalCenter
         }
 

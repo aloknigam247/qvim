@@ -1,10 +1,8 @@
 import QtQuick
 import QtQuick.Window
-import QtQuick.Controls
-import QtQuick.Layouts
 import Qvim 1.0
 
-ApplicationWindow {
+Window {
     id: window
     width: 1200
     height: 800
@@ -18,25 +16,30 @@ ApplicationWindow {
         $connector.attachUi(cols, rows)
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
+    Tabline {
+        id: tabline
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        visible: $connector.tabline.rowCount() > 0
+        height: visible ? 28 : 0
+    }
 
-        Tabline {
-            Layout.fillWidth: true
-            visible: $connector.tabline.rowCount() > 0
-        }
+    Shell {
+        id: shell
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: tabline.bottom
+        anchors.bottom: cmdline.visible ? cmdline.top : parent.bottom
+    }
 
-        Shell {
-            id: shell
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-        }
-
-        Cmdline {
-            Layout.fillWidth: true
-            visible: $connector.cmdline.visible
-        }
+    Cmdline {
+        id: cmdline
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: $connector.cmdline.visible
+        height: visible ? 28 : 0
     }
 
     PopupMenu {
@@ -46,5 +49,10 @@ ApplicationWindow {
         cellWidth: shell.cellWidth
         cellHeight: shell.cellHeight
         z: 100
+    }
+
+    Messages {
+        anchors.fill: parent
+        z: 200
     }
 }

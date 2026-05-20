@@ -12,7 +12,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 option(QVIM_ENABLE_ASAN "Build with MSVC AddressSanitizer" OFF)
 option(BUILD_TESTING "Build the test suites" ON)
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test QuickTest)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickTest Test)
 find_package(msgpack-cxx CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.10)
@@ -29,6 +29,7 @@ set(QVIM_LIB_SOURCES
     src/MsgpackRpc.cpp        src/MsgpackRpc.h
     src/NvimConnector.cpp     src/NvimConnector.h
     src/HighlightTable.cpp    src/HighlightTable.h
+    src/MessagesModel.cpp     src/MessagesModel.h
     src/ModeInfo.cpp          src/ModeInfo.h
     src/GridModel.cpp         src/GridModel.h
     src/GridItem.cpp          src/GridItem.h
@@ -48,7 +49,6 @@ target_link_libraries(qvim_lib
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
-        Qt6::QuickControls2
         msgpack-cxx
 )
 set_target_properties(qvim_lib PROPERTIES AUTOMOC ON)
@@ -57,18 +57,19 @@ qt_add_qml_module(qvim_lib
     URI Qvim
     VERSION 1.0
     QML_FILES
+        qml/Cmdline.qml
         qml/Main.qml
+        qml/Messages.qml
+        qml/PopupMenu.qml
         qml/Shell.qml
         qml/Tabline.qml
-        qml/PopupMenu.qml
-        qml/Cmdline.qml
 )
 
 qt_add_executable(qvim src/main.cpp)
 target_link_libraries(qvim PRIVATE qvim_lib qvim_libplugin)
 set_target_properties(qvim PROPERTIES WIN32_EXECUTABLE TRUE)
 
-if(WIN32)
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     # vcpkg's Qt install splits debug/release across separate prefixes, and
     # windeployqt can't be redirected to the debug prefix. We deploy the
     # minimum runtime ourselves: Qt DLLs, the platform plugin, and the QML
@@ -123,3 +124,21 @@ if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# --- Release deployment ---
+# For non-Debug builds, use Qt's deployment helper to gather all runtime
+# dependencies at install time. windeployqt doesn't support vcpkg's debug
+# prefix layout, so we only run this for Release-style builds.
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug" AND WIN32)
+    qt_generate_deploy_app_script(
+        TARGET qvim
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${deploy_script})
+endif()
+
+install(TARGETS qvim
+    RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .
+)

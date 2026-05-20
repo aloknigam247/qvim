@@ -90,7 +90,16 @@ QString InputHandler::keyToNvim(QKeyEvent* ev) {
             Qt::KeyboardModifiers rest = mods;
             // Shift is already encoded by uppercase when text reflects it; strip it.
             rest &= ~Qt::ShiftModifier;
-            return QStringLiteral("<%1%2>").arg(modString(rest), escapeLiteral(c));
+            // Inside a <...> token the angle brackets themselves must be
+            // referred to by name, otherwise the keycode is ambiguous
+            // (e.g. <C-<lt>> would nest brackets; <C->> would terminate early).
+            QString keyPart;
+            if      (c == QChar('<'))  keyPart = QStringLiteral("lt");
+            else if (c == QChar('>'))  keyPart = QStringLiteral("gt");
+            else if (c == QChar(' '))  keyPart = QStringLiteral("Space");
+            else if (c == QChar('|'))  keyPart = QStringLiteral("Bar");
+            else                       keyPart = QString(c);
+            return QStringLiteral("<%1%2>").arg(modString(rest), keyPart);
         }
 
         if (c == QChar('<')) return QStringLiteral("<lt>");

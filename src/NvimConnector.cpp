@@ -2,6 +2,7 @@
 #include "MsgpackRpc.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
+#include "MessagesModel.h"
 #include "ModeInfo.h"
 #include "TablineModel.h"
 #include "PopupMenuModel.h"
@@ -34,6 +35,7 @@ NvimConnector::NvimConnector(QObject* parent)
     , m_rpc(new MsgpackRpc(this))
     , m_grid(new GridModel(this))
     , m_hl(new HighlightTable(this))
+    , m_messages(new MessagesModel(this))
     , m_mode(new ModeInfo(this))
     , m_tabline(new TablineModel(this))
     , m_popupmenu(new PopupMenuModel(this))
@@ -55,12 +57,19 @@ bool NvimConnector::attachUi(int cols, int rows) {
             pk.pack_array(3);
             pk.pack(static_cast<int64_t>(cols));
             pk.pack(static_cast<int64_t>(rows));
-            pk.pack_map(5);
+            // Diagnostic mode: every non-core extension disabled to bisect the
+            // residual focus-loss-after-':' bug. Re-enable by flipping the
+            // matching bool back to true once the offending feature is found.
+            // The C++ dispatch handlers, QML overlays, and models all remain
+            // wired in — nvim simply won't emit the events that drive them.
+            pk.pack_map(7);
             pk.pack("rgb");            pk.pack(true);
             pk.pack("ext_linegrid");   pk.pack(true);
-            pk.pack("ext_tabline");    pk.pack(true);
-            pk.pack("ext_popupmenu");  pk.pack(true);
-            pk.pack("ext_cmdline");    pk.pack(true);
+            pk.pack("ext_multigrid");  pk.pack(false);
+            pk.pack("ext_tabline");    pk.pack(false);
+            pk.pack("ext_popupmenu");  pk.pack(false);
+            pk.pack("ext_cmdline");    pk.pack(false);
+            pk.pack("ext_messages");   pk.pack(false);
         },
         [this](RpcResult res) {
             if (res) {
@@ -131,12 +140,12 @@ void NvimConnector::execLua(const QString& code) {
         }, nullptr);
 }
 
-void NvimConnector::onNotification(const QString& method, qvim::ObjectHandlePtr params) {
-    if (method == QStringLiteral("redraw")) {
-        handleRedraw(paramsView(params));
+void NvimConnector::onNotification(const qvim::Notification& note) {
+    if (note.method == QStringLiteral("redraw")) {
+        handleRedraw(note.params());
         return;
     }
-    emit customNotification(method, std::move(params));
+    emit customNotification(note);
 }
 
 void NvimConnector::onRpcDisconnected() {
@@ -165,26 +174,94 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
     const auto& a = evt.via.array;
 
     if (name == "grid_resize") {
-        if (a.size >= 3) m_grid->resize(asInt(a.ptr[1]), asInt(a.ptr[2]));
+        // [grid, width, height]
+        if (a.size >= 3) m_grid->resize(static_cast<int>(asInt(a.ptr[0])),
+                                        static_cast<int>(asInt(a.ptr[1])),
+                                        static_cast<int>(asInt(a.ptr[2])));
         return;
     }
     if (name == "grid_clear") {
-        m_grid->clear();
+        // [grid]
+        if (a.size >= 1) m_grid->clear(static_cast<int>(asInt(a.ptr[0])));
         return;
     }
     if (name == "grid_cursor_goto") {
-        if (a.size >= 3) m_grid->setCursor(asInt(a.ptr[1]), asInt(a.ptr[2]));
+        // [grid, row, col]
+        if (a.size >= 3) m_grid->setCursor(static_cast<int>(asInt(a.ptr[0])),
+                                           static_cast<int>(asInt(a.ptr[1])),
+                                           static_cast<int>(asInt(a.ptr[2])));
         return;
     }
     if (name == "grid_line") {
-        if (a.size >= 4) m_grid->applyLine(asInt(a.ptr[1]), asInt(a.ptr[2]), a.ptr[3]);
+        // [grid, row, col_start, cells, wrap?]
+        if (a.size >= 4) m_grid->applyLine(static_cast<int>(asInt(a.ptr[0])),
+                                           static_cast<int>(asInt(a.ptr[1])),
+                                           static_cast<int>(asInt(a.ptr[2])),
+                                           a.ptr[3]);
         return;
     }
     if (name == "grid_scroll") {
+        // [grid, top, bot, left, right, rows, cols]
         if (a.size >= 7) {
-            m_grid->scroll(asInt(a.ptr[1]), asInt(a.ptr[2]),
-                           asInt(a.ptr[3]), asInt(a.ptr[4]),
-                           asInt(a.ptr[5]));
+            m_grid->scroll(static_cast<int>(asInt(a.ptr[0])),
+                           static_cast<int>(asInt(a.ptr[1])),
+                           static_cast<int>(asInt(a.ptr[2])),
+                           static_cast<int>(asInt(a.ptr[3])),
+                           static_cast<int>(asInt(a.ptr[4])),
+                           static_cast<int>(asInt(a.ptr[5])));
+        }
+        return;
+    }
+    if (name == "grid_destroy") {
+        // [grid]
+        if (a.size >= 1) m_grid->destroyGrid(static_cast<int>(asInt(a.ptr[0])));
+        return;
+    }
+    if (name == "win_pos") {
+        // [grid, win, start_row, start_col, width, height]
+        if (a.size >= 6) {
+            m_grid->setPos(static_cast<int>(asInt(a.ptr[0])),
+                           static_cast<int>(asInt(a.ptr[3])),  // x = start_col
+                           static_cast<int>(asInt(a.ptr[2])),  // y = start_row
+                           static_cast<int>(asInt(a.ptr[4])),  // w
+                           static_cast<int>(asInt(a.ptr[5]))); // h
+        }
+        return;
+    }
+    if (name == "win_float_pos") {
+        // [grid, win, anchor, anchor_grid, anchor_row, anchor_col, focusable, zindex]
+        if (a.size >= 8) {
+            m_grid->setFloatPos(static_cast<int>(asInt(a.ptr[0])),
+                                static_cast<int>(asInt(a.ptr[3])),
+                                static_cast<int>(asInt(a.ptr[4])),
+                                static_cast<int>(asInt(a.ptr[5])),
+                                static_cast<int>(asInt(a.ptr[7])));
+        }
+        return;
+    }
+    if (name == "win_external_pos") {
+        // [grid, win]
+        if (a.size >= 1) m_grid->setExternalPos(static_cast<int>(asInt(a.ptr[0])));
+        return;
+    }
+    if (name == "win_hide") {
+        // [grid]
+        if (a.size >= 1) m_grid->setHidden(static_cast<int>(asInt(a.ptr[0])));
+        return;
+    }
+    if (name == "win_close") {
+        // [grid] — like destroy, but issued when the window is closed
+        if (a.size >= 1) m_grid->destroyGrid(static_cast<int>(asInt(a.ptr[0])));
+        return;
+    }
+    if (name == "win_viewport") {
+        // [grid, win, topline, botline, curline, curcol, line_count?, scroll_delta?]
+        if (a.size >= 6) {
+            m_grid->setViewport(static_cast<int>(asInt(a.ptr[0])),
+                                static_cast<int>(asInt(a.ptr[2])),
+                                static_cast<int>(asInt(a.ptr[3])),
+                                static_cast<int>(asInt(a.ptr[4])),
+                                static_cast<int>(asInt(a.ptr[5])));
         }
         return;
     }
@@ -286,8 +363,39 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
         emit flush();
         return;
     }
+    if (name == "msg_show") {
+        // [kind, content, replace_last] (history flag in newer nvim, ignored)
+        if (a.size >= 3) {
+            m_messages->msgShow(a.ptr[0], a.ptr[1], asBool(a.ptr[2]));
+        }
+        return;
+    }
+    if (name == "msg_clear") {
+        m_messages->msgClear();
+        return;
+    }
+    if (name == "msg_history_show") {
+        if (a.size >= 1) m_messages->msgHistoryShow(a.ptr[0]);
+        return;
+    }
+    if (name == "msg_showmode") {
+        if (a.size >= 1) m_messages->msgShowMode(a.ptr[0]);
+        return;
+    }
+    if (name == "msg_showcmd") {
+        if (a.size >= 1) m_messages->msgShowCmd(a.ptr[0]);
+        return;
+    }
+    if (name == "msg_ruler") {
+        if (a.size >= 1) m_messages->msgRuler(a.ptr[0]);
+        return;
+    }
+    if (name == "msg_history_clear") {
+        // history cleared on nvim side — no UI state to update for v1.
+        return;
+    }
     // mouse_on, mouse_off, busy_start, busy_stop, set_icon, update_menu,
-    // hl_group_set, grid_destroy, win_*, msg_*, wildmenu_* — ignored in v0.
+    // hl_group_set, msg_set_pos, wildmenu_* — ignored in v0.
 }
 
 } // namespace qvim

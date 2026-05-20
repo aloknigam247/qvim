@@ -37,8 +37,8 @@ Rectangle {
                 Text {
                     text: model.word
                     color: "#d4d4d4"
-                    font.family: "Cascadia Mono"
-                    font.pointSize: 10
+                    font.family: "JetBrains Mono Nerd Font"
+                    font.pointSize: 14
                     width: 150
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
@@ -46,13 +46,15 @@ Rectangle {
                 Text {
                     text: model.kind
                     color: "#9cdcfe"
-                    font.pointSize: 9
+                    font.family: "JetBrains Mono Nerd Font"
+                    font.pointSize: 14
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: model.menu
                     color: "#808080"
-                    font.pointSize: 9
+                    font.family: "JetBrains Mono Nerd Font"
+                    font.pointSize: 14
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }

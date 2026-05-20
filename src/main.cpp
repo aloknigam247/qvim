@@ -1,7 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QQuickStyle>
 #include <QStandardPaths>
 #include <QFileInfo>
 #include <QDir>
@@ -25,7 +24,7 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("qvim"));
     app.setOrganizationName(QStringLiteral("qvim"));
-    QQuickStyle::setStyle(QStringLiteral("Basic"));
+    qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
 
     qvim::NvimConnector connector;
