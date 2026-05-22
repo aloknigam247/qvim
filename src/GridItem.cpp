@@ -259,6 +259,73 @@ void GridItem::paint(QPainter* painter) {
     const int rows = g->gridRows(m_gridId);
     const QColor defaultBg = h->defaultBg();
 
+    // Rounded-corner pass for Visual selection. Walk the grid, collect
+    // contiguous per-row spans of cells whose hl_id has the Visual flag
+    // (set from ext_hlstate's info array on hl_attr_define). Draw each
+    // span as one rounded shape with corners rounded only where the
+    // adjacent row has no Visual cell at the boundary column, so a
+    // multi-row selection appears continuous with rounded outer corners
+    // and flush inner seams. Drawn before the main run loop so glyphs
+    // paint on top; the main loop skips per-cell bg fills for Visual
+    // cells to avoid painting a rectangle over the rounded pill.
+    {
+        struct VisualSpan {
+            int row;
+            int c0;
+            int c1;
+            int hlId;
+        };
+        QVarLengthArray<VisualSpan, 32> spans;
+        for (int r = 0; r < rows; ++r) {
+            int c = 0;
+            while (c < cols) {
+                const Cell& cell = g->cell(m_gridId, r, c);
+                if (!h->isVisual(cell.hlId)) { ++c; continue; }
+                const int c0 = c;
+                const int spanHl = cell.hlId;
+                while (c < cols && h->isVisual(g->cell(m_gridId, r, c).hlId)) ++c;
+                spans.push_back({r, c0, c, spanHl});
+            }
+        }
+
+        if (!spans.empty()) {
+            const qreal radius = std::min(m_cellHeight * 0.25, m_cellWidth * 0.6);
+            auto isVisualAt = [&](int r, int c) -> bool {
+                if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
+                return h->isVisual(g->cell(m_gridId, r, c).hlId);
+            };
+
+            painter->save();
+            painter->setRenderHint(QPainter::Antialiasing, true);
+            painter->setPen(Qt::NoPen);
+            for (const VisualSpan& s : spans) {
+                const HlAttr a = h->resolved(s.hlId);
+                if (!a.bg.isValid() || a.bg == defaultBg) continue;
+                const qreal x0 = s.c0 * m_cellWidth;
+                const qreal x1 = s.c1 * m_cellWidth;
+                const qreal y0 = s.row * m_cellHeight;
+                const qreal y1 = (s.row + 1) * m_cellHeight;
+                const bool tl = !isVisualAt(s.row - 1, s.c0);
+                const bool tr = !isVisualAt(s.row - 1, s.c1 - 1);
+                const bool bl = !isVisualAt(s.row + 1, s.c0);
+                const bool br = !isVisualAt(s.row + 1, s.c1 - 1);
+                QPainterPath path;
+                path.moveTo(tl ? x0 + radius : x0, y0);
+                path.lineTo(tr ? x1 - radius : x1, y0);
+                if (tr) path.quadTo(x1, y0, x1, y0 + radius);
+                path.lineTo(x1, br ? y1 - radius : y1);
+                if (br) path.quadTo(x1, y1, x1 - radius, y1);
+                path.lineTo(bl ? x0 + radius : x0, y1);
+                if (bl) path.quadTo(x0, y1, x0, y1 - radius);
+                path.lineTo(x0, tl ? y0 + radius : y0);
+                if (tl) path.quadTo(x0, y0, x0 + radius, y0);
+                path.closeSubpath();
+                painter->fillPath(path, a.bg);
+            }
+            painter->restore();
+        }
+    }
+
     // Lazy cache of per-hl_id QFont. Building a QFont and calling
     // setBold/setItalic/setUnderline/setStrikeOut on every run is expensive
     // (QFontPrivate detach + re-resolve). Cache keyed by hl_id is safe because
@@ -288,7 +355,7 @@ void GridItem::paint(QPainter* painter) {
 
             const HlAttr a = h->resolved(runHl);
             const QRectF runRect(c * m_cellWidth, y, (runEnd - c) * m_cellWidth, m_cellHeight);
-            if (a.bg != defaultBg) {
+            if (a.bg != defaultBg && !h->isVisual(runHl)) {
                 painter->fillRect(runRect, a.bg);
             }
 
