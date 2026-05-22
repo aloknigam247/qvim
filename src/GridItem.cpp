@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QQuickWindow>
 #include <QRawFont>
 #include <QRegularExpression>
 #include <QVarLengthArray>
@@ -71,8 +72,9 @@ void GridItem::setConnector(NvimConnector* c) {
     if (m_conn) disconnect(m_conn, nullptr, this, nullptr);
     m_conn = c;
     if (m_conn) {
-        connect(m_conn, &NvimConnector::guifontChanged, this, &GridItem::onGuifontChanged);
-        connect(m_conn, &NvimConnector::flush,          this, &GridItem::onFlush);
+        connect(m_conn, &NvimConnector::guifontChanged,   this, &GridItem::onGuifontChanged);
+        connect(m_conn, &NvimConnector::linespaceChanged, this, &GridItem::onLinespaceChanged);
+        connect(m_conn, &NvimConnector::flush,            this, &GridItem::onFlush);
         if (auto* g = grid()) {
             connect(g, &GridModel::sizeChanged,   this, [this]{ update(); });
             connect(g, &GridModel::cursorChanged, this, [this]{ update(); });
@@ -118,14 +120,58 @@ void GridItem::setDebugOverlay(bool v) {
 void GridItem::recomputeMetrics() {
     const QFontMetricsF fm(m_font);
     m_cellWidth  = fm.horizontalAdvance(QLatin1Char('M'));
-    m_cellHeight = fm.height();
-    m_baseline   = fm.ascent();
+    // `linespace` is extra vertical pixels added per cell, vim-style: half
+    // above the baseline (raises ascent visually) and half below. We keep the
+    // baseline aligned with the original ascent + linespace/2 so the glyph
+    // sits centred in the taller row.
+    const qreal extra = static_cast<qreal>(std::max(0, m_linespace));
+    m_cellHeight = fm.height() + extra;
+    m_baseline   = fm.ascent() + extra / 2.0;
     if (m_fallback) {
-        // QRawFont takes a pixel size; derive it from the QFont metrics so the
-        // fallback glyphs render at the same visual size as the primary face.
         const qreal pixelSize = fm.ascent() + fm.descent();
         m_fallback->setPrimary(m_fontName, pixelSize);
     }
+}
+
+void GridItem::onLinespaceChanged() {
+    if (!m_conn) return;
+    const int ls = m_conn->linespace();
+    if (ls == m_linespace) return;
+    m_linespace = ls;
+    recomputeMetrics();
+    emit fontChanged();
+    resizeWindowToGrid();
+    update();
+}
+
+void GridItem::resizeWindowToGrid() {
+    if (m_gridId != 1) return;
+    auto* g = grid();
+    if (!g) return;
+    const int cols = g->gridCols(1);
+    const int rows = g->gridRows(1);
+    if (cols <= 0 || rows <= 0) return;
+    auto* win = window();
+    if (!win) return;
+    // +1px on each axis so the integer-division in maybeResizeUi
+    //   cols == int(width() / m_cellWidth)
+    // doesn't round down due to qreal cellWidth float-imprecision, which
+    // would otherwise look like a geometry change requiring try_resize.
+    const int newW = static_cast<int>(std::ceil(cols * m_cellWidth)) + 1;
+    const int newH = static_cast<int>(std::ceil(rows * m_cellHeight)) + 1;
+    if (newW <= 0 || newH <= 0) return;
+    // Suppress the geometryChange-driven nvim_ui_try_resize that would
+    // otherwise loop back through nvim and re-emit grid_resize. The metric
+    // change is the cause; nvim's grid is already authoritative.
+    //
+    // The Qt window resize is processed asynchronously: the resulting
+    // geometryChange on this item may fire AFTER this function returns, so
+    // we defer clearing the flag via a 0-delay singleShot. This still runs
+    // before the next paint and well before any user input could trigger
+    // another resize.
+    m_suppressGeometryResize = true;
+    win->resize(newW, newH);
+    QTimer::singleShot(0, this, [this]{ m_suppressGeometryResize = false; });
 }
 
 void GridItem::onGuifontChanged() {
@@ -139,7 +185,7 @@ void GridItem::onGuifontChanged() {
     m_font.setPointSizeF(size);
     recomputeMetrics();
     emit fontChanged();
-    maybeResizeUi();
+    resizeWindowToGrid();
     update();
 }
 
@@ -180,6 +226,7 @@ void GridItem::maybeResizeUi() {
 
 void GridItem::geometryChange(const QRectF& newGeom, const QRectF& oldGeom) {
     QQuickPaintedItem::geometryChange(newGeom, oldGeom);
+    if (m_suppressGeometryResize) return;
     maybeResizeUi();
 }
 

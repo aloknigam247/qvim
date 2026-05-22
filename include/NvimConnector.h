@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QString>
 #include <QStringList>
+#include <QVariant>
 #include <qqmlregistration.h>
 
 #include <functional>
@@ -47,6 +48,18 @@ class NvimConnector : public QObject {
     Q_PROPERTY(qreal                  guifontSize   READ guifontSize   NOTIFY guifontChanged)
     Q_PROPERTY(bool                   attached      READ attached      NOTIFY attachedChanged)
     Q_PROPERTY(QColor                 defaultBackground READ defaultBackground NOTIFY defaultBackgroundChanged)
+    // ui-options propagated live from nvim via option_set redraw events.
+    Q_PROPERTY(bool    arabicshape    READ arabicshape    NOTIFY arabicshapeChanged)
+    Q_PROPERTY(QString ambiwidth      READ ambiwidth      NOTIFY ambiwidthChanged)
+    Q_PROPERTY(bool    emoji          READ emoji          NOTIFY emojiChanged)
+    Q_PROPERTY(QString guifontwide    READ guifontwide    NOTIFY guifontwideChanged)
+    Q_PROPERTY(int     linespace      READ linespace      NOTIFY linespaceChanged)
+    Q_PROPERTY(bool    mousefocus     READ mousefocus     NOTIFY mousefocusChanged)
+    Q_PROPERTY(bool    mousehide      READ mousehide      NOTIFY mousehideChanged)
+    Q_PROPERTY(bool    mousemoveevent READ mousemoveevent NOTIFY mousemoveeventChanged)
+    Q_PROPERTY(int     pumblend       READ pumblend       NOTIFY pumblendChanged)
+    Q_PROPERTY(int     showtabline    READ showtabline    NOTIFY showtablineChanged)
+    Q_PROPERTY(bool    termguicolors  READ termguicolors  NOTIFY termguicolorsChanged)
 
 public:
     explicit NvimConnector(QObject* parent = nullptr);
@@ -76,6 +89,18 @@ public:
     bool            attached()      const { return m_attached; }
     QColor          defaultBackground() const { return m_hl->defaultBg(); }
 
+    bool    arabicshape()    const { return m_arabicshape; }
+    QString ambiwidth()      const { return m_ambiwidth; }
+    bool    emoji()          const { return m_emoji; }
+    QString guifontwide()    const { return m_guifontwide; }
+    int     linespace()      const { return m_linespace; }
+    bool    mousefocus()     const { return m_mousefocus; }
+    bool    mousehide()      const { return m_mousehide; }
+    bool    mousemoveevent() const { return m_mousemoveevent; }
+    int     pumblend()       const { return m_pumblend; }
+    int     showtabline()    const { return m_showtabline; }
+    bool    termguicolors()  const { return m_termguicolors; }
+
     Q_INVOKABLE void input(const QString& keys);
     Q_INVOKABLE void inputMouse(const QString& button, const QString& action,
                                 const QString& modifier, int grid, int row, int col);
@@ -89,6 +114,10 @@ public:
     Q_INVOKABLE void paste(const QString& text);
     Q_INVOKABLE void command(const QString& cmd);
     Q_INVOKABLE void execLua(const QString& code);
+    // Direct option_set entry point. Used by the redraw dispatch (after
+    // unpacking the msgpack value to QVariant) and by unit tests that don't
+    // want to spin up an nvim process. O(1) per call.
+    Q_INVOKABLE void onOptionSet(const QString& name, const QVariant& value);
 
 signals:
     void titleChanged();
@@ -100,6 +129,17 @@ signals:
     void bell();
     void disconnected();
     void customNotification(const qvim::Notification& note);
+    void arabicshapeChanged();
+    void ambiwidthChanged();
+    void emojiChanged();
+    void guifontwideChanged();
+    void linespaceChanged();
+    void mousefocusChanged();
+    void mousehideChanged();
+    void mousemoveeventChanged();
+    void pumblendChanged();
+    void showtablineChanged();
+    void termguicolorsChanged();
 
 private slots:
     void onNotification(const qvim::Notification& note);
@@ -122,6 +162,19 @@ private:
     QString m_title;
     QString m_guifont;
     bool    m_attached = false;
+
+    // Defaults match the nvim ui-options defaults (see :h ui-options).
+    bool    m_arabicshape    = true;
+    QString m_ambiwidth      = QStringLiteral("single");
+    bool    m_emoji          = true;
+    QString m_guifontwide;
+    int     m_linespace      = 0;
+    bool    m_mousefocus     = false;
+    bool    m_mousehide      = true;
+    bool    m_mousemoveevent = false;
+    int     m_pumblend       = 0;
+    int     m_showtabline    = 1;
+    bool    m_termguicolors  = false;
 };
 
 } // namespace qvim

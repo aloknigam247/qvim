@@ -16,23 +16,24 @@ function(qvim_add_test name)
 endfunction()
 
 # Tier 1 — unit / model (guiless)
-qvim_add_test(test_app_icon           unit/test_app_icon.cpp)
-qvim_add_test(test_argv_parser        unit/test_argv_parser.cpp)
-qvim_add_test(test_cmdline_pos        unit/test_cmdline_pos.cpp)
-qvim_add_test(test_config_cli_reader  unit/test_config_cli_reader.cpp)
-qvim_add_test(test_config_g_reader    unit/test_config_g_reader.cpp)
-qvim_add_test(test_config_registry    unit/test_config_registry.cpp)
-qvim_add_test(test_float_focusable    unit/test_float_focusable.cpp)
-qvim_add_test(test_font_fallback      unit/test_font_fallback.cpp)
-qvim_add_test(test_grid_model         unit/test_grid_model.cpp)
-qvim_add_test(test_hidpi_rendering    unit/test_hidpi_rendering.cpp)
-qvim_add_test(test_highlight_table    unit/test_highlight_table.cpp)
-qvim_add_test(test_input_fuzz         unit/test_input_fuzz.cpp)
-qvim_add_test(test_input_handler      unit/test_input_handler.cpp)
-qvim_add_test(test_mouse_input        unit/test_mouse_input.cpp)
-qvim_add_test(test_msgpack_rpc        unit/test_msgpack_rpc.cpp)
-qvim_add_test(test_popupmenu_select   unit/test_popupmenu_select.cpp)
-qvim_add_test(test_resize_coalescer   unit/test_resize_coalescer.cpp)
+qvim_add_test(test_app_icon            unit/test_app_icon.cpp)
+qvim_add_test(test_argv_parser         unit/test_argv_parser.cpp)
+qvim_add_test(test_cmdline_pos         unit/test_cmdline_pos.cpp)
+qvim_add_test(test_config_cli_reader   unit/test_config_cli_reader.cpp)
+qvim_add_test(test_config_g_reader     unit/test_config_g_reader.cpp)
+qvim_add_test(test_config_registry     unit/test_config_registry.cpp)
+qvim_add_test(test_float_focusable     unit/test_float_focusable.cpp)
+qvim_add_test(test_font_fallback       unit/test_font_fallback.cpp)
+qvim_add_test(test_grid_model          unit/test_grid_model.cpp)
+qvim_add_test(test_hidpi_rendering     unit/test_hidpi_rendering.cpp)
+qvim_add_test(test_highlight_table     unit/test_highlight_table.cpp)
+qvim_add_test(test_input_fuzz          unit/test_input_fuzz.cpp)
+qvim_add_test(test_input_handler       unit/test_input_handler.cpp)
+qvim_add_test(test_mouse_input         unit/test_mouse_input.cpp)
+qvim_add_test(test_msgpack_rpc         unit/test_msgpack_rpc.cpp)
+qvim_add_test(test_option_set_dispatch unit/test_option_set_dispatch.cpp)
+qvim_add_test(test_popupmenu_select    unit/test_popupmenu_select.cpp)
+qvim_add_test(test_resize_coalescer    unit/test_resize_coalescer.cpp)
 
 # test_app_icon constructs QGuiApplication and needs the qico imageformat
 # plugin from vcpkg's debug Qt to decode :/icon.ico. The qvim post-build step
@@ -41,6 +42,12 @@ set(QVIM_TEST_IMAGEFORMATS_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARG
 cmake_path(NATIVE_PATH QVIM_TEST_IMAGEFORMATS_DIR QVIM_TEST_IMAGEFORMATS_DIR_NATIVE)
 set_tests_properties(test_app_icon PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QT_PLUGIN_PATH=${QVIM_TEST_IMAGEFORMATS_DIR_NATIVE}"
+)
+# test_option_set_dispatch uses QTEST_MAIN (QGuiApplication) so it needs a
+# resolvable platform plugin too.
+set_tests_properties(test_option_set_dispatch PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE}"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
 )
 
 # Tier 2 — integration (offscreen QPA, real nvim --embed)
@@ -58,6 +65,7 @@ qvim_add_test(test_pixel_snapshot                integration/test_pixel_snapshot
 qvim_add_test(test_popupmenu                     integration/test_popupmenu.cpp)
 qvim_add_test(test_resize                        integration/test_resize.cpp)
 qvim_add_test(test_resize_smoothness             integration/test_resize_smoothness.cpp)
+qvim_add_test(test_runtime_set_options           integration/test_runtime_set_options.cpp)
 qvim_add_test(test_tabline                       integration/test_tabline.cpp)
 qvim_add_test(test_title_updates                 integration/test_title_updates.cpp)
 qvim_add_test(test_titlebar_color                integration/test_titlebar_color.cpp)
@@ -67,6 +75,9 @@ target_link_libraries(test_visual_on_drag PRIVATE qvim_libplugin Qt6::Quick)
 # Nerd-font render test loads Main.qml like the user-smoke harness to drive a
 # real grid through the QML scene; needs the same qvim_libplugin link.
 target_link_libraries(test_nerdfont_render PRIVATE qvim_libplugin Qt6::Quick)
+
+# test_runtime_set_options loads Main.qml under one of its cases.
+target_link_libraries(test_runtime_set_options PRIVATE qvim_libplugin Qt6::Quick)
 
 # User-POV smoke harness loads Main.qml in a real QQuickWindow and drives it
 # via QTest::keyClick — exercises the full focus chain, not just the connector.
@@ -78,9 +89,8 @@ target_link_libraries(test_user_smoke PRIVATE qvim_libplugin Qt6::Quick)
 # events through Qt's hit-test, so they need the same QML registration link.
 target_link_libraries(test_click_focuses_float           PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin Qt6::Quick)
-target_link_libraries(test_nerdfont_render               PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_nerdfont_render test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
+foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_nerdfont_render test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

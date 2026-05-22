@@ -9,6 +9,7 @@
 #include "CmdlineModel.h"
 
 #include <QDebug>
+#include <QVariant>
 
 namespace qvim {
 
@@ -276,6 +277,103 @@ void NvimConnector::execLua(const QString& code) {
         }, nullptr);
 }
 
+void NvimConnector::onOptionSet(const QString& name, const QVariant& value) {
+    // O(1) string-table dispatch. Each branch reads the value typed, compares
+    // against the cached field, and emits NOTIFY only on real change so QML
+    // bindings don't re-evaluate spuriously (relevant for guifont, where a
+    // notify triggers font-cache rebuilds in GridItem).
+    if (name == QStringLiteral("guifont")) {
+        const QString s = value.toString();
+        if (s == m_guifont) return;
+        m_guifont = s;
+        emit guifontChanged();
+        return;
+    }
+    if (name == QStringLiteral("guifontwide")) {
+        const QString s = value.toString();
+        if (s == m_guifontwide) return;
+        m_guifontwide = s;
+        emit guifontwideChanged();
+        return;
+    }
+    if (name == QStringLiteral("linespace")) {
+        const int v = value.toInt();
+        if (v == m_linespace) return;
+        m_linespace = v;
+        emit linespaceChanged();
+        return;
+    }
+    if (name == QStringLiteral("arabicshape")) {
+        const bool v = value.toBool();
+        if (v == m_arabicshape) return;
+        m_arabicshape = v;
+        emit arabicshapeChanged();
+        return;
+    }
+    if (name == QStringLiteral("ambiwidth")) {
+        const QString s = value.toString();
+        if (s == m_ambiwidth) return;
+        m_ambiwidth = s;
+        emit ambiwidthChanged();
+        return;
+    }
+    if (name == QStringLiteral("emoji")) {
+        const bool v = value.toBool();
+        if (v == m_emoji) return;
+        m_emoji = v;
+        emit emojiChanged();
+        return;
+    }
+    if (name == QStringLiteral("mousefocus")) {
+        const bool v = value.toBool();
+        if (v == m_mousefocus) return;
+        m_mousefocus = v;
+        emit mousefocusChanged();
+        return;
+    }
+    if (name == QStringLiteral("mousehide")) {
+        const bool v = value.toBool();
+        if (v == m_mousehide) return;
+        m_mousehide = v;
+        emit mousehideChanged();
+        return;
+    }
+    if (name == QStringLiteral("mousemoveevent")) {
+        const bool v = value.toBool();
+        if (v == m_mousemoveevent) return;
+        m_mousemoveevent = v;
+        emit mousemoveeventChanged();
+        return;
+    }
+    if (name == QStringLiteral("pumblend")) {
+        const int v = value.toInt();
+        if (v == m_pumblend) return;
+        m_pumblend = v;
+        emit pumblendChanged();
+        return;
+    }
+    if (name == QStringLiteral("showtabline")) {
+        const int v = value.toInt();
+        if (v == m_showtabline) return;
+        m_showtabline = v;
+        emit showtablineChanged();
+        return;
+    }
+    if (name == QStringLiteral("termguicolors")) {
+        const bool v = value.toBool();
+        if (v == m_termguicolors) return;
+        m_termguicolors = v;
+        emit termguicolorsChanged();
+        return;
+    }
+    // ext_* flags are GUI-controlled (we set them in nvim_ui_attach); nvim
+    // echoes them back through option_set but we don't react. Log and drop.
+    if (name.startsWith(QStringLiteral("ext_"))) {
+        return;
+    }
+    qDebug() << "option_set: unhandled" << name << value;
+}
+
 void NvimConnector::onNotification(const qvim::Notification& note) {
     if (note.method == QStringLiteral("redraw")) {
         handleRedraw(note.params());
@@ -479,10 +577,21 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
     if (name == "option_set") {
         if (a.size >= 2) {
             const QString opt = asQString(a.ptr[0]);
-            if (opt == QStringLiteral("guifont")) {
-                m_guifont = asQString(a.ptr[1]);
-                emit guifontChanged();
+            const msgpack::object& v = a.ptr[1];
+            QVariant qv;
+            switch (v.type) {
+            case msgpack::type::BOOLEAN:
+                qv = v.via.boolean; break;
+            case msgpack::type::POSITIVE_INTEGER:
+                qv = static_cast<qlonglong>(v.via.u64); break;
+            case msgpack::type::NEGATIVE_INTEGER:
+                qv = static_cast<qlonglong>(v.via.i64); break;
+            case msgpack::type::STR:
+                qv = QString::fromUtf8(v.via.str.ptr, v.via.str.size); break;
+            default:
+                break;
             }
+            onOptionSet(opt, qv);
         }
         return;
     }
