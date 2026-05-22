@@ -6,10 +6,11 @@
 #include <QDir>
 #include <cstdio>
 
+#include "AppIcon.h"
 #include "ArgvParser.h"
+#include "ClipboardBridge.h"
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
-#include "ClipboardBridge.h"
 #include "RecentProjectsModel.h"
 
 namespace {
@@ -47,6 +48,7 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("qvim"));
     app.setOrganizationName(QStringLiteral("qvim"));
+    qvim::setupApplicationIcon(app);
     qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
 

@@ -16,6 +16,7 @@ function(qvim_add_test name)
 endfunction()
 
 # Tier 1 — unit / model (guiless)
+qvim_add_test(test_app_icon         unit/test_app_icon.cpp)
 qvim_add_test(test_argv_parser      unit/test_argv_parser.cpp)
 qvim_add_test(test_cmdline_pos      unit/test_cmdline_pos.cpp)
 qvim_add_test(test_float_focusable  unit/test_float_focusable.cpp)
@@ -26,6 +27,15 @@ qvim_add_test(test_input_fuzz       unit/test_input_fuzz.cpp)
 qvim_add_test(test_input_handler    unit/test_input_handler.cpp)
 qvim_add_test(test_msgpack_rpc      unit/test_msgpack_rpc.cpp)
 qvim_add_test(test_popupmenu_select unit/test_popupmenu_select.cpp)
+
+# test_app_icon constructs QGuiApplication and needs the qico imageformat
+# plugin from vcpkg's debug Qt to decode :/icon.ico. The qvim post-build step
+# stages plugins next to qvim.exe; point QT_PLUGIN_PATH at that staging dir.
+set(QVIM_TEST_IMAGEFORMATS_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/Qt6/plugins")
+cmake_path(NATIVE_PATH QVIM_TEST_IMAGEFORMATS_DIR QVIM_TEST_IMAGEFORMATS_DIR_NATIVE)
+set_tests_properties(test_app_icon PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QT_PLUGIN_PATH=${QVIM_TEST_IMAGEFORMATS_DIR_NATIVE}"
+)
 
 # Tier 2 — integration (offscreen QPA, real nvim --embed)
 qvim_add_test(test_attach_and_render             integration/test_attach_and_render.cpp)

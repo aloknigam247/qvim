@@ -26,6 +26,7 @@ if(MSVC)
 endif()
 
 set(QVIM_LIB_SOURCES
+    src/AppIcon.cpp           src/AppIcon.h
     src/ArgvParser.cpp        src/ArgvParser.h
     src/MsgpackRpc.cpp        src/MsgpackRpc.h
     src/NvimConnector.cpp     src/NvimConnector.h
@@ -42,7 +43,7 @@ set(QVIM_LIB_SOURCES
     src/RecentProjectsModel.cpp src/RecentProjectsModel.h
 )
 
-qt_add_library(qvim_lib STATIC ${QVIM_LIB_SOURCES})
+qt_add_library(qvim_lib STATIC ${QVIM_LIB_SOURCES} resources/qvim.qrc)
 target_include_directories(qvim_lib PUBLIC src)
 target_link_libraries(qvim_lib
     PUBLIC
@@ -66,7 +67,11 @@ qt_add_qml_module(qvim_lib
         qml/Tabline.qml
 )
 
-qt_add_executable(qvim src/main.cpp)
+if(WIN32)
+    qt_add_executable(qvim src/main.cpp resources/qvim.rc)
+else()
+    qt_add_executable(qvim src/main.cpp)
+endif()
 target_link_libraries(qvim PRIVATE qvim_lib qvim_libplugin)
 set_target_properties(qvim PROPERTIES WIN32_EXECUTABLE TRUE)
 
@@ -109,6 +114,11 @@ Qml2Imports = .
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${QVIM_DEBUG_PLUGINS}/platforms/qminimald.dll"
             "${QVIM_OUT_DIR}/platforms/qminimald.dll"
+        # ICO image format plugin (needed to load :/icon.ico for window icon)
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/imageformats"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QVIM_DEBUG_PLUGINS}/imageformats/qicod.dll"
+            "${QVIM_OUT_DIR}/imageformats/qicod.dll"
         # QML modules used by qvim's QML files
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
             "${QVIM_DEBUG_QML}/QtQuick"          "${QVIM_OUT_DIR}/QtQuick"
