@@ -274,6 +274,7 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
                                 static_cast<int>(asInt(a.ptr[3])),
                                 static_cast<int>(asInt(a.ptr[4])),
                                 static_cast<int>(asInt(a.ptr[5])),
+                                asBool(a.ptr[6]),
                                 static_cast<int>(asInt(a.ptr[7])));
         }
         return;

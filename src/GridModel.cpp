@@ -29,6 +29,12 @@ void GridSurfaceProxy::setFloat(bool isFloat, int zindex) {
     emit floatChanged();
 }
 
+void GridSurfaceProxy::setFocusable(bool focusable) {
+    if (m_isFocusable == focusable) return;
+    m_isFocusable = focusable;
+    emit focusableChanged();
+}
+
 GridModel::GridModel(QObject* parent) : QObject(parent) {
     // The global grid (id=1) always exists; its proxy is created lazily on
     // first ensure() call to keep ctor allocation-free.
@@ -207,10 +213,11 @@ void GridModel::destroyGrid(int gridId) {
 
 void GridModel::setPos(int gridId, int x, int y, int w, int h) {
     GridSurface& s = ensure(gridId);
-    s.x       = x;
-    s.y       = y;
-    s.visible = true;
-    s.isFloat = false;
+    s.x         = x;
+    s.y         = y;
+    s.visible   = true;
+    s.isFloat   = false;
+    s.focusable = true;     // non-float windows are always focusable
     if (w > 0 && h > 0 && (w != s.cols || h != s.rows)) {
         s.cols = w;
         s.rows = h;
@@ -221,22 +228,26 @@ void GridModel::setPos(int gridId, int x, int y, int w, int h) {
     p->setPosition(x, y);
     p->setSize(s.cols, s.rows);
     p->setFloat(false, s.zindex);
+    p->setFocusable(true);
     p->setVisible(true);
     emit gridGeometryChanged(gridId);
 }
 
-void GridModel::setFloatPos(int gridId, int /*anchorGrid*/, int anchorRow, int anchorCol, int zindex) {
+void GridModel::setFloatPos(int gridId, int /*anchorGrid*/, int anchorRow, int anchorCol,
+                            bool focusable, int zindex) {
     GridSurface& s = ensure(gridId);
     // v1: collapse anchor to global-grid coords; full anchor resolution is
     // QML's job once it knows where the anchor grid sits.
-    s.x       = anchorCol;
-    s.y       = anchorRow;
-    s.zindex  = zindex;
-    s.visible = true;
-    s.isFloat = true;
+    s.x         = anchorCol;
+    s.y         = anchorRow;
+    s.zindex    = zindex;
+    s.visible   = true;
+    s.isFloat   = true;
+    s.focusable = focusable;
     auto* p = ensureProxy(gridId);
     p->setPosition(anchorCol, anchorRow);
     p->setFloat(true, zindex);
+    p->setFocusable(focusable);
     p->setVisible(true);
     emit gridGeometryChanged(gridId);
 }
@@ -284,8 +295,9 @@ QRect GridModel::gridGeometry(int gridId) const {
 int GridModel::gridCols(int gridId) const     { const auto* s = surface(gridId); return s ? s->cols    : 0; }
 int GridModel::gridRows(int gridId) const     { const auto* s = surface(gridId); return s ? s->rows    : 0; }
 bool GridModel::gridVisible(int gridId) const { const auto* s = surface(gridId); return s ? s->visible : false; }
-bool GridModel::gridIsFloat(int gridId) const { const auto* s = surface(gridId); return s ? s->isFloat : false; }
-int GridModel::gridZindex(int gridId) const   { const auto* s = surface(gridId); return s ? s->zindex  : 0; }
+bool GridModel::gridIsFloat(int gridId) const     { const auto* s = surface(gridId); return s ? s->isFloat   : false; }
+bool GridModel::gridIsFocusable(int gridId) const { const auto* s = surface(gridId); return s ? s->focusable : true;  }
+int GridModel::gridZindex(int gridId) const       { const auto* s = surface(gridId); return s ? s->zindex    : 0;     }
 
 const Cell& GridModel::cell(int gridId, int row, int col) const {
     static const Cell empty{QStringLiteral(" "), 0, false};

@@ -30,6 +30,10 @@ struct GridSurface {
     int           zindex     = 0;       // for floats
     bool          visible    = true;
     bool          isFloat    = false;
+    // Non-float windows are always focusable; nvim reports the flag only on
+    // win_float_pos. Default true so the QML delegate's MouseArea is enabled
+    // unless explicitly turned off for an unfocusable float.
+    bool          focusable  = true;
     QVector<Cell> cells;                // row-major, size = rows*cols
 };
 
@@ -48,21 +52,23 @@ class GridSurfaceProxy : public QObject {
     Q_PROPERTY(int  cols    READ cols    NOTIFY sizeChanged)
     Q_PROPERTY(int  rows    READ rows    NOTIFY sizeChanged)
     Q_PROPERTY(bool visible READ visible NOTIFY visibilityChanged)
-    Q_PROPERTY(bool isFloat READ isFloat NOTIFY floatChanged)
-    Q_PROPERTY(int  zindex  READ zindex  NOTIFY floatChanged)
+    Q_PROPERTY(bool isFloat     READ isFloat     NOTIFY floatChanged)
+    Q_PROPERTY(int  zindex      READ zindex      NOTIFY floatChanged)
+    Q_PROPERTY(bool isFocusable READ isFocusable NOTIFY focusableChanged)
 
 public:
     explicit GridSurfaceProxy(int id, QObject* parent = nullptr)
         : QObject(parent), m_gridId(id) {}
 
-    int  gridId()  const { return m_gridId; }
-    int  x()       const { return m_x; }
-    int  y()       const { return m_y; }
-    int  cols()    const { return m_cols; }
-    int  rows()    const { return m_rows; }
-    bool visible() const { return m_visible; }
-    bool isFloat() const { return m_isFloat; }
-    int  zindex()  const { return m_zindex; }
+    int  gridId()      const { return m_gridId; }
+    int  x()           const { return m_x; }
+    int  y()           const { return m_y; }
+    int  cols()        const { return m_cols; }
+    int  rows()        const { return m_rows; }
+    bool visible()     const { return m_visible; }
+    bool isFloat()     const { return m_isFloat; }
+    int  zindex()      const { return m_zindex; }
+    bool isFocusable() const { return m_isFocusable; }
 
     // Setters emit only when the value actually changes. Callers in GridModel
     // funnel every surface mutation through these so we don't re-paint or
@@ -71,22 +77,25 @@ public:
     void setSize(int cols, int rows);
     void setVisible(bool v);
     void setFloat(bool isFloat, int zindex);
+    void setFocusable(bool focusable);
 
 signals:
     void positionChanged();
     void sizeChanged();
     void visibilityChanged();
     void floatChanged();
+    void focusableChanged();
 
 private:
     const int m_gridId;
-    int  m_x       = 0;
-    int  m_y       = 0;
-    int  m_cols    = 0;
-    int  m_rows    = 0;
-    bool m_visible = true;
-    bool m_isFloat = false;
-    int  m_zindex  = 0;
+    int  m_x           = 0;
+    int  m_y           = 0;
+    int  m_cols        = 0;
+    int  m_rows        = 0;
+    bool m_visible     = true;
+    bool m_isFloat     = false;
+    int  m_zindex      = 0;
+    bool m_isFocusable = true;
 };
 
 class GridModel : public QObject {
@@ -114,7 +123,7 @@ public:
     void setCursor(int gridId, int row, int col);
     void destroyGrid(int gridId);
     void setPos(int gridId, int x, int y, int w, int h);
-    void setFloatPos(int gridId, int anchorGrid, int anchorRow, int anchorCol, int zindex);
+    void setFloatPos(int gridId, int anchorGrid, int anchorRow, int anchorCol, bool focusable, int zindex);
     void setExternalPos(int gridId);
     void setHidden(int gridId);
     void setViewport(int gridId, int topline, int botline, int curline, int curcol);
@@ -140,6 +149,7 @@ public:
     Q_INVOKABLE int gridRows(int gridId) const;
     Q_INVOKABLE bool gridVisible(int gridId) const;
     Q_INVOKABLE bool gridIsFloat(int gridId) const;
+    Q_INVOKABLE bool gridIsFocusable(int gridId) const;
     Q_INVOKABLE int  gridZindex(int gridId) const;
     // QML binds to the proxy's properties so geometry edits don't destroy the
     // delegate. Returns nullptr for unknown grids; QML handles that gracefully

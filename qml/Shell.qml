@@ -45,6 +45,9 @@ Item {
             width:  surface ? surface.cols * baseGrid.cellWidth  : 0
             height: surface ? surface.rows * baseGrid.cellHeight : 0
             z:      surface && surface.isFloat ? 50 + surface.zindex : 1
+            // Unfocusable floats (e.g. hover doc popups) must let clicks pass
+            // through to the grid underneath rather than swallowing them.
+            enabled: !surface || surface.isFocusable
         }
     }
 
