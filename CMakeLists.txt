@@ -33,6 +33,7 @@ set(QVIM_LIB_SOURCES
     src/HighlightTable.cpp      include/HighlightTable.h
     src/MessagesModel.cpp       include/MessagesModel.h
     src/ModeInfo.cpp            include/ModeInfo.h
+    src/FontFallback.cpp        include/FontFallback.h
     src/GridModel.cpp           include/GridModel.h
     src/GridItem.cpp            include/GridItem.h
     src/InputHandler.cpp        include/InputHandler.h

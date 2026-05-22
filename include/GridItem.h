@@ -5,12 +5,14 @@
 #include <QFontMetricsF>
 #include <QPointer>
 #include <QTimer>
+#include <memory>
 #include <qqmlregistration.h>
 
 #include "NvimConnector.h"
 
 namespace qvim {
 
+class FontFallback;
 class GridModel;
 class HighlightTable;
 class ModeInfo;
@@ -28,6 +30,7 @@ class GridItem : public QQuickPaintedItem {
 
 public:
     explicit GridItem(QQuickItem* parent = nullptr);
+    ~GridItem() override;
 
     void paint(QPainter* painter) override;
 
@@ -91,6 +94,7 @@ private:
     bool     m_debugOverlay = false;
     bool     m_cursorOn     = true;
     QTimer   m_blinkTimer;
+    std::unique_ptr<FontFallback> m_fallback;
 };
 
 } // namespace qvim

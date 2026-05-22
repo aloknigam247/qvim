@@ -1,17 +1,22 @@
 #include "GridItem.h"
 #include "NvimConnector.h"
+#include "FontFallback.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
 #include "ModeInfo.h"
 #include "InputHandler.h"
 
 #include <QElapsedTimer>
+#include <QGlyphRun>
 #include <QHash>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRawFont>
 #include <QRegularExpression>
+#include <QVarLengthArray>
+#include <QVector>
 #include <QWheelEvent>
 #include <QtGlobal>
 #include <climits>
@@ -36,6 +41,8 @@ void parseGuifont(const QString& guifont, QString& family, qreal& size) {
 }
 } // namespace
 
+GridItem::~GridItem() = default;
+
 GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton | Qt::MiddleButton);
     setAcceptHoverEvents(false);
@@ -45,6 +52,7 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     m_font = QFont(m_fontName, m_fontSize);
     m_font.setStyleHint(QFont::Monospace);
     m_font.setHintingPreference(QFont::PreferFullHinting);
+    m_fallback = std::make_unique<FontFallback>();
     recomputeMetrics();
     connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::blinkTick);
     m_blinkTimer.setInterval(500);
@@ -112,6 +120,12 @@ void GridItem::recomputeMetrics() {
     m_cellWidth  = fm.horizontalAdvance(QLatin1Char('M'));
     m_cellHeight = fm.height();
     m_baseline   = fm.ascent();
+    if (m_fallback) {
+        // QRawFont takes a pixel size; derive it from the QFont metrics so the
+        // fallback glyphs render at the same visual size as the primary face.
+        const qreal pixelSize = fm.ascent() + fm.descent();
+        m_fallback->setPrimary(m_fontName, pixelSize);
+    }
 }
 
 void GridItem::onGuifontChanged() {
@@ -232,12 +246,22 @@ void GridItem::paint(QPainter* painter) {
 
             QString runText;
             runText.reserve(runEnd - c);
+            bool runHasNonAscii = false;
             for (int cc = c; cc < runEnd; ++cc) {
                 const Cell& cell = g->cell(m_gridId, r, cc);
                 // Right-half markers of double-width glyphs contribute no glyph
                 // of their own; the left cell's glyph already spans both columns.
                 if (cell.doubleWidth) continue;
-                runText += cell.text.isEmpty() ? QChar(' ') : cell.text;
+                if (cell.text.isEmpty()) {
+                    runText += QChar(' ');
+                } else {
+                    runText += cell.text;
+                    if (!runHasNonAscii) {
+                        for (QChar ch : cell.text) {
+                            if (ch.unicode() >= 0x80) { runHasNonAscii = true; break; }
+                        }
+                    }
+                }
             }
 
             // Only rebuild/apply font when the hl_id (and therefore the font
@@ -262,7 +286,56 @@ void GridItem::paint(QPainter* painter) {
                 lastHlIdPen = runHl;
                 lastPenColor = a.fg;
             }
-            painter->drawText(QPointF(c * m_cellWidth, y + m_baseline), runText);
+            if (!runHasNonAscii) {
+                // Fast path: pure ASCII, primary face handles everything.
+                painter->drawText(QPointF(c * m_cellWidth, y + m_baseline), runText);
+            } else {
+                // Slow path: per-cell resolve so PUA / Nerd Font codepoints land
+                // on the family that actually carries the glyph. drawText is
+                // unreliable here because Qt's text engine will silently swap
+                // the family on us at shape time.
+                for (int cc = c; cc < runEnd; ++cc) {
+                    const Cell& cell = g->cell(m_gridId, r, cc);
+                    if (cell.doubleWidth) continue;
+                    const QString& t = cell.text.isEmpty() ? QString(QChar(' ')) : cell.text;
+                    char32_t cp = 0;
+                    if (!t.isEmpty()) {
+                        if (t.size() >= 2 && t.at(0).isHighSurrogate() && t.at(1).isLowSurrogate()) {
+                            cp = QChar::surrogateToUcs4(t.at(0), t.at(1));
+                        } else {
+                            cp = t.at(0).unicode();
+                        }
+                    }
+                    const QPointF baselinePos(cc * m_cellWidth, y + m_baseline);
+                    if (cp < 0x80 || !m_fallback) {
+                        painter->drawText(baselinePos, t);
+                        continue;
+                    }
+                    const FontFallback::Resolved& res = m_fallback->resolve(cp);
+                    if (res.isPrimary) {
+                        painter->drawText(baselinePos, t);
+                        continue;
+                    }
+                    const QVector<quint32> glyphs = res.raw.glyphIndexesForString(t);
+                    if (glyphs.isEmpty()) {
+                        painter->drawText(baselinePos, t);
+                        continue;
+                    }
+                    QVector<QPointF> positions;
+                    positions.reserve(glyphs.size());
+                    qreal xCursor = 0.0;
+                    const QVector<QPointF> advances = res.raw.advancesForGlyphIndexes(glyphs);
+                    for (int i = 0; i < glyphs.size(); ++i) {
+                        positions.append(QPointF(xCursor, 0.0));
+                        if (i < advances.size()) xCursor += advances.at(i).x();
+                    }
+                    QGlyphRun gr;
+                    gr.setRawFont(res.raw);
+                    gr.setGlyphIndexes(glyphs);
+                    gr.setPositions(positions);
+                    painter->drawGlyphRun(baselinePos, gr);
+                }
+            }
 
             if (a.undercurl) {
                 painter->setPen(a.sp);
