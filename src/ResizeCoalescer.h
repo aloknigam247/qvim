@@ -32,7 +32,10 @@ private:
     int m_pendingRows = -1;
     int m_lastEmittedCols = -1;
     int m_lastEmittedRows = -1;
-    static constexpr int kDefaultIntervalMs = 24;  // ~1.5 frames @60Hz
+    // 0 ms = next event-loop tick. Resize feels instant but Qt still
+    // collapses bursts within a single event-loop iteration into one timer
+    // fire, so we avoid the per-pixel grid_resize storm.
+    static constexpr int kDefaultIntervalMs = 0;
 };
 
 } // namespace qvim
