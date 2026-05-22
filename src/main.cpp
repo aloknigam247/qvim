@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
     qvim::Config cfg;
     cfg.registerOption(QStringLiteral("rounded_highlights"),
                        qvim::ConfigType::StringList,
-                       QStringList{QStringLiteral("Visual")});
+                       QStringList{});
 
     QStringList forwardArgs = cli.nvimForwardArgs;
     qvim::ConfigCliReader::extract(forwardArgs, cfg);
