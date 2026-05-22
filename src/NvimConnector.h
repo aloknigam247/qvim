@@ -45,7 +45,8 @@ public:
     explicit NvimConnector(QObject* parent = nullptr);
     ~NvimConnector() override;
 
-    bool start(const QString& nvimExe = QStringLiteral("nvim"));
+    bool start(const QString& nvimExe = QStringLiteral("nvim"),
+               const QStringList& nvimForwardArgs = {});
     Q_INVOKABLE bool attachUi(int cols, int rows);
 
     GridModel*      grid()       const { return m_grid; }

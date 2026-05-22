@@ -26,6 +26,7 @@ if(MSVC)
 endif()
 
 set(QVIM_LIB_SOURCES
+    src/ArgvParser.cpp        src/ArgvParser.h
     src/MsgpackRpc.cpp        src/MsgpackRpc.h
     src/NvimConnector.cpp     src/NvimConnector.h
     src/HighlightTable.cpp    src/HighlightTable.h

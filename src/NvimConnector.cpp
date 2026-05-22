@@ -47,8 +47,8 @@ NvimConnector::NvimConnector(QObject* parent)
 
 NvimConnector::~NvimConnector() = default;
 
-bool NvimConnector::start(const QString& nvimExe) {
-    return m_rpc->startEmbeddedNvim(nvimExe);
+bool NvimConnector::start(const QString& nvimExe, const QStringList& nvimForwardArgs) {
+    return m_rpc->startEmbeddedNvim(nvimExe, nvimForwardArgs);
 }
 
 namespace {
