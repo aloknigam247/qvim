@@ -89,10 +89,28 @@ Three tiers (see `tests/CMakeLists.txt`):
 - `ext_messages: true` causes nvim to relocate the message line off-grid, shrinking the active grid by 1 row. Tests that assert exact `rows()` against the attach size must subtract 1.
 - Concurrent builds against `D:\qvim\build\dev` contend on `vcpkg-running.lock` and `qvim_lib.pdb`. Serialise builds when running multiple agents, or build individual `.vcxproj` targets via MSBuild to skip the vcpkg-configure step.
 - `nvim_ui_try_resize` called from `geometryChange` will fire during cmdline_show reflow. With ext_multigrid this triggers `grid_resize` + `win_pos` for every grid — make sure these don't destroy QML delegates.
+- `QQuickPaintedItem::paint()` runs on the SceneGraph **render thread**, not the GUI thread. Any `QRawFont` / `QFontEngine`-backed object must be constructed AND destroyed on the render thread (the dtor also asserts thread affinity). If you cache one, hook `QQuickWindow::sceneGraphInvalidated` with `Qt::DirectConnection` to release it before the SceneGraph tears down.
+- After merging library-only `.cpp` changes into main, the incremental linker may skip relinking `qvim.exe` — the .lib changes, the .exe doesn't. Always force-rebuild with `cmake --build --preset dev --target qvim` before asking the user to verify a fix; otherwise they're testing a stale binary.
 
 ## Fanning out subagents
 
 For multi-task batches: group by file ownership.
 - Disjoint-file work runs in the main checkout in parallel.
-- Hot files (`GridItem.cpp`, `NvimConnector.cpp`, `GridModel.cpp`) — use `isolation: "worktree"` so each agent works on a separate branch. Merge manually afterward.
+- Hot files (`GridItem.cpp`, `NvimConnector.cpp`, `GridModel.cpp`, `CMakeLists.txt`, `src/main.cpp`) — use `isolation: "worktree"` so each agent works on a separate branch. Merge manually afterward.
 - Touching `tests/CMakeLists.txt` from many agents is usually safe (alphabetical inserts) but verify after.
+
+### Agent merge protocol (parent serializes, never agents)
+
+When fanning out a batch that touches any shared file:
+
+1. Agents commit to their worktree branch and **STOP** — no self-merge. Self-merging racing on shared files (CMakeLists, main.cpp, tests/CMakeLists.txt) reliably loses commits via `reset --hard $prevHead` on build-failure paths.
+2. The parent (you) cherry-picks branches into main sequentially. Use `git cherry-pick <sha>`, not rebase — rebase replays through every intermediate commit and conflicts on each one; cherry-pick re-applies just the target's delta against current main.
+3. After each merge: `cmake --build --preset dev` to verify, then force-rebuild qvim if only the .lib changed (see Gotchas).
+4. Delete the worktree + branch only AFTER the user verifies the merged behaviour. A test-passing branch can still produce a visually broken binary; keep the worktree until the manual smoke confirms.
+
+### Worktree path discipline (agents)
+
+Agents launched with `isolation: "worktree"` get a worktree at `D:\qvim\.claude\worktrees\agent-<id>` but **do not get path translation**. The Edit/Write tools take absolute paths verbatim.
+
+- **Never** use `D:\qvim\` in agent Edit/Write/Bash calls — those writes go to main, bypass isolation, and stomp other agents.
+- Always derive paths from `git rev-parse --show-toplevel` or `$PWD`. The agent preamble (`.claude/agent-preamble.md`) states this; reuse that preamble for any new fanout batch.
