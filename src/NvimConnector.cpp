@@ -114,6 +114,41 @@ bool NvimConnector::attachUi(int cols, int rows) {
             if (res) {
                 m_attached = true;
                 emit attachedChanged();
+                // Ensure nvim emits set_title and that the format shows just
+                // the file name (+ modified marker) unless the user has
+                // configured their own 'titlestring'. We probe the option
+                // first and only install our default when it's empty.
+                m_rpc->request(QStringLiteral("nvim_get_option_value"),
+                    [](msgpack::packer<msgpack::sbuffer>& pk) {
+                        pk.pack_array(2);
+                        pk.pack(std::string("titlestring"));
+                        pk.pack_map(0);
+                    },
+                    [this](RpcResult getRes) {
+                        bool empty = true;
+                        if (getRes) {
+                            const msgpack::object& o = (*getRes)->get();
+                            if (o.type == msgpack::type::STR && o.via.str.size > 0) {
+                                empty = false;
+                            }
+                        }
+                        if (empty) {
+                            m_rpc->notify(QStringLiteral("nvim_set_option_value"),
+                                [](msgpack::packer<msgpack::sbuffer>& pk) {
+                                    pk.pack_array(3);
+                                    pk.pack(std::string("titlestring"));
+                                    pk.pack(std::string("%t%( %M%)"));
+                                    pk.pack_map(0);
+                                });
+                        }
+                        m_rpc->notify(QStringLiteral("nvim_set_option_value"),
+                            [](msgpack::packer<msgpack::sbuffer>& pk) {
+                                pk.pack_array(3);
+                                pk.pack(std::string("title"));
+                                pk.pack(true);
+                                pk.pack_map(0);
+                            });
+                    });
             } else {
                 qWarning() << "nvim_ui_attach failed:" << res.error().message;
             }

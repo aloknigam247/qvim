@@ -7,7 +7,7 @@ Window {
     width: 1200
     height: 800
     visible: true
-    title: $connector.title.length ? ($connector.title + " — qvim") : "qvim"
+    title: $connector.title || "qvim"
     color: "#1e1e1e"
 
     Component.onCompleted: {
