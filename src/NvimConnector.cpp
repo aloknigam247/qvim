@@ -105,9 +105,10 @@ bool NvimConnector::attachUi(int cols, int rows) {
             // matching bool back to true once the offending feature is found.
             // The C++ dispatch handlers, QML overlays, and models all remain
             // wired in — nvim simply won't emit the events that drive them.
-            pk.pack_map(7);
+            pk.pack_map(8);
             pk.pack("rgb");            pk.pack(true);
             pk.pack("ext_linegrid");   pk.pack(true);
+            pk.pack("ext_hlstate");    pk.pack(true);
             pk.pack("ext_multigrid");  pk.pack(false);
             pk.pack("ext_tabline");    pk.pack(false);
             pk.pack("ext_popupmenu");  pk.pack(false);
@@ -510,7 +511,11 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
         return;
     }
     if (name == "hl_attr_define") {
-        if (a.size >= 2) m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1]);
+        if (a.size >= 4) {
+            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1], &a.ptr[3]);
+        } else if (a.size >= 2) {
+            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1]);
+        }
         return;
     }
     if (name == "mode_info_set") {

@@ -14,6 +14,7 @@ struct HlAttr {
     QColor sp;
     bool   bold          = false;
     bool   italic        = false;
+    bool   isVisual      = false;
     bool   underline     = false;
     bool   undercurl     = false;
     bool   strikethrough = false;
@@ -30,10 +31,12 @@ public:
     explicit HighlightTable(QObject* parent = nullptr);
 
     void setDefaultColors(int rgbFg, int rgbBg, int rgbSp);
-    void defineAttr(int id, const msgpack::object& rgbAttr);
+    void defineAttr(int id, const msgpack::object& rgbAttr,
+                    const msgpack::object* info = nullptr);
     void clear();
 
     HlAttr attr(int id) const;
+    bool   isVisual(int id) const;
     QColor defaultFg() const { return m_defaultFg; }
     QColor defaultBg() const { return m_defaultBg; }
     QColor defaultSp() const { return m_defaultSp; }
