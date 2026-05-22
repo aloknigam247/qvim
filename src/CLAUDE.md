@@ -20,6 +20,7 @@ Root rules in `D:\qvim\CLAUDE.md` still apply. This file adds C++-only specifics
 - `TablineModel.{h,cpp}` — ext_tabline state (tabs + buffers).
 - `ClipboardBridge.{h,cpp}` — implements nvim's clipboard provider via Qt clipboard.
 - `RecentProjectsModel.{h,cpp}` — non-nvim feature; JSON-backed list under `%APPDATA%\qvim`.
+- `ResizeCoalescer.{h,cpp}` — debounces window-resize → `nvim_ui_try_resize` RPCs (~24ms). Owned by `NvimConnector`; GridItem letterboxes between RPCs.
 - `WindowChrome.{h,cpp}` — Windows-only `DwmSetWindowAttribute` wrapper. `applyToWindow(QQuickWindow*, QColor)` repaints the OS caption to match nvim's editor bg.
 
 ## Conventions
