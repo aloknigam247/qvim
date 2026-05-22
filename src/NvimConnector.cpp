@@ -345,6 +345,7 @@ void NvimConnector::dispatchEvent(const std::string& name, const msgpack::object
             m_hl->setDefaultColors(asInt(a.ptr[0], -1),
                                    asInt(a.ptr[1], -1),
                                    asInt(a.ptr[2], -1));
+            emit defaultBackgroundChanged();
         }
         return;
     }

@@ -51,6 +51,7 @@ qvim_add_test(test_popupmenu                     integration/test_popupmenu.cpp)
 qvim_add_test(test_resize                        integration/test_resize.cpp)
 qvim_add_test(test_tabline                       integration/test_tabline.cpp)
 qvim_add_test(test_title_updates                 integration/test_title_updates.cpp)
+qvim_add_test(test_titlebar_color                integration/test_titlebar_color.cpp)
 
 # User-POV smoke harness loads Main.qml in a real QQuickWindow and drives it
 # via QTest::keyClick — exercises the full focus chain, not just the connector.
@@ -63,7 +64,7 @@ target_link_libraries(test_user_smoke PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_focuses_float           PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_tabline test_title_updates test_user_smoke)
+foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_tabline test_title_updates test_titlebar_color test_user_smoke)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

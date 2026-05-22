@@ -14,6 +14,19 @@ Window {
         const cols = Math.max(80, Math.floor(width  / Math.max(1, shell.cellWidth)))
         const rows = Math.max(24, Math.floor(height / Math.max(1, shell.cellHeight)))
         $connector.attachUi(cols, rows)
+        _syncTitleBar()
+    }
+
+    function _syncTitleBar() {
+        if (typeof $windowChrome === "undefined") return
+        const bg = $connector.defaultBackground
+        if (!bg || !bg.valid) return
+        $windowChrome.applyToWindow(window, bg)
+    }
+
+    Connections {
+        target: $connector
+        function onDefaultBackgroundChanged() { _syncTitleBar() }
     }
 
     Tabline {

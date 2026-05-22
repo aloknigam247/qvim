@@ -41,6 +41,7 @@ set(QVIM_LIB_SOURCES
     src/PopupMenuModel.cpp    src/PopupMenuModel.h
     src/CmdlineModel.cpp      src/CmdlineModel.h
     src/RecentProjectsModel.cpp src/RecentProjectsModel.h
+    src/WindowChrome.cpp      src/WindowChrome.h
 )
 
 qt_add_library(qvim_lib STATIC ${QVIM_LIB_SOURCES} resources/qvim.qrc)
@@ -53,6 +54,7 @@ target_link_libraries(qvim_lib
         Qt6::Quick
         msgpack-cxx
 )
+target_link_libraries(qvim_lib PRIVATE $<$<PLATFORM_ID:Windows>:dwmapi>)
 set_target_properties(qvim_lib PROPERTIES AUTOMOC ON)
 
 qt_add_qml_module(qvim_lib

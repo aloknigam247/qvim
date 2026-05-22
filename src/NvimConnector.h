@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -40,6 +41,7 @@ class NvimConnector : public QObject {
     Q_PROPERTY(QString                guifontFamily READ guifontFamily NOTIFY guifontChanged)
     Q_PROPERTY(qreal                  guifontSize   READ guifontSize   NOTIFY guifontChanged)
     Q_PROPERTY(bool                   attached      READ attached      NOTIFY attachedChanged)
+    Q_PROPERTY(QColor                 defaultBackground READ defaultBackground NOTIFY defaultBackgroundChanged)
 
 public:
     explicit NvimConnector(QObject* parent = nullptr);
@@ -61,6 +63,7 @@ public:
     QString         guifontFamily() const;
     qreal           guifontSize()   const;
     bool            attached()      const { return m_attached; }
+    QColor          defaultBackground() const { return m_hl->defaultBg(); }
 
     Q_INVOKABLE void input(const QString& keys);
     Q_INVOKABLE void inputMouse(const QString& button, const QString& action,
@@ -74,6 +77,7 @@ signals:
     void titleChanged();
     void guifontChanged();
     void attachedChanged();
+    void defaultBackgroundChanged();
     void flush();   // emitted after each redraw batch — UI should repaint here
     void bell();
     void disconnected();

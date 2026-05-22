@@ -12,6 +12,7 @@
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
 #include "RecentProjectsModel.h"
+#include "WindowChrome.h"
 
 namespace {
 
@@ -55,6 +56,7 @@ int main(int argc, char* argv[]) {
     qvim::NvimConnector connector;
     qvim::ClipboardBridge clipboard;
     qvim::RecentProjectsModel recents;
+    qvim::WindowChrome windowChrome;
 
     if (!connector.start(locateNvim(), cli.nvimForwardArgs)) {
         qFatal("Failed to start nvim. Ensure it is on PATH.");
@@ -69,6 +71,7 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &connector);
     engine.rootContext()->setContextProperty(QStringLiteral("$clipboard"), &clipboard);
     engine.rootContext()->setContextProperty(QStringLiteral("$recents"),   &recents);
+    engine.rootContext()->setContextProperty(QStringLiteral("$windowChrome"), &windowChrome);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, []{ QCoreApplication::exit(-1); }, Qt::QueuedConnection);
