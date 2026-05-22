@@ -32,15 +32,16 @@ qvim is a Neovim GUI client written in C++23 / Qt 6.10 / QML, talking to an embe
 ## Layout
 
 ```
-src/
-  MsgpackRpc.{h,cpp}        # nvim transport
-  NvimConnector.{h,cpp}     # redraw event dispatch
-  GridModel.{h,cpp}         # cell grid (row-major)
-  HighlightTable.{h,cpp}    # hl_attr cache
-  ModeInfo.{h,cpp}          # cursor shape / mode index
-  GridItem.{h,cpp}          # QQuickPaintedItem renderer
-  InputHandler.{h,cpp}      # QKeyEvent → nvim keycodes
-  TablineModel / PopupMenuModel / CmdlineModel
+include/                    # all project headers, flat, included as "Foo.h"
+  MsgpackRpc.h              # nvim transport
+  NvimConnector.h           # redraw event dispatch
+  GridModel.h               # cell grid (row-major)
+  HighlightTable.h          # hl_attr cache
+  ModeInfo.h                # cursor shape / mode index
+  GridItem.h                # QQuickPaintedItem renderer
+  InputHandler.h            # QKeyEvent → nvim keycodes
+  TablineModel.h / PopupMenuModel.h / CmdlineModel.h / ...
+src/                        # implementation .cpp files
 qml/                        # UI shell (Main, Shell, Tabline, PopupMenu, Cmdline)
 tests/
   unit/                     # tier 1, headless
