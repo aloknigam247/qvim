@@ -33,7 +33,6 @@ set(QVIM_LIB_SOURCES
     src/Config.cpp              include/Config.h
     src/ConfigCliReader.cpp     include/ConfigCliReader.h
     src/ConfigGGlobalReader.cpp include/ConfigGGlobalReader.h
-    src/FontFallback.cpp        include/FontFallback.h
     src/GridItem.cpp            include/GridItem.h
     src/GridModel.cpp           include/GridModel.h
     src/HighlightTable.cpp      include/HighlightTable.h

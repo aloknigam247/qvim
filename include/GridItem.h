@@ -5,7 +5,6 @@
 #include <QFontMetricsF>
 #include <QPointer>
 #include <QTimer>
-#include <memory>
 #include <qqmlregistration.h>
 
 #include "HighlightTable.h"
@@ -13,7 +12,6 @@
 
 namespace qvim {
 
-class FontFallback;
 class GridModel;
 class ModeInfo;
 
@@ -74,9 +72,6 @@ protected:
     void wheelEvent(QWheelEvent* ev) override;
     void geometryChange(const QRectF& newGeom, const QRectF& oldGeom) override;
     void focusInEvent(QFocusEvent* ev) override;
-    // Hook sceneGraphInvalidated on render thread so QRawFont objects (built
-    // lazily inside paint()) are freed on the same thread that built them.
-    void itemChange(ItemChange change, const ItemChangeData& value) override;
 
 private slots:
     void onGuifontChanged();
@@ -93,11 +88,6 @@ private:
     // fire nvim_ui_try_resize against nvim (which is what actually changed
     // the metrics in the first place).
     void resizeWindowToGrid();
-    // Apply `family` to m_font, force Normal weight, and if the resolved face
-    // is still bold (because the installed family has no Normal style or Windows
-    // substituted a heavy face), walk a list of monospace fallbacks until a
-    // Normal-weight face is found.
-    void applyFontFamily(const QString& family);
     GridModel*      grid() const;
     HighlightTable* hl()   const;
     ModeInfo*       mode() const;
@@ -116,7 +106,6 @@ private:
     bool     m_suppressGeometryResize = false;
     int      m_linespace    = 0;
     QTimer   m_blinkTimer;
-    std::unique_ptr<FontFallback> m_fallback;
 };
 
 } // namespace qvim
