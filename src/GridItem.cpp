@@ -289,7 +289,7 @@ void GridItem::paint(QPainter* painter) {
         }
 
         if (!spans.empty()) {
-            const qreal radius = std::min(m_cellHeight * 0.25, m_cellWidth * 0.6);
+            const qreal radius = 5.0;
             auto isRoundedAt = [&](int r, int c) -> bool {
                 if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
                 return h->isRounded(g->cell(m_gridId, r, c).hlId);
