@@ -1,5 +1,7 @@
 #include "HighlightTable.h"
 
+#include <algorithm>
+
 namespace qvim {
 
 namespace {
@@ -38,30 +40,33 @@ int getInt(const msgpack::object& mapObj, const char* key, int def = -1) {
     return def;
 }
 
-// Returns true iff the map entry `key` is a STR equal to `expected`.
-bool strFieldEquals(const msgpack::object& mapObj, const char* key, const char* expected) {
+// Returns the STR value at `key` if present, or an empty QString.
+QString getString(const msgpack::object& mapObj, const char* key) {
     const int i = findKey(mapObj, key);
-    if (i < 0) return false;
+    if (i < 0) return {};
     const auto& v = mapObj.via.map.ptr[i].val;
-    if (v.type != msgpack::type::STR) return false;
+    if (v.type != msgpack::type::STR) return {};
     const auto& s = v.via.str;
-    const std::size_t n = std::strlen(expected);
-    return s.size == n && std::memcmp(s.ptr, expected, n) == 0;
+    return QString::fromUtf8(s.ptr, static_cast<int>(s.size));
 }
 
 // ext_hlstate gives us an `info` array of dicts describing how the resolved
-// attribute was composed (kind/ui_name/hi_name). Scan for any entry naming
-// the "Visual" highlight group.
-bool infoMentionsVisual(const msgpack::object& info) {
-    if (info.type != msgpack::type::ARRAY) return false;
+// attribute was composed (kind/ui_name/hi_name). Collect every named entry
+// (preferring `ui_name`, falling back to `hi_name`).
+QStringList namesFromInfo(const msgpack::object& info) {
+    QStringList out;
+    if (info.type != msgpack::type::ARRAY) return out;
     const auto& arr = info.via.array;
+    out.reserve(static_cast<int>(arr.size));
     for (uint32_t i = 0; i < arr.size; ++i) {
         const auto& e = arr.ptr[i];
         if (e.type != msgpack::type::MAP) continue;
-        if (strFieldEquals(e, "ui_name", "Visual")) return true;
-        if (strFieldEquals(e, "hi_name", "Visual")) return true;
+        QString n = getString(e, "ui_name");
+        if (n.isEmpty()) n = getString(e, "hi_name");
+        if (n.isEmpty()) continue;
+        out.push_back(n);
     }
-    return false;
+    return out;
 }
 } // namespace
 
@@ -90,7 +95,11 @@ void HighlightTable::defineAttr(int id, const msgpack::object& rgbAttr,
     a.strikethrough = getBool(rgbAttr, "strikethrough");
     a.reverse       = getBool(rgbAttr, "reverse");
     a.blend         = getInt(rgbAttr, "blend", 0);
-    if (info) a.isVisual = infoMentionsVisual(*info);
+    if (info) a.names = namesFromInfo(*info);
+    a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(),
+                              [this](const QString& n) {
+                                  return m_roundedHighlights.contains(n);
+                              });
     m_attrs[id] = a;
     emit changed();
 }
@@ -100,16 +109,30 @@ void HighlightTable::clear() {
     emit changed();
 }
 
+void HighlightTable::setRoundedHighlights(const QStringList& names) {
+    QSet<QString> next(names.cbegin(), names.cend());
+    if (next == m_roundedHighlights) return;
+    m_roundedHighlights = std::move(next);
+    for (auto& kv : m_attrs) {
+        HlAttr& a = kv.second;
+        a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(),
+                                  [this](const QString& n) {
+                                      return m_roundedHighlights.contains(n);
+                                  });
+    }
+    emit changed();
+}
+
 HlAttr HighlightTable::attr(int id) const {
     auto it = m_attrs.find(id);
     if (it == m_attrs.end()) return {};
     return it->second;
 }
 
-bool HighlightTable::isVisual(int id) const {
+bool HighlightTable::isRounded(int id) const {
     auto it = m_attrs.find(id);
     if (it == m_attrs.end()) return false;
-    return it->second.isVisual;
+    return it->second.isRounded;
 }
 
 HlAttr HighlightTable::resolved(int id) const {

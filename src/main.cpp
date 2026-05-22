@@ -12,6 +12,7 @@
 #include "Config.h"
 #include "ConfigCliReader.h"
 #include "ConfigGGlobalReader.h"
+#include "HighlightTable.h"
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
 #include "RecentProjectsModel.h"
@@ -57,8 +58,9 @@ int main(int argc, char* argv[]) {
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
 
     qvim::Config cfg;
-    // TODO: future tasks register options on `cfg` here, e.g.
-    //   cfg.registerOption("opacity", qvim::ConfigType::Float, 1.0);
+    cfg.registerOption(QStringLiteral("rounded_highlights"),
+                       qvim::ConfigType::StringList,
+                       QStringList{QStringLiteral("Visual")});
 
     QStringList forwardArgs = cli.nvimForwardArgs;
     qvim::ConfigCliReader::extract(forwardArgs, cfg);
@@ -73,6 +75,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     clipboard.attachTo(&connector);
+
+    // Push the resolved rounded_highlights list into HighlightTable on
+    // startup and whenever Config changes — must be wired BEFORE the
+    // attachComplete handler runs ConfigGGlobalReader::read, because that
+    // will fire Config::changed once the user's g:qvim_rounded_highlights
+    // resolves.
+    auto applyRounded = [&]() {
+        if (auto* h = connector.highlights()) {
+            h->setRoundedHighlights(
+                cfg.value(QStringLiteral("rounded_highlights")).toStringList());
+        }
+    };
+    applyRounded();
+    QObject::connect(&cfg, &qvim::Config::changed, &connector,
+                     [applyRounded](const QString& name) {
+                         if (name == QStringLiteral("rounded_highlights")) applyRounded();
+                     });
 
     QObject::connect(&connector, &qvim::NvimConnector::disconnected,
                      &app, &QGuiApplication::quit);

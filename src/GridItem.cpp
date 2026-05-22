@@ -280,19 +280,19 @@ void GridItem::paint(QPainter* painter) {
             int c = 0;
             while (c < cols) {
                 const Cell& cell = g->cell(m_gridId, r, c);
-                if (!h->isVisual(cell.hlId)) { ++c; continue; }
+                if (!h->isRounded(cell.hlId)) { ++c; continue; }
                 const int c0 = c;
                 const int spanHl = cell.hlId;
-                while (c < cols && h->isVisual(g->cell(m_gridId, r, c).hlId)) ++c;
+                while (c < cols && h->isRounded(g->cell(m_gridId, r, c).hlId)) ++c;
                 spans.push_back({r, c0, c, spanHl});
             }
         }
 
         if (!spans.empty()) {
             const qreal radius = std::min(m_cellHeight * 0.25, m_cellWidth * 0.6);
-            auto isVisualAt = [&](int r, int c) -> bool {
+            auto isRoundedAt = [&](int r, int c) -> bool {
                 if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
-                return h->isVisual(g->cell(m_gridId, r, c).hlId);
+                return h->isRounded(g->cell(m_gridId, r, c).hlId);
             };
 
             painter->save();
@@ -305,10 +305,10 @@ void GridItem::paint(QPainter* painter) {
                 const qreal x1 = s.c1 * m_cellWidth;
                 const qreal y0 = s.row * m_cellHeight;
                 const qreal y1 = (s.row + 1) * m_cellHeight;
-                const bool tl = !isVisualAt(s.row - 1, s.c0);
-                const bool tr = !isVisualAt(s.row - 1, s.c1 - 1);
-                const bool bl = !isVisualAt(s.row + 1, s.c0);
-                const bool br = !isVisualAt(s.row + 1, s.c1 - 1);
+                const bool tl = !isRoundedAt(s.row - 1, s.c0);
+                const bool tr = !isRoundedAt(s.row - 1, s.c1 - 1);
+                const bool bl = !isRoundedAt(s.row + 1, s.c0);
+                const bool br = !isRoundedAt(s.row + 1, s.c1 - 1);
                 QPainterPath path;
                 path.moveTo(tl ? x0 + radius : x0, y0);
                 path.lineTo(tr ? x1 - radius : x1, y0);
@@ -355,7 +355,7 @@ void GridItem::paint(QPainter* painter) {
 
             const HlAttr a = h->resolved(runHl);
             const QRectF runRect(c * m_cellWidth, y, (runEnd - c) * m_cellWidth, m_cellHeight);
-            if (a.bg != defaultBg && !h->isVisual(runHl)) {
+            if (a.bg != defaultBg && !h->isRounded(runHl)) {
                 painter->fillRect(runRect, a.bg);
             }
 

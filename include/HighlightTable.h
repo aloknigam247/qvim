@@ -2,6 +2,9 @@
 
 #include <QObject>
 #include <QColor>
+#include <QSet>
+#include <QString>
+#include <QStringList>
 #include <qqmlregistration.h>
 #include <msgpack.hpp>
 #include <unordered_map>
@@ -14,7 +17,8 @@ struct HlAttr {
     QColor sp;
     bool   bold          = false;
     bool   italic        = false;
-    bool   isVisual      = false;
+    bool   isRounded     = false;
+    QStringList names;
     bool   underline     = false;
     bool   undercurl     = false;
     bool   strikethrough = false;
@@ -35,8 +39,10 @@ public:
                     const msgpack::object* info = nullptr);
     void clear();
 
+    void   setRoundedHighlights(const QStringList& names);
+
     HlAttr attr(int id) const;
-    bool   isVisual(int id) const;
+    bool   isRounded(int id) const;
     QColor defaultFg() const { return m_defaultFg; }
     QColor defaultBg() const { return m_defaultBg; }
     QColor defaultSp() const { return m_defaultSp; }
@@ -50,6 +56,7 @@ private:
     QColor m_defaultFg = Qt::white;
     QColor m_defaultBg = Qt::black;
     QColor m_defaultSp = Qt::red;
+    QSet<QString> m_roundedHighlights;
     std::unordered_map<int, HlAttr> m_attrs;
 };
 
