@@ -47,6 +47,15 @@ public:
     // worse).
     const Resolved& resolve(char32_t cp);
 
+    // Release the QRawFont objects on the render thread before the
+    // SceneGraph tears down. QRawFont is thread-bound (QFontEngine asserts in
+    // its dtor that the thread matches the one that built it), so the
+    // destructor of FontFallback running on the UI thread cannot free them.
+    // Call this from QQuickWindow::sceneGraphInvalidated (DirectConnection)
+    // so the QRawFont dtors run on the same render thread that constructed
+    // them in resolve().
+    void releaseRenderResources();
+
     // Visible cache size — for tests and diagnostics.
     int cacheSize() const { return static_cast<int>(m_lru.size()); }
 
@@ -65,9 +74,17 @@ private:
 
     QString          m_family;
     qreal            m_pixelSize = 12.0;
-    QRawFont         m_primary;
-    QVector<QRawFont> m_fallbacks;
+    QStringList      m_fallbackFamilies;      // resolved Nerd / symbol families
     QStringList      m_overrideFamilies;      // test hook; empty in production
+    // QRawFont is thread-bound (QFontEngine asserts it is only ever used on
+    // the thread that created it). QQuickPaintedItem::paint runs on the
+    // SceneGraph render thread, so we build the primary + fallback QRawFonts
+    // on demand inside resolve() (which is always called from paint). The
+    // strings above are configured from the UI thread; QRawFont construction
+    // happens on the render thread.
+    mutable QRawFont          m_primary;
+    mutable QVector<QRawFont> m_fallbacks;
+    mutable bool              m_lazyBuilt = false;
 
     // LRU: front = most recently used. The hash maps codepoint to (list_iter,
     // resolved). Iterators into std::list are stable across other inserts /

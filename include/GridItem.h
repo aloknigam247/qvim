@@ -74,6 +74,9 @@ protected:
     void wheelEvent(QWheelEvent* ev) override;
     void geometryChange(const QRectF& newGeom, const QRectF& oldGeom) override;
     void focusInEvent(QFocusEvent* ev) override;
+    // Hook sceneGraphInvalidated on render thread so QRawFont objects (built
+    // lazily inside paint()) are freed on the same thread that built them.
+    void itemChange(ItemChange change, const ItemChangeData& value) override;
 
 private slots:
     void onGuifontChanged();

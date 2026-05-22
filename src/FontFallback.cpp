@@ -49,23 +49,47 @@ bool looksLikeNerdOrSymbolFamily(const QString& family) {
 
 FontFallback::FontFallback() = default;
 
+void FontFallback::releaseRenderResources() {
+    m_primary = QRawFont();
+    m_fallbacks.clear();
+    m_lru.clear();
+    m_map.clear();
+    m_lazyBuilt = false;
+}
+
 void FontFallback::setPrimary(const QString& family, qreal pixelSize) {
-    if (family == m_family && qFuzzyCompare(pixelSize, m_pixelSize) && !m_primary.familyName().isEmpty()) {
+    if (family == m_family && qFuzzyCompare(pixelSize, m_pixelSize) && m_lazyBuilt) {
         return;
     }
     m_family    = family;
     m_pixelSize = pixelSize;
     m_lru.clear();
     m_map.clear();
-    rebuildPrimary();
-    rebuildFallbacks();
+    // Resolve the fallback family list now (QFontDatabase::families is
+    // thread-safe and cheap). QRawFont construction is deferred until the
+    // first resolve() call so it happens on the paint thread.
+    m_fallbackFamilies.clear();
+    if (!m_overrideFamilies.isEmpty()) {
+        m_fallbackFamilies = m_overrideFamilies;
+    } else {
+        for (const QString& fam : QFontDatabase::families()) {
+            if (looksLikeNerdOrSymbolFamily(fam) && fam != m_family) {
+                m_fallbackFamilies.append(fam);
+            }
+        }
+    }
+    m_lazyBuilt = false;
+    m_primary = QRawFont();
+    m_fallbacks.clear();
 }
 
 void FontFallback::setFallbackFamiliesForTest(const QStringList& families) {
     m_overrideFamilies = families;
+    m_fallbackFamilies = families;
     m_lru.clear();
     m_map.clear();
-    rebuildFallbacks();
+    m_lazyBuilt = false;
+    m_fallbacks.clear();
 }
 
 void FontFallback::rebuildPrimary() {
@@ -74,22 +98,22 @@ void FontFallback::rebuildPrimary() {
 
 void FontFallback::rebuildFallbacks() {
     m_fallbacks.clear();
-    QStringList families = m_overrideFamilies;
-    if (families.isEmpty()) {
-        for (const QString& fam : QFontDatabase::families()) {
-            if (looksLikeNerdOrSymbolFamily(fam) && fam != m_family) {
-                families.append(fam);
-            }
-        }
-    }
-    m_fallbacks.reserve(families.size());
-    for (const QString& fam : families) {
+    m_fallbacks.reserve(m_fallbackFamilies.size());
+    for (const QString& fam : m_fallbackFamilies) {
         QRawFont rf = rawFromFamily(fam, m_pixelSize);
         if (rf.isValid()) m_fallbacks.append(std::move(rf));
     }
 }
 
 const FontFallback::Resolved& FontFallback::resolve(char32_t cp) {
+    // Lazy build on the calling (paint) thread so QRawFont is owned by that
+    // thread — QFontEngine asserts cross-thread use.
+    if (!m_lazyBuilt) {
+        rebuildPrimary();
+        rebuildFallbacks();
+        m_lazyBuilt = true;
+    }
+
     auto it = m_map.find(cp);
     if (it != m_map.end()) {
         touch(cp);

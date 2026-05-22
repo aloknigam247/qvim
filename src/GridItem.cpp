@@ -271,6 +271,18 @@ void GridItem::geometryChange(const QRectF& newGeom, const QRectF& oldGeom) {
     maybeResizeUi();
 }
 
+void GridItem::itemChange(ItemChange change, const ItemChangeData& value) {
+    QQuickPaintedItem::itemChange(change, value);
+    if (change == ItemSceneChange && value.window) {
+        // Direct connection so the slot fires on the render thread that the
+        // SceneGraph invalidation runs on. QRawFont built inside paint() is
+        // bound to that thread; we must release it there too.
+        connect(value.window, &QQuickWindow::sceneGraphInvalidated,
+                this, [this]{ if (m_fallback) m_fallback->releaseRenderResources(); },
+                Qt::DirectConnection);
+    }
+}
+
 void GridItem::focusInEvent(QFocusEvent* ev) {
     QQuickPaintedItem::focusInEvent(ev);
     m_cursorOn = true;
