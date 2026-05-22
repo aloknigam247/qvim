@@ -152,11 +152,66 @@ bool NvimConnector::attachUi(int cols, int rows) {
                                 pk.pack_map(0);
                             });
                     });
+                emit attachComplete();
             } else {
                 qWarning() << "nvim_ui_attach failed:" << res.error().message;
             }
         });
     return true;
+}
+
+namespace {
+QVariant msgpackToVariant(const msgpack::object& o) {
+    switch (o.type) {
+        case msgpack::type::NIL:
+            return {};
+        case msgpack::type::BOOLEAN:
+            return QVariant(o.via.boolean);
+        case msgpack::type::POSITIVE_INTEGER:
+            return QVariant(static_cast<qulonglong>(o.via.u64));
+        case msgpack::type::NEGATIVE_INTEGER:
+            return QVariant(static_cast<qlonglong>(o.via.i64));
+        case msgpack::type::FLOAT32:
+        case msgpack::type::FLOAT64:
+            return QVariant(o.via.f64);
+        case msgpack::type::STR:
+            return QVariant(QString::fromUtf8(o.via.str.ptr, o.via.str.size));
+        case msgpack::type::ARRAY: {
+            QVariantList list;
+            list.reserve(static_cast<int>(o.via.array.size));
+            for (uint32_t i = 0; i < o.via.array.size; ++i) {
+                list.push_back(msgpackToVariant(o.via.array.ptr[i]));
+            }
+            return list;
+        }
+        case msgpack::type::BIN:
+            return QVariant(QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)));
+        default:
+            return {};
+    }
+}
+} // namespace
+
+void NvimConnector::getVar(const QString& name, GetVarCallback cb) {
+    m_rpc->request(QStringLiteral("nvim_get_var"),
+        [&name](msgpack::packer<msgpack::sbuffer>& pk) {
+            pk.pack_array(1);
+            pk.pack(name.toStdString());
+        },
+        [cb = std::move(cb)](RpcResult res) {
+            if (!cb) return;
+            if (!res) {
+                cb(std::nullopt);
+                return;
+            }
+            // Callback receives the whole [1, msgid, err, result] envelope.
+            const msgpack::object& root = res.value()->get();
+            if (root.type != msgpack::type::ARRAY || root.via.array.size < 4) {
+                cb(std::nullopt);
+                return;
+            }
+            cb(msgpackToVariant(root.via.array.ptr[3]));
+        });
 }
 
 void NvimConnector::input(const QString& keys) {

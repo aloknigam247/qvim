@@ -9,6 +9,9 @@
 #include "AppIcon.h"
 #include "ArgvParser.h"
 #include "ClipboardBridge.h"
+#include "Config.h"
+#include "ConfigCliReader.h"
+#include "ConfigGGlobalReader.h"
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
 #include "RecentProjectsModel.h"
@@ -53,12 +56,19 @@ int main(int argc, char* argv[]) {
     qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
 
+    qvim::Config cfg;
+    // TODO: future tasks register options on `cfg` here, e.g.
+    //   cfg.registerOption("opacity", qvim::ConfigType::Float, 1.0);
+
+    QStringList forwardArgs = cli.nvimForwardArgs;
+    qvim::ConfigCliReader::extract(forwardArgs, cfg);
+
     qvim::NvimConnector connector;
     qvim::ClipboardBridge clipboard;
     qvim::RecentProjectsModel recents;
     qvim::WindowChrome windowChrome;
 
-    if (!connector.start(locateNvim(), cli.nvimForwardArgs)) {
+    if (!connector.start(locateNvim(), forwardArgs)) {
         qFatal("Failed to start nvim. Ensure it is on PATH.");
         return 1;
     }
@@ -66,8 +76,13 @@ int main(int argc, char* argv[]) {
 
     QObject::connect(&connector, &qvim::NvimConnector::disconnected,
                      &app, &QGuiApplication::quit);
+    QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
+                     &cfg, [&connector, &cfg]() {
+                         qvim::ConfigGGlobalReader::read(connector, cfg);
+                     });
 
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty(QStringLiteral("$config"),    &cfg);
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &connector);
     engine.rootContext()->setContextProperty(QStringLiteral("$clipboard"), &clipboard);
     engine.rootContext()->setContextProperty(QStringLiteral("$recents"),   &recents);

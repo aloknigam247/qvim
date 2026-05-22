@@ -28,21 +28,24 @@ endif()
 set(QVIM_LIB_SOURCES
     src/AppIcon.cpp             include/AppIcon.h
     src/ArgvParser.cpp          include/ArgvParser.h
-    src/MsgpackRpc.cpp          include/MsgpackRpc.h
-    src/NvimConnector.cpp       include/NvimConnector.h
+    src/ClipboardBridge.cpp     include/ClipboardBridge.h
+    src/CmdlineModel.cpp        include/CmdlineModel.h
+    src/Config.cpp              include/Config.h
+    src/ConfigCliReader.cpp     include/ConfigCliReader.h
+    src/ConfigGGlobalReader.cpp include/ConfigGGlobalReader.h
+    src/FontFallback.cpp        include/FontFallback.h
+    src/GridItem.cpp            include/GridItem.h
+    src/GridModel.cpp           include/GridModel.h
     src/HighlightTable.cpp      include/HighlightTable.h
+    src/InputHandler.cpp        include/InputHandler.h
     src/MessagesModel.cpp       include/MessagesModel.h
     src/ModeInfo.cpp            include/ModeInfo.h
-    src/FontFallback.cpp        include/FontFallback.h
-    src/GridModel.cpp           include/GridModel.h
-    src/GridItem.cpp            include/GridItem.h
-    src/InputHandler.cpp        include/InputHandler.h
-    src/ClipboardBridge.cpp     include/ClipboardBridge.h
-    src/TablineModel.cpp        include/TablineModel.h
+    src/MsgpackRpc.cpp          include/MsgpackRpc.h
+    src/NvimConnector.cpp       include/NvimConnector.h
     src/PopupMenuModel.cpp      include/PopupMenuModel.h
-    src/CmdlineModel.cpp        include/CmdlineModel.h
     src/RecentProjectsModel.cpp include/RecentProjectsModel.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
+    src/TablineModel.cpp        include/TablineModel.h
     src/WindowChrome.cpp        include/WindowChrome.h
 )
 

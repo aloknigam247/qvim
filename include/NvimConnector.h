@@ -7,6 +7,10 @@
 #include <QStringList>
 #include <qqmlregistration.h>
 
+#include <functional>
+#include <optional>
+#include <QVariant>
+
 #include <msgpack.hpp>
 #include "MsgpackRpc.h"
 #include "GridModel.h"
@@ -52,6 +56,12 @@ public:
                const QStringList& nvimForwardArgs = {});
     Q_INVOKABLE bool attachUi(int cols, int rows);
 
+    // Issues `nvim_get_var(name)` and invokes `cb` with the unpacked value on
+    // success, or with an empty optional if the variable is unset / errored.
+    // Used by ConfigGGlobalReader to populate Config from g:qvim_* globals.
+    using GetVarCallback = std::function<void(std::optional<QVariant>)>;
+    void getVar(const QString& name, GetVarCallback cb);
+
     GridModel*      grid()       const { return m_grid; }
     HighlightTable* highlights() const { return m_hl; }
     MessagesModel*  messages()   const { return m_messages; }
@@ -84,6 +94,7 @@ signals:
     void titleChanged();
     void guifontChanged();
     void attachedChanged();
+    void attachComplete();
     void defaultBackgroundChanged();
     void flush();   // emitted after each redraw batch — UI should repaint here
     void bell();
