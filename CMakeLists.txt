@@ -26,27 +26,27 @@ if(MSVC)
 endif()
 
 set(QVIM_LIB_SOURCES
-    src/AppIcon.cpp           src/AppIcon.h
-    src/ArgvParser.cpp        src/ArgvParser.h
-    src/MsgpackRpc.cpp        src/MsgpackRpc.h
-    src/NvimConnector.cpp     src/NvimConnector.h
-    src/HighlightTable.cpp    src/HighlightTable.h
-    src/MessagesModel.cpp     src/MessagesModel.h
-    src/ModeInfo.cpp          src/ModeInfo.h
-    src/GridModel.cpp         src/GridModel.h
-    src/GridItem.cpp          src/GridItem.h
-    src/InputHandler.cpp      src/InputHandler.h
-    src/ClipboardBridge.cpp   src/ClipboardBridge.h
-    src/TablineModel.cpp      src/TablineModel.h
-    src/PopupMenuModel.cpp    src/PopupMenuModel.h
-    src/CmdlineModel.cpp      src/CmdlineModel.h
-    src/RecentProjectsModel.cpp src/RecentProjectsModel.h
-    src/ResizeCoalescer.cpp   src/ResizeCoalescer.h
-    src/WindowChrome.cpp      src/WindowChrome.h
+    src/AppIcon.cpp             include/AppIcon.h
+    src/ArgvParser.cpp          include/ArgvParser.h
+    src/MsgpackRpc.cpp          include/MsgpackRpc.h
+    src/NvimConnector.cpp       include/NvimConnector.h
+    src/HighlightTable.cpp      include/HighlightTable.h
+    src/MessagesModel.cpp       include/MessagesModel.h
+    src/ModeInfo.cpp            include/ModeInfo.h
+    src/GridModel.cpp           include/GridModel.h
+    src/GridItem.cpp            include/GridItem.h
+    src/InputHandler.cpp        include/InputHandler.h
+    src/ClipboardBridge.cpp     include/ClipboardBridge.h
+    src/TablineModel.cpp        include/TablineModel.h
+    src/PopupMenuModel.cpp      include/PopupMenuModel.h
+    src/CmdlineModel.cpp        include/CmdlineModel.h
+    src/RecentProjectsModel.cpp include/RecentProjectsModel.h
+    src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
+    src/WindowChrome.cpp        include/WindowChrome.h
 )
 
 qt_add_library(qvim_lib STATIC ${QVIM_LIB_SOURCES} resources/qvim.qrc)
-target_include_directories(qvim_lib PUBLIC src)
+target_include_directories(qvim_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(qvim_lib
     PUBLIC
         Qt6::Core
