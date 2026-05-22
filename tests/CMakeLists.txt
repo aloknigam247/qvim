@@ -24,6 +24,7 @@ qvim_add_test(test_config_g_reader     unit/test_config_g_reader.cpp)
 qvim_add_test(test_config_registry     unit/test_config_registry.cpp)
 qvim_add_test(test_float_focusable     unit/test_float_focusable.cpp)
 qvim_add_test(test_font_fallback       unit/test_font_fallback.cpp)
+qvim_add_test(test_font_style          unit/test_font_style.cpp)
 qvim_add_test(test_grid_model          unit/test_grid_model.cpp)
 qvim_add_test(test_hidpi_rendering     unit/test_hidpi_rendering.cpp)
 qvim_add_test(test_highlight_table     unit/test_highlight_table.cpp)
@@ -43,8 +44,12 @@ cmake_path(NATIVE_PATH QVIM_TEST_IMAGEFORMATS_DIR QVIM_TEST_IMAGEFORMATS_DIR_NAT
 set_tests_properties(test_app_icon PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QT_PLUGIN_PATH=${QVIM_TEST_IMAGEFORMATS_DIR_NATIVE}"
 )
-# test_option_set_dispatch uses QTEST_MAIN (QGuiApplication) so it needs a
-# resolvable platform plugin too.
+# test_font_style + test_option_set_dispatch use QTEST_MAIN (QGuiApplication)
+# so they need a resolvable platform plugin too.
+set_tests_properties(test_font_style PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE}"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
+)
 set_tests_properties(test_option_set_dispatch PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE}"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

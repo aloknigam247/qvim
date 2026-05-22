@@ -8,13 +8,13 @@
 #include <memory>
 #include <qqmlregistration.h>
 
+#include "HighlightTable.h"
 #include "NvimConnector.h"
 
 namespace qvim {
 
 class FontFallback;
 class GridModel;
-class HighlightTable;
 class ModeInfo;
 
 class GridItem : public QQuickPaintedItem {
@@ -55,6 +55,11 @@ public:
     Q_INVOKABLE int colAt(qreal x) const;
     Q_INVOKABLE int rowAt(qreal y) const;
 
+    // Build the per-run QFont for a highlight attribute. Public for testing —
+    // paint() uses this through a per-frame hl_id cache to avoid repeated
+    // QFont detach/resolve. Pure function of m_font + attribute flags.
+    QFont buildRunFont(const HlAttr& a) const;
+
 signals:
     void connectorChanged();
     void gridIdChanged();
@@ -85,6 +90,11 @@ private:
     // fire nvim_ui_try_resize against nvim (which is what actually changed
     // the metrics in the first place).
     void resizeWindowToGrid();
+    // Apply `family` to m_font, force Normal weight, and if the resolved face
+    // is still bold (because the installed family has no Normal style or Windows
+    // substituted a heavy face), walk a list of monospace fallbacks until a
+    // Normal-weight face is found.
+    void applyFontFamily(const QString& family);
     GridModel*      grid() const;
     HighlightTable* hl()   const;
     ModeInfo*       mode() const;

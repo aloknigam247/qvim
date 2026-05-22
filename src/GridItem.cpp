@@ -7,6 +7,8 @@
 #include "InputHandler.h"
 
 #include <QElapsedTimer>
+#include <QFontDatabase>
+#include <QFontInfo>
 #include <QGlyphRun>
 #include <QHash>
 #include <QKeyEvent>
@@ -50,10 +52,12 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setFlag(ItemHasContents, true);
     setFlag(ItemIsFocusScope, true);
     setActiveFocusOnTab(true);
-    m_font = QFont(m_fontName, m_fontSize);
+    m_font = QFont();
+    m_font.setPointSizeF(m_fontSize);
     m_font.setStyleHint(QFont::Monospace);
     m_font.setHintingPreference(QFont::PreferFullHinting);
     m_fallback = std::make_unique<FontFallback>();
+    applyFontFamily(m_fontName);
     recomputeMetrics();
     connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::blinkTick);
     m_blinkTimer.setInterval(500);
@@ -93,7 +97,7 @@ void GridItem::setConnector(NvimConnector* c) {
 void GridItem::setFontName(const QString& name) {
     if (name == m_fontName) return;
     m_fontName = name;
-    m_font.setFamily(name);
+    applyFontFamily(name);
     recomputeMetrics();
     emit fontChanged();
     maybeResizeUi();
@@ -174,6 +178,43 @@ void GridItem::resizeWindowToGrid() {
     QTimer::singleShot(0, this, [this]{ m_suppressGeometryResize = false; });
 }
 
+void GridItem::applyFontFamily(const QString& family) {
+    // Bug seed: QFont(family, size) leaves weight unset in resolveMask, so a
+    // later setWeight/setBold can't override Windows GDI's family-substitution
+    // pick. We explicitly set Normal weight and re-check via QFontInfo —
+    // QFontInfo reports the ACTUAL resolved face, not the requested one.
+    m_font.setFamily(family);
+    m_font.setWeight(QFont::Normal);
+    m_font.setStyle(QFont::StyleNormal);
+
+    if (!QFontInfo(m_font).bold()) return;
+
+    qDebug() << "qvim: font" << m_font.family()
+             << "has no Normal style; falling back to system monospace";
+
+    const QStringList fallbacks{
+        QStringLiteral("Cascadia Mono"),
+        QStringLiteral("Consolas"),
+        QFontDatabase::systemFont(QFontDatabase::FixedFont).family(),
+    };
+    for (const QString& fb : fallbacks) {
+        if (fb.isEmpty()) continue;
+        m_font.setFamily(fb);
+        m_font.setWeight(QFont::Normal);
+        m_font.setStyle(QFont::StyleNormal);
+        if (!QFontInfo(m_font).bold()) return;
+    }
+}
+
+QFont GridItem::buildRunFont(const HlAttr& a) const {
+    QFont rf = m_font;
+    rf.setWeight(a.bold ? QFont::Bold : QFont::Normal);
+    rf.setItalic(a.italic);
+    rf.setUnderline(a.underline);
+    rf.setStrikeOut(a.strikethrough);
+    return rf;
+}
+
 void GridItem::onGuifontChanged() {
     if (!m_conn) return;
     QString family = m_fontName;
@@ -181,8 +222,8 @@ void GridItem::onGuifontChanged() {
     parseGuifont(m_conn->guifont(), family, size);
     m_fontName = family;
     m_fontSize = size;
-    m_font.setFamily(family);
     m_font.setPointSizeF(size);
+    applyFontFamily(family);
     recomputeMetrics();
     emit fontChanged();
     resizeWindowToGrid();
@@ -318,12 +359,7 @@ void GridItem::paint(QPainter* painter) {
             if (runHl != lastHlIdFont) {
                 auto it = fontCache.find(runHl);
                 if (it == fontCache.end()) {
-                    QFont rf = m_font;
-                    rf.setBold(a.bold);
-                    rf.setItalic(a.italic);
-                    rf.setUnderline(a.underline);
-                    rf.setStrikeOut(a.strikethrough);
-                    it = fontCache.insert(runHl, rf);
+                    it = fontCache.insert(runHl, buildRunFont(a));
                 }
                 painter->setFont(it.value());
                 lastHlIdFont = runHl;
