@@ -111,7 +111,22 @@ QString InputHandler::keyToNvim(QKeyEvent* ev) {
 
 InputHandler::MouseInput InputHandler::mouseFor(QMouseEvent* ev, QEvent::Type type) {
     MouseInput m;
-    switch (ev->button()) {
+    // Qt sets ev->button() only on press/release transitions; during a drag
+    // (QEvent::MouseMove) it's Qt::NoButton and only ev->buttons() carries
+    // the held set. Derive the logical button from the held set on drag,
+    // otherwise the drag would silently drop on the floor and visual-mode
+    // selection would only enter on mouse release.
+    Qt::MouseButton btn = Qt::NoButton;
+    if (type == QEvent::MouseMove) {
+        const Qt::MouseButtons held = ev->buttons();
+        if      (held & Qt::LeftButton)   btn = Qt::LeftButton;
+        else if (held & Qt::MiddleButton) btn = Qt::MiddleButton;
+        else if (held & Qt::RightButton)  btn = Qt::RightButton;
+        else                              return m;  // hover, nothing to send
+    } else {
+        btn = ev->button();
+    }
+    switch (btn) {
         case Qt::LeftButton:   m.button = QStringLiteral("left"); break;
         case Qt::RightButton:  m.button = QStringLiteral("right"); break;
         case Qt::MiddleButton: m.button = QStringLiteral("middle"); break;
