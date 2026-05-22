@@ -5,6 +5,8 @@ Root rules in `D:\qvim\CLAUDE.md` still apply. This file adds C++-only specifics
 ## File-to-responsibility map
 
 - `main.cpp` — app entry, QQmlApplicationEngine wiring, context properties.
+- `AppIcon.{h,cpp}` — `setupApplicationIcon(QGuiApplication&)`; loads `:/icon.ico` via static-lib QRC init.
+- `ArgvParser.{h,cpp}` — splits qvim's argv. `--qvim-*` / `--help` / `--version` consumed locally; everything else forwarded to `nvim --embed`. Unmangles pwsh-7's native-arg quoting.
 - `MsgpackRpc.{h,cpp}` — nvim transport. Owns the unpacker arena. `msgpack::object` views into this arena.
 - `NvimConnector.{h,cpp}` — redraw event dispatch. Hot-path switch over event names.
 - `GridModel.{h,cpp}` — row-major cell grid. Single source of truth for what `paint()` reads.
