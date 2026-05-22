@@ -16,6 +16,7 @@
 #include "TablineModel.h"
 #include "PopupMenuModel.h"
 #include "CmdlineModel.h"
+#include "ResizeCoalescer.h"
 
 namespace qvim {
 
@@ -69,6 +70,12 @@ public:
     Q_INVOKABLE void inputMouse(const QString& button, const QString& action,
                                 const QString& modifier, int grid, int row, int col);
     Q_INVOKABLE void tryResize(int cols, int rows);
+    // Debounced variant — coalesces a burst of resize requests into a single
+    // RPC. Use from drag handlers (geometryChange); call tryResize directly
+    // only from tests / programmatic resize where the synchronous behaviour
+    // is required.
+    Q_INVOKABLE void requestResize(int cols, int rows);
+    qvim::ResizeCoalescer* resizeCoalescer() const { return m_resizeCoalescer; }
     Q_INVOKABLE void paste(const QString& text);
     Q_INVOKABLE void command(const QString& cmd);
     Q_INVOKABLE void execLua(const QString& code);
@@ -99,6 +106,7 @@ private:
     TablineModel*   m_tabline   = nullptr;
     PopupMenuModel* m_popupmenu = nullptr;
     CmdlineModel*   m_cmdline   = nullptr;
+    ResizeCoalescer* m_resizeCoalescer = nullptr;
 
     QString m_title;
     QString m_guifont;

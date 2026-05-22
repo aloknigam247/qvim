@@ -40,9 +40,12 @@ NvimConnector::NvimConnector(QObject* parent)
     , m_tabline(new TablineModel(this))
     , m_popupmenu(new PopupMenuModel(this))
     , m_cmdline(new CmdlineModel(this))
+    , m_resizeCoalescer(new ResizeCoalescer(this))
 {
     connect(m_rpc, &MsgpackRpc::notification, this, &NvimConnector::onNotification);
     connect(m_rpc, &MsgpackRpc::disconnected, this, &NvimConnector::onRpcDisconnected);
+    connect(m_resizeCoalescer, &ResizeCoalescer::resizeRequested,
+            this, &NvimConnector::tryResize);
 }
 
 NvimConnector::~NvimConnector() = default;
@@ -185,6 +188,10 @@ void NvimConnector::tryResize(int cols, int rows) {
             pk.pack(static_cast<int64_t>(cols));
             pk.pack(static_cast<int64_t>(rows));
         });
+}
+
+void NvimConnector::requestResize(int cols, int rows) {
+    m_resizeCoalescer->requestResize(cols, rows);
 }
 
 void NvimConnector::paste(const QString& text) {

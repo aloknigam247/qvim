@@ -41,6 +41,7 @@ set(QVIM_LIB_SOURCES
     src/PopupMenuModel.cpp    src/PopupMenuModel.h
     src/CmdlineModel.cpp      src/CmdlineModel.h
     src/RecentProjectsModel.cpp src/RecentProjectsModel.h
+    src/ResizeCoalescer.cpp   src/ResizeCoalescer.h
     src/WindowChrome.cpp      src/WindowChrome.h
 )
 

@@ -160,7 +160,7 @@ void GridItem::maybeResizeUi() {
     const int cols = std::max(10, static_cast<int>(width()  / m_cellWidth));
     const int rows = std::max(3,  static_cast<int>(height() / m_cellHeight));
     if (auto* g = grid(); g && (g->gridCols(1) != cols || g->gridRows(1) != rows)) {
-        m_conn->tryResize(cols, rows);
+        m_conn->requestResize(cols, rows);
     }
 }
 
