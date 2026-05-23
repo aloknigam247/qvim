@@ -61,3 +61,28 @@ ctest --preset dev --output-on-failure -R test_grid_model
 - Redraw event dispatch: `NvimConnector.cpp`.
 - `QQuickPaintedItem` pure-paint renderer: `GridItem.cpp`.
 - `QKeyEvent` → nvim keycode encoding: `InputHandler.cpp`.
+- Rectilinear rounded overlay (union polygon + uniform `quadTo(corner, pOut)` for convex + concave inverse rounding): the visual-selection block in `GridItem.cpp::paint()`.
+
+## Adding a config option
+
+`Config` is the typed registry, but it's inert until something is wired to it. To add `g:qvim_<name>` / `--qvim-<name>` support:
+
+1. **Register** in `main.cpp` right after `qvim::Config cfg;` and BEFORE `ConfigCliReader::extract`:
+   ```cpp
+   cfg.registerOption(QStringLiteral("<name>"), qvim::ConfigType::<Type>, <default>);
+   ```
+2. **Wire** the resolved value to the target object. The lambda + signal pattern (used for `rounded_highlights`):
+   ```cpp
+   auto apply<X> = [&]() {
+       if (auto* target = connector.<accessor>()) {
+           target-><setter>(cfg.value(QStringLiteral("<name>")).to<Type>());
+       }
+   };
+   apply<X>();
+   QObject::connect(&cfg, &qvim::Config::changed, &connector,
+                    [apply<X>](const QString& name) {
+                        if (name == QStringLiteral("<name>")) apply<X>();
+                    });
+   ```
+3. **Order matters**: the `Config::changed` connection MUST be in place BEFORE the `attachComplete` handler runs `ConfigGGlobalReader::read`, otherwise the user's `g:` value resolves silently and never reaches the target.
+4. If the option needs CLI parity, nothing extra is needed — `ConfigCliReader::extract` auto-discovers `--qvim-<name>=<value>` for any registered option.

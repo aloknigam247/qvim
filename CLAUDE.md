@@ -10,6 +10,7 @@ qvim is a Neovim GUI client written in C++23 / Qt 6.10 / QML, talking to an embe
 
 - The redraw event stream from `nvim --embed` is the single source of truth. Never paper over an unexpected event shape — fix the parser. Silent fallbacks (`if (a.size < N) return;`) are acceptable for forward-compat with new event variants but must not mask bugs in events we already claim to handle.
 - `grid_line`, `grid_scroll`, `mode_change`, `hl_attr_define`, `default_colors_set`, and `flush` are hot-path correctness gates. Cover any change here with a unit test under `tests/unit/` or `tests/integration/` before merging.
+- `ext_hlstate` is opted in at `nvim_ui_attach`, so `hl_attr_define` is `[id, rgb_attr, cterm_attr, info]` (4 elements, not 3). `info` is an array of dicts naming the composing highlight groups (`ui_name`/`hi_name`); `HighlightTable` parses it to flag attrs against the `rounded_highlights` config set. Any new reader of this event must handle the 4-element shape.
 - `paint()` must be a pure function of (`GridModel`, `HighlightTable`, `ModeInfo`, cursor state). Never reach back into RPC state from the paint path.
 - Input encoding (`InputHandler::keyToNvim`) is correctness-critical. Every key path must produce a well-bracketed nvim keycode — no `<lt>` leaks, no unbalanced `<>`, no raw control bytes.
 
