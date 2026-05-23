@@ -259,15 +259,15 @@ void GridItem::paint(QPainter* painter) {
     const int rows = g->gridRows(m_gridId);
     const QColor defaultBg = h->defaultBg();
 
-    // Rounded-corner pass for Visual selection. Walk the grid, collect
-    // contiguous per-row spans of cells whose hl_id has the Visual flag
-    // (set from ext_hlstate's info array on hl_attr_define). Draw each
-    // span as one rounded shape with corners rounded only where the
-    // adjacent row has no Visual cell at the boundary column, so a
-    // multi-row selection appears continuous with rounded outer corners
-    // and flush inner seams. Drawn before the main run loop so glyphs
-    // paint on top; the main loop skips per-cell bg fills for Visual
-    // cells to avoid painting a rectangle over the rounded pill.
+    // Rounded-corner pass for cells flagged isRounded (from ext_hlstate's
+    // info array on hl_attr_define, configured via g:qvim_rounded_highlights).
+    // Walk the grid collecting per-row spans, group connected spans into
+    // closed rectilinear polygons (one per multi-row selection blob), and
+    // emit a single rounded path per polygon. Every corner of the polygon is
+    // rounded — convex outer corners bulge away from the interior, concave
+    // inner corners bulge into it (VS Code-style inverse rounding). Drawn
+    // before the run loop so glyphs paint on top; the run loop skips per-cell
+    // bg fills for isRounded cells so the rounded shape isn't overpainted.
     {
         struct VisualSpan {
             int row;
@@ -290,35 +290,84 @@ void GridItem::paint(QPainter* painter) {
 
         if (!spans.empty()) {
             const qreal radius = 5.0;
-            auto isRoundedAt = [&](int r, int c) -> bool {
-                if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
-                return h->isRounded(g->cell(m_gridId, r, c).hlId);
-            };
+
+            // Group spans into connected polygons. Two spans are in the same
+            // group iff they sit on consecutive rows AND their column ranges
+            // overlap. Row gaps or non-overlapping pairs start a new polygon.
+            QVarLengthArray<int, 16> groupStart;
+            groupStart.push_back(0);
+            for (int i = 1; i < spans.size(); ++i) {
+                const VisualSpan& pa = spans[i - 1];
+                const VisualSpan& pb = spans[i];
+                const bool sameGroup = pb.row == pa.row + 1 &&
+                                       pb.c0 < pa.c1 && pa.c0 < pb.c1;
+                if (!sameGroup) groupStart.push_back(i);
+            }
+            groupStart.push_back(spans.size());
 
             painter->save();
             painter->setRenderHint(QPainter::Antialiasing, true);
             painter->setPen(Qt::NoPen);
-            for (const VisualSpan& s : spans) {
-                const HlAttr a = h->resolved(s.hlId);
+
+            for (int gi = 0; gi + 1 < groupStart.size(); ++gi) {
+                const int gs = groupStart[gi];
+                const int ge = groupStart[gi + 1];
+                const HlAttr a = h->resolved(spans[gs].hlId);
                 if (!a.bg.isValid() || a.bg == defaultBg) continue;
-                const qreal x0 = s.c0 * m_cellWidth;
-                const qreal x1 = s.c1 * m_cellWidth;
-                const qreal y0 = s.row * m_cellHeight;
-                const qreal y1 = (s.row + 1) * m_cellHeight;
-                const bool tl = !isRoundedAt(s.row - 1, s.c0);
-                const bool tr = !isRoundedAt(s.row - 1, s.c1 - 1);
-                const bool bl = !isRoundedAt(s.row + 1, s.c0);
-                const bool br = !isRoundedAt(s.row + 1, s.c1 - 1);
+
+                // Build the closed outline as a list of 90-degree corners in
+                // clockwise order. Top edge → right side descending (with a
+                // horizontal step at every c1 mismatch) → bottom edge → left
+                // side ascending (with a step at every c0 mismatch).
+                QVarLengthArray<QPointF, 64> verts;
+                verts.push_back({spans[gs].c0 * m_cellWidth,
+                                 spans[gs].row * m_cellHeight});
+                verts.push_back({spans[gs].c1 * m_cellWidth,
+                                 spans[gs].row * m_cellHeight});
+                for (int i = gs; i < ge - 1; ++i) {
+                    if (spans[i].c1 != spans[i + 1].c1) {
+                        const qreal y = (spans[i].row + 1) * m_cellHeight;
+                        verts.push_back({spans[i].c1     * m_cellWidth, y});
+                        verts.push_back({spans[i + 1].c1 * m_cellWidth, y});
+                    }
+                }
+                verts.push_back({spans[ge - 1].c1 * m_cellWidth,
+                                 (spans[ge - 1].row + 1) * m_cellHeight});
+                verts.push_back({spans[ge - 1].c0 * m_cellWidth,
+                                 (spans[ge - 1].row + 1) * m_cellHeight});
+                for (int i = ge - 1; i > gs; --i) {
+                    if (spans[i].c0 != spans[i - 1].c0) {
+                        const qreal y = spans[i].row * m_cellHeight;
+                        verts.push_back({spans[i].c0     * m_cellWidth, y});
+                        verts.push_back({spans[i - 1].c0 * m_cellWidth, y});
+                    }
+                }
+
+                // Round every corner with a quadratic Bezier whose control
+                // point IS the corner itself. The curve always bulges TOWARD
+                // the control point — that direction is outside-the-polygon
+                // for convex corners (smooth outer round) and inside-the-
+                // polygon for concave corners (inverse round, eating a small
+                // bite into the polygon at the indent). Cap rEff at half the
+                // adjacent edge length so short spans don't produce arcs that
+                // overlap each other.
                 QPainterPath path;
-                path.moveTo(tl ? x0 + radius : x0, y0);
-                path.lineTo(tr ? x1 - radius : x1, y0);
-                if (tr) path.quadTo(x1, y0, x1, y0 + radius);
-                path.lineTo(x1, br ? y1 - radius : y1);
-                if (br) path.quadTo(x1, y1, x1 - radius, y1);
-                path.lineTo(bl ? x0 + radius : x0, y1);
-                if (bl) path.quadTo(x0, y1, x0, y1 - radius);
-                path.lineTo(x0, tl ? y0 + radius : y0);
-                if (tl) path.quadTo(x0, y0, x0 + radius, y0);
+                const int nv = verts.size();
+                for (int i = 0; i < nv; ++i) {
+                    const QPointF& prev = verts[(i + nv - 1) % nv];
+                    const QPointF& curr = verts[i];
+                    const QPointF& next = verts[(i + 1) % nv];
+                    const QPointF dIn  = curr - prev;
+                    const QPointF dOut = next - curr;
+                    const qreal lenIn  = qAbs(dIn.x())  + qAbs(dIn.y());
+                    const qreal lenOut = qAbs(dOut.x()) + qAbs(dOut.y());
+                    const qreal rEff = std::min({radius, lenIn / 2.0, lenOut / 2.0});
+                    const QPointF pIn  = curr - QPointF(dIn.x()  / lenIn,  dIn.y()  / lenIn)  * rEff;
+                    const QPointF pOut = curr + QPointF(dOut.x() / lenOut, dOut.y() / lenOut) * rEff;
+                    if (i == 0) path.moveTo(pIn);
+                    else        path.lineTo(pIn);
+                    path.quadTo(curr, pOut);
+                }
                 path.closeSubpath();
                 painter->fillPath(path, a.bg);
             }
