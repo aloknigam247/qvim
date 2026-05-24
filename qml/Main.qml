@@ -5,7 +5,7 @@ import Qvim 1.0
 Window {
     id: window
     width: 1200
-    height: 800
+    height: 780
     visible: true
     title: $connector.title || "qvim"
     color: "#1e1e1e"
