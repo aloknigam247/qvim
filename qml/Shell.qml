@@ -27,17 +27,22 @@ Item {
     // per-hl_id font cache (task #8) all survive the geometry edit.
     Repeater {
         id: subGrids
-        model: $connector.grid.gridIds
+        // Filter out grid 1 — baseGrid above already renders it. A delegate
+        // for grid 1 would be invisible but its width/height bindings (set to
+        // surface.cols * cellWidth, surface.rows * cellHeight) would override
+        // the anchors.fill that baseGrid relies on; the resulting geometryChange
+        // then fires maybeResizeUi with sub-grid dimensions instead of window
+        // dimensions, telling nvim to grow past the window on guifont changes.
+        model: $connector.grid.gridIds.filter(function(g) { return g !== 1 })
 
         delegate: GridItem {
             required property var modelData
             readonly property int  gid:     modelData
             readonly property var  surface: $connector.grid.surfaceFor(gid)
 
-            // The id=1 base grid is rendered by `baseGrid` above; the Repeater
-            // delegate for id=1 stays invisible. Guard `surface` because the
-            // proxy may not exist for a microsecond after gridsChanged fires.
-            visible: gid !== 1 && surface !== null && surface.visible
+            // Guard `surface` because the proxy may not exist for a microsecond
+            // after gridsChanged fires.
+            visible: surface !== null && surface.visible
             connector: $connector
             gridId: gid
             x:      surface ? surface.x    * baseGrid.cellWidth  : 0
