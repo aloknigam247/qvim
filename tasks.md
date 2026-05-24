@@ -1,3 +1,0 @@
-- [ ] PERF: editor launching is slow
-- [ ] REFACTOR: move header files into include directory
-- [ ] PERF: cursor movement is slow
