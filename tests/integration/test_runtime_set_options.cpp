@@ -86,11 +86,9 @@ private slots:
     // Defence-in-depth: drive the QML scene through a metric-affecting
     // option change and assert the connector observably propagated it (the
     // signal fires, the typed property holds the parsed value, the parsed
-    // family/size accessors agree). The actual window-resize policy lives
-    // in GridItem::resizeWindowToGrid and is covered by its own integration
-    // path in the smoke harness; here under `minimal` QPA the surface-free
-    // window doesn't honour resize() deterministically enough to assert on
-    // pixel dimensions without flake.
+    // family/size accessors agree). The grid-resize that follows the font
+    // change is exercised by the resize integration tests; here under
+    // `minimal` QPA we only assert the option propagation.
     void guifontPropagatesThroughQmlScene() {
         NvimConnector conn;
         QVERIFY(conn.start(locateNvim()));

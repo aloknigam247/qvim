@@ -11,7 +11,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QQuickWindow>
 #include <QRegularExpression>
 #include <QVarLengthArray>
 #include <QVector>
@@ -132,38 +131,8 @@ void GridItem::onLinespaceChanged() {
     m_linespace = ls;
     recomputeMetrics();
     emit fontChanged();
-    resizeWindowToGrid();
+    maybeResizeUi();
     update();
-}
-
-void GridItem::resizeWindowToGrid() {
-    if (m_gridId != 1) return;
-    auto* g = grid();
-    if (!g) return;
-    const int cols = g->gridCols(1);
-    const int rows = g->gridRows(1);
-    if (cols <= 0 || rows <= 0) return;
-    auto* win = window();
-    if (!win) return;
-    // +1px on each axis so the integer-division in maybeResizeUi
-    //   cols == int(width() / m_cellWidth)
-    // doesn't round down due to qreal cellWidth float-imprecision, which
-    // would otherwise look like a geometry change requiring try_resize.
-    const int newW = static_cast<int>(std::ceil(cols * m_cellWidth)) + 1;
-    const int newH = static_cast<int>(std::ceil(rows * m_cellHeight)) + 1;
-    if (newW <= 0 || newH <= 0) return;
-    // Suppress the geometryChange-driven nvim_ui_try_resize that would
-    // otherwise loop back through nvim and re-emit grid_resize. The metric
-    // change is the cause; nvim's grid is already authoritative.
-    //
-    // The Qt window resize is processed asynchronously: the resulting
-    // geometryChange on this item may fire AFTER this function returns, so
-    // we defer clearing the flag via a 0-delay singleShot. This still runs
-    // before the next paint and well before any user input could trigger
-    // another resize.
-    m_suppressGeometryResize = true;
-    win->resize(newW, newH);
-    QTimer::singleShot(0, this, [this]{ m_suppressGeometryResize = false; });
 }
 
 QFont GridItem::buildRunFont(const HlAttr& a) const {
@@ -186,7 +155,7 @@ void GridItem::onGuifontChanged() {
     m_font.setPointSizeF(size);
     recomputeMetrics();
     emit fontChanged();
-    resizeWindowToGrid();
+    maybeResizeUi();
     update();
 }
 
@@ -227,7 +196,6 @@ void GridItem::maybeResizeUi() {
 
 void GridItem::geometryChange(const QRectF& newGeom, const QRectF& oldGeom) {
     QQuickPaintedItem::geometryChange(newGeom, oldGeom);
-    if (m_suppressGeometryResize) return;
     maybeResizeUi();
 }
 

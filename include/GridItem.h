@@ -82,12 +82,6 @@ private slots:
 private:
     void recomputeMetrics();
     void maybeResizeUi();
-    // Resize the host QQuickWindow so the existing (cols, rows) still fit
-    // exactly under the new cell metrics. Sets m_suppressGeometryResize for
-    // the duration so the resulting geometryChange() does NOT loop back and
-    // fire nvim_ui_try_resize against nvim (which is what actually changed
-    // the metrics in the first place).
-    void resizeWindowToGrid();
     GridModel*      grid() const;
     HighlightTable* hl()   const;
     ModeInfo*       mode() const;
@@ -103,7 +97,6 @@ private:
     qreal    m_baseline     = 12.0;
     bool     m_debugOverlay = false;
     bool     m_cursorOn     = true;
-    bool     m_suppressGeometryResize = false;
     int      m_linespace    = 0;
     QTimer   m_blinkTimer;
 };
