@@ -89,7 +89,11 @@ private:
 
     QPointer<NvimConnector> m_conn;
     int      m_gridId       = 1;
-    QString  m_fontName     = QStringLiteral("JetBrains Mono Nerd Font");
+    // Initial family is the OS-supplied fixed-width font (Consolas on Windows,
+    // Menlo on macOS, monospace on Linux). nvim's option_set guifont overrides
+    // this as soon as it arrives; the system fixed font only paints the brief
+    // window before that and is the right "no qvim default" fallback.
+    QString  m_fontName;
     qreal    m_fontSize     = 14.0;
     QFont    m_font;
     qreal    m_cellWidth    = 8.0;

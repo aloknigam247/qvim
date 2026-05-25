@@ -9,6 +9,7 @@
 #include "CmdlineModel.h"
 
 #include <QDebug>
+#include <QFontDatabase>
 #include <QVariant>
 
 namespace qvim {
@@ -58,10 +59,17 @@ bool NvimConnector::start(const QString& nvimExe, const QStringList& nvimForward
 namespace {
 // Same parsing the GridItem uses for its own font selection. Centralised here
 // so QML overlays can bind via Q_PROPERTY without duplicating the regex.
-// Defaults match the qvim-wide hardcoded fallback (JetBrains Mono Nerd Font,
-// 14pt) so overlays render sensibly before nvim's first option_set arrives.
+// Before nvim's first option_set arrives we defer to the OS-supplied fixed
+// font (Consolas on Windows, Menlo on macOS, system monospace on Linux) so
+// qvim doesn't impose its own font choice.
 constexpr qreal kDefaultGuifontSize = 14.0;
-const QString   kDefaultGuifontFamily = QStringLiteral("JetBrains Mono Nerd Font");
+
+QString systemFixedFontFamily() {
+    // Cached on first call so QFontDatabase isn't queried on every property
+    // read. Safe because the platform's fixed font doesn't change at runtime.
+    static const QString cached = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+    return cached;
+}
 
 void parseGuifontImpl(const QString& guifont, QString& family, qreal& size) {
     if (guifont.isEmpty()) return;
@@ -81,14 +89,14 @@ void parseGuifontImpl(const QString& guifont, QString& family, qreal& size) {
 } // namespace
 
 QString NvimConnector::guifontFamily() const {
-    QString family = kDefaultGuifontFamily;
+    QString family = systemFixedFontFamily();
     qreal size = kDefaultGuifontSize;
     parseGuifontImpl(m_guifont, family, size);
     return family;
 }
 
 qreal NvimConnector::guifontSize() const {
-    QString family = kDefaultGuifontFamily;
+    QString family = systemFixedFontFamily();
     qreal size = kDefaultGuifontSize;
     parseGuifontImpl(m_guifont, family, size);
     return size;

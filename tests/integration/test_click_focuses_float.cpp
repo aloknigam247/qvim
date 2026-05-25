@@ -75,7 +75,7 @@ private slots:
 
     void clickOnFocusableFloatMovesCursor() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);

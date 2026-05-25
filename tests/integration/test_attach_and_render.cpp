@@ -9,7 +9,7 @@ class TestAttachAndRender : public QObject {
 private slots:
     void attachProducesGrid() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));

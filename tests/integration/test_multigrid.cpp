@@ -12,7 +12,7 @@ private slots:
     // at least two grid ids and that each has a non-empty geometry.
     void vsplitCreatesSecondGrid() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
@@ -42,7 +42,7 @@ private slots:
     // ends up on the new (left) window's grid, not the global grid.
     void cursorTracksActiveGrid() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));

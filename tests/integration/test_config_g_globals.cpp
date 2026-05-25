@@ -20,7 +20,7 @@ private slots:
             QStringLiteral("--cmd"),
             QStringLiteral("let g:qvim_test_value = 0.42"),
         };
-        QVERIFY(conn.start(locateNvim(), extra));
+        QVERIFY(startTestNvim(conn, extra));
         QSignalSpy completeSpy(&conn, &NvimConnector::attachComplete);
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(completeSpy.wait(5000));

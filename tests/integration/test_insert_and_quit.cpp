@@ -9,7 +9,7 @@ class TestInsertAndQuit : public QObject {
 private slots:
     void typeAbcThenAssert() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(40, 10));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
@@ -26,7 +26,7 @@ private slots:
 
     void quitCommandClosesProcess() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(20, 5));
         QVERIFY(waitForAttach(&conn));
 

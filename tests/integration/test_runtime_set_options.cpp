@@ -53,7 +53,7 @@ private slots:
     // Q_PROPERTY contains the new value.
     void setGuifontFiresSignal() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QSignalSpy attachSpy(&conn, &NvimConnector::attachedChanged);
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(attachSpy.wait(5000));
@@ -70,7 +70,7 @@ private slots:
 
     void setLinespaceFiresSignal() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QSignalSpy attachSpy(&conn, &NvimConnector::attachedChanged);
         QVERIFY(conn.attachUi(80, 24));
         QVERIFY(attachSpy.wait(5000));
@@ -91,7 +91,7 @@ private slots:
     // `minimal` QPA we only assert the option propagation.
     void guifontPropagatesThroughQmlScene() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);

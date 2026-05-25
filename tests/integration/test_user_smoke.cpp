@@ -88,7 +88,7 @@ private slots:
     // was lost on the cmdline_show reflow this assertion fails.
     void keypressAfterColonReachesNvim() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);
@@ -131,7 +131,7 @@ private slots:
     // collision, or a black-on-black render bug; only pixels catch those.
     void cmdlineIsVisibleOnScreenAfterColon() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);
@@ -197,7 +197,7 @@ private slots:
     // Defence-in-depth: typing a multi-char command after ':' all reaches nvim.
     void multiKeyCommandReachesNvim() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);

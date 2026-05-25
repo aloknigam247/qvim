@@ -6,8 +6,11 @@
 #include "InputHandler.h"
 
 #include <QElapsedTimer>
+#include <QFontDatabase>
+#include <QGlyphRun>
 #include <QHash>
 #include <QKeyEvent>
+#include <QRawFont>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -46,9 +49,11 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setFlag(ItemHasContents, true);
     setFlag(ItemIsFocusScope, true);
     setActiveFocusOnTab(true);
-    m_font = QFont(m_fontName, m_fontSize);
+    m_font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    m_font.setPointSizeF(m_fontSize);
     m_font.setStyleHint(QFont::Monospace);
     m_font.setHintingPreference(QFont::PreferFullHinting);
+    m_fontName = m_font.family();
     recomputeMetrics();
     connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::blinkTick);
     m_blinkTimer.setInterval(500);
@@ -351,6 +356,23 @@ void GridItem::paint(QPainter* painter) {
     QHash<int, QFont> fontCache;
     fontCache.reserve(32);
 
+    // Per-hl_id QRawFont cache for the PUA overlay pass below. QRawFont::fromFont
+    // is moderately expensive (~10us); caching turns the overlay's per-cluster
+    // cost into a hash lookup. Same single-frame lifetime as fontCache.
+    QHash<int, QRawFont> rawFontCache;
+    rawFontCache.reserve(8);
+
+    // Returns true if `c` is in the Unicode Private Use Area (BMP U+E000-U+F8FF)
+    // or starts a supplementary PUA-A/B surrogate pair. Used to detect cells
+    // whose glyphs need the QGlyphRun overlay pass (see below).
+    auto isPua = [](QChar c) -> bool {
+        const ushort u = c.unicode();
+        if (u >= 0xE000 && u <= 0xF8FF) return true;
+        // Supplementary PUA-A (U+F0000-U+FFFFD) lives in surrogate range
+        // U+DB80-U+DBBF; PUA-B (U+100000-U+10FFFD) in U+DBC0-U+DBFF.
+        return c.isHighSurrogate() && u >= 0xDB80;
+    };
+
     // Track last applied painter state to avoid redundant setFont/setPen calls
     // both within a row and across consecutive rows.
     int     lastHlIdFont = INT_MIN;
@@ -362,6 +384,12 @@ void GridItem::paint(QPainter* painter) {
         const QRectF rowRect(0.0, y, m_cellWidth * cols, m_cellHeight);
         painter->save();
         painter->setClipRect(rowRect);
+
+        // Track whether this row contains any Private Use Area codepoint. Set
+        // during run-building (no extra iteration). Used to gate the overlay
+        // pass at row end so PUA-free rows (the common case in code buffers)
+        // pay zero extra cost.
+        bool rowHasPua = false;
 
         int c = 0;
         while (c < cols) {
@@ -387,6 +415,7 @@ void GridItem::paint(QPainter* painter) {
                     runText += QChar(' ');
                 } else {
                     runText += cell.text;
+                    if (!rowHasPua && isPua(cell.text[0])) rowHasPua = true;
                 }
             }
 
@@ -425,6 +454,76 @@ void GridItem::paint(QPainter* painter) {
 
             c = runEnd;
         }
+
+        // PUA overlay pass. Qt 6's text shaper drops Private Use Area
+        // codepoints (QTBUG-110502 closed Won't Do, QTBUG-116417 open with the
+        // root cause traced to QChar::isPrint() returning false for PUA in
+        // qtextengine.cpp's shaper). Result: QPainter::drawText silently emits
+        // no glyph for nerd-font icons, powerline separators, etc., even when
+        // the resolved font's cmap has them. The Qt-blessed workaround is to
+        // bypass the shaper via QRawFont's direct cmap lookup + drawGlyphRun.
+        // We only take this path when the row actually has PUA cells; rows
+        // without PUA keep the drawText codepath untouched (and so retain
+        // Qt's automatic font fallback, which is what makes characters like
+        // U+1F600 render via the system emoji font when the primary font
+        // lacks them).
+        if (rowHasPua) {
+            int cc = 0;
+            while (cc < cols) {
+                const Cell& cell = g->cell(m_gridId, r, cc);
+                if (cell.doubleWidth || cell.text.isEmpty() || !isPua(cell.text[0])) {
+                    ++cc; continue;
+                }
+
+                // Extend the cluster while consecutive cells share the hl_id
+                // AND are PUA. Splitting at hl_id changes lets each cluster use
+                // a single pen color + single QGlyphRun call.
+                const int clusterHl = cell.hlId;
+                int clusterEnd = cc + 1;
+                while (clusterEnd < cols) {
+                    const Cell& next = g->cell(m_gridId, r, clusterEnd);
+                    if (next.doubleWidth) { ++clusterEnd; continue; }
+                    if (next.hlId != clusterHl) break;
+                    if (next.text.isEmpty() || !isPua(next.text[0])) break;
+                    ++clusterEnd;
+                }
+
+                const HlAttr ha = h->resolved(clusterHl);
+                auto fit = fontCache.find(clusterHl);
+                if (fit == fontCache.end()) fit = fontCache.insert(clusterHl, buildRunFont(ha));
+                auto rit = rawFontCache.find(clusterHl);
+                if (rit == rawFontCache.end()) rit = rawFontCache.insert(clusterHl, QRawFont::fromFont(fit.value()));
+
+                QList<quint32> glyphs;
+                QList<QPointF> positions;
+                glyphs.reserve(clusterEnd - cc);
+                positions.reserve(clusterEnd - cc);
+                for (int i = cc; i < clusterEnd; ++i) {
+                    const Cell& pcell = g->cell(m_gridId, r, i);
+                    if (pcell.doubleWidth) continue;
+                    const QList<quint32> ids = rit.value().glyphIndexesForString(pcell.text);
+                    if (!ids.isEmpty()) {
+                        glyphs.append(ids.first());
+                        positions.append(QPointF(i * m_cellWidth, y + m_baseline));
+                    }
+                }
+
+                if (!glyphs.isEmpty()) {
+                    painter->setPen(ha.fg);
+                    QGlyphRun run;
+                    run.setRawFont(rit.value());
+                    run.setGlyphIndexes(glyphs);
+                    run.setPositions(positions);
+                    painter->drawGlyphRun(QPointF(0, 0), run);
+                    // Pen color may have changed; force next run's pen re-apply.
+                    lastHlIdPen = INT_MIN;
+                    lastPenColor = QColor();
+                }
+
+                cc = clusterEnd;
+            }
+        }
+
         painter->restore();
         // QPainter::restore() reverts font/pen to whatever was active before
         // the matching save(). Invalidate the cached "last applied" state so
@@ -471,8 +570,22 @@ void GridItem::paint(QPainter* painter) {
                 if (!cell.text.isEmpty()) {
                     painter->setPen(h->defaultBg());
                     painter->setFont(m_font);
-                    painter->drawText(QPointF(cc * m_cellWidth, cr * m_cellHeight + m_baseline),
-                                      cell.text);
+                    if (isPua(cell.text[0])) {
+                        // Same Qt shaper-drops-PUA workaround as the row overlay
+                        // pass above: render via QGlyphRun to bypass the bug.
+                        const QRawFont raw = QRawFont::fromFont(m_font);
+                        const QList<quint32> ids = raw.glyphIndexesForString(cell.text);
+                        if (!ids.isEmpty()) {
+                            QGlyphRun run;
+                            run.setRawFont(raw);
+                            run.setGlyphIndexes({ids.first()});
+                            run.setPositions({QPointF(cc * m_cellWidth, cr * m_cellHeight + m_baseline)});
+                            painter->drawGlyphRun(QPointF(0, 0), run);
+                        }
+                    } else {
+                        painter->drawText(QPointF(cc * m_cellWidth, cr * m_cellHeight + m_baseline),
+                                          cell.text);
+                    }
                 }
             }
         }

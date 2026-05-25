@@ -9,7 +9,7 @@ class TestPopupmenu : public QObject {
 private slots:
     void completionShowsItems() {
         NvimConnector conn;
-        QVERIFY(conn.start(locateNvim()));
+        QVERIFY(startTestNvim(conn));
         QVERIFY(conn.attachUi(40, 10));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
