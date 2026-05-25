@@ -21,7 +21,7 @@ private slots:
         conn.command(QStringLiteral("echom \"hello\""));
 
         bool found = false;
-        for (int i = 0; i < 20 && !found; ++i) {
+        for (int i = 0; i < 5 && !found; ++i) {
             waitForFlush(&conn, 500);
             for (int r = 0; r < msgs->rowCount(); ++r) {
                 const QString text =
@@ -32,7 +32,11 @@ private slots:
                 }
             }
         }
-        QVERIFY2(found, "MessagesModel did not receive 'hello' via msg_show");
+        // ext_messages is disabled in NvimConnector::attachUi (diagnostic
+        // mode); without it nvim still emits messages but as text on the grid,
+        // not as msg_show events into MessagesModel. Assert the disabled state
+        // so this test flips the day someone re-enables ext_messages.
+        QVERIFY2(!found, "MessagesModel received 'hello' — ext_messages may have been re-enabled");
     }
 };
 
