@@ -41,6 +41,7 @@ Root rules in `D:\qvim\CLAUDE.md` still apply. This file adds C++-only specifics
 - Allocating per cell in the redraw or paint path. Batch text runs by `(hl_id, font_state)`.
 - Throttling `update()` manually — Qt already coalesces.
 - Reaching back into RPC / `NvimConnector` from `paint()`.
+- Drawing Private Use Area codepoints (nerd-font icons, powerline glyphs) via `QPainter::drawText`. Qt's text shaper silently drops them on Windows (QTBUG-116417, root cause traced to `QChar::isPrint()` in `qtextengine.cpp`; QTBUG-110502 closed Won't Do). Use the hybrid pattern in `GridItem::paint()`: drawText for ordinary text (preserves Qt's automatic font fallback, which is what makes e.g. emoji render via the system emoji font), plus a per-row `QRawFont::glyphIndexesForString` + `drawGlyphRun` overlay pass for PUA-bearing cells. A `rowHasPua` flag set during run-building gates the overlay so PUA-free rows pay zero overhead.
 
 ## Build/test cheatsheet
 
