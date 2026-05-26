@@ -41,6 +41,7 @@ Root rules in `D:\qvim\CLAUDE.md` still apply. This file adds C++-only specifics
 - Allocating per cell in the redraw or paint path. Batch text runs by `(hl_id, font_state)`.
 - Throttling `update()` manually — Qt already coalesces.
 - Reaching back into RPC / `NvimConnector` from `paint()`.
+- `std::freopen(nullptr, "rb", stdin)` to set stdin binary on Windows — triggers /W4 C4996. Use `_setmode(_fileno(stdin), _O_BINARY)` from `<io.h>`/`<fcntl.h>` instead. CRT-initialised `stdin` works fine for /SUBSYSTEM:WINDOWS apps when the parent shell redirects it.
 - Drawing Private Use Area codepoints (nerd-font icons, powerline glyphs) via `QPainter::drawText`. Qt's text shaper silently drops them on Windows (QTBUG-116417, root cause traced to `QChar::isPrint()` in `qtextengine.cpp`; QTBUG-110502 closed Won't Do). Use the hybrid pattern in `GridItem::paint()`: drawText for ordinary text (preserves Qt's automatic font fallback, which is what makes e.g. emoji render via the system emoji font), plus a per-row `QRawFont::glyphIndexesForString` + `drawGlyphRun` overlay pass for PUA-bearing cells. A `rowHasPua` flag set during run-building gates the overlay so PUA-free rows pay zero overhead.
 
 ## Build/test cheatsheet
@@ -87,3 +88,13 @@ ctest --preset dev --output-on-failure -R test_grid_model
    ```
 3. **Order matters**: the `Config::changed` connection MUST be in place BEFORE the `attachComplete` handler runs `ConfigGGlobalReader::read`, otherwise the user's `g:` value resolves silently and never reaches the target.
 4. If the option needs CLI parity, nothing extra is needed — `ConfigCliReader::extract` auto-discovers `--qvim-<name>=<value>` for any registered option.
+
+## Intercepting an nvim CLI arg
+
+Some nvim CLI args conflict with `--embed` (which owns stdin/stdout for the RPC channel) or only make sense to qvim. Examples: `-` (read stdin into buffer), `+<lnum>` (cursor position — works native, but a hypothetical qvim-specific override would follow the same recipe). To consume an arg locally and simulate its effect via RPC:
+
+1. **Add a flag** to `QvimArgs` in `include/ArgvParser.h` (`bool <feature> = false;`).
+2. **Intercept** in `parseArgv` (`src/ArgvParser.cpp`) BEFORE the `out.nvimForwardArgs << arg;` fallback — set the flag and `continue`, do NOT append. This is what keeps the arg out of nvim's argv.
+3. **Add an RPC method** on `NvimConnector` that performs the equivalent action via `m_rpc->request(...)` (e.g. `nvim_buf_set_lines`, `nvim_command`, `nvim_input`). Pack the msgpack array yourself in the lambda — match the existing `paste()` / `command()` style.
+4. **Wire on `attachComplete`** in `main.cpp` — the nvim instance is fully initialised and the UI is attached, so RPC effects are visible immediately. Capture any payload (e.g. the slurped stdin bytes) by value into the lambda so it survives past the local scope.
+5. If the action needs pre-Qt work (e.g. reading qvim's own stdin), do it synchronously between the help/version short-circuits and the `QGuiApplication app(argc, argv);` construction.
