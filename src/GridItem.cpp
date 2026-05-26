@@ -55,9 +55,10 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     m_font.setHintingPreference(QFont::PreferFullHinting);
     m_fontName = m_font.family();
     recomputeMetrics();
-    connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::blinkTick);
-    m_blinkTimer.setInterval(500);
-    m_blinkTimer.start();
+    m_clock.start();
+    m_blink.notifyActivity(m_clock.elapsed());
+    m_blinkTimer.setSingleShot(true);
+    connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::onBlinkTimeout);
 }
 
 void GridItem::setGridId(int id) {
@@ -77,13 +78,14 @@ void GridItem::setConnector(NvimConnector* c) {
         connect(m_conn, &NvimConnector::flush,            this, &GridItem::onFlush);
         if (auto* g = grid()) {
             connect(g, &GridModel::sizeChanged,   this, [this]{ update(); });
-            connect(g, &GridModel::cursorChanged, this, [this]{ update(); });
+            connect(g, &GridModel::cursorChanged, this, [this]{ onCursorActivity(); });
         }
         if (auto* h = hl()) {
             connect(h, &HighlightTable::changed, this, [this]{ update(); });
         }
         if (auto* m = mode()) {
-            connect(m, &ModeInfo::currentChanged, this, [this]{ m_cursorOn = true; update(); });
+            connect(m, &ModeInfo::currentChanged, this, [this]{ onModeBlinkChanged(); });
+            onModeBlinkChanged();
         }
     }
     emit connectorChanged();
@@ -168,9 +170,37 @@ void GridItem::onFlush() {
     update();
 }
 
-void GridItem::blinkTick() {
-    m_cursorOn = !m_cursorOn;
+void GridItem::onBlinkTimeout() {
     update();
+    rescheduleBlink();
+}
+
+void GridItem::onCursorActivity() {
+    m_blink.notifyActivity(m_clock.elapsed());
+    rescheduleBlink();
+    update();
+}
+
+void GridItem::onModeBlinkChanged() {
+    if (auto* m = mode()) {
+        m_blink.setBlinkParams(m->blinkWait(), m->blinkOn(), m->blinkOff());
+    } else {
+        m_blink.setBlinkParams(0, 0, 0);
+    }
+    m_blink.notifyActivity(m_clock.elapsed());
+    rescheduleBlink();
+    update();
+}
+
+void GridItem::rescheduleBlink() {
+    const qint64 now = m_clock.elapsed();
+    const qint64 next = m_blink.nextChangeMs(now);
+    if (next == CursorBlinkState::kNoChange) {
+        m_blinkTimer.stop();
+        return;
+    }
+    const qint64 delay = std::max<qint64>(1, next - now);
+    m_blinkTimer.start(static_cast<int>(delay));
 }
 
 GridModel*      GridItem::grid() const { return m_conn ? m_conn->grid()       : nullptr; }
@@ -206,8 +236,7 @@ void GridItem::geometryChange(const QRectF& newGeom, const QRectF& oldGeom) {
 
 void GridItem::focusInEvent(QFocusEvent* ev) {
     QQuickPaintedItem::focusInEvent(ev);
-    m_cursorOn = true;
-    update();
+    onCursorActivity();
 }
 
 void GridItem::paint(QPainter* painter) {
@@ -543,7 +572,8 @@ void GridItem::paint(QPainter* painter) {
     // lives on exactly one grid at a time, whichever was the last
     // grid_cursor_goto target).
     const bool isActive = (g->activeGrid() == m_gridId);
-    if (isActive && (m_cursorOn || !mode() || !mode()->cursorStyleEnabled())) {
+    const bool cursorOn = m_blink.isOn(m_clock.elapsed());
+    if (isActive && (cursorOn || !mode() || !mode()->cursorStyleEnabled())) {
         const int cr = g->cursorRowOf(m_gridId);
         const int cc = g->cursorColOf(m_gridId);
         if (cr >= 0 && cr < rows && cc >= 0 && cc < cols) {
@@ -565,7 +595,7 @@ void GridItem::paint(QPainter* painter) {
                 rect.setHeight(std::max(1.0, m_cellHeight * 0.15));
             }
             painter->fillRect(rect, curColor);
-            if (shape == CursorShape::Block && m_cursorOn) {
+            if (shape == CursorShape::Block && cursorOn) {
                 const Cell& cell = g->cell(m_gridId, cr, cc);
                 if (!cell.text.isEmpty()) {
                     painter->setPen(h->defaultBg());

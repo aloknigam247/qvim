@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QQuickPaintedItem>
 #include <QFont>
 #include <QFontMetricsF>
@@ -7,6 +8,7 @@
 #include <QTimer>
 #include <qqmlregistration.h>
 
+#include "CursorBlinkState.h"
 #include "HighlightTable.h"
 #include "NvimConnector.h"
 
@@ -77,7 +79,7 @@ private slots:
     void onGuifontChanged();
     void onLinespaceChanged();
     void onFlush();
-    void blinkTick();
+    void onBlinkTimeout();
 
 private:
     void recomputeMetrics();
@@ -86,6 +88,9 @@ private:
     HighlightTable* hl()   const;
     ModeInfo*       mode() const;
     void sendMouse(QMouseEvent* ev, QEvent::Type type);
+    void onCursorActivity();
+    void onModeBlinkChanged();
+    void rescheduleBlink();
 
     QPointer<NvimConnector> m_conn;
     int      m_gridId       = 1;
@@ -100,9 +105,10 @@ private:
     qreal    m_cellHeight   = 16.0;
     qreal    m_baseline     = 12.0;
     bool     m_debugOverlay = false;
-    bool     m_cursorOn     = true;
     int      m_linespace    = 0;
-    QTimer   m_blinkTimer;
+    CursorBlinkState m_blink;
+    QElapsedTimer    m_clock;
+    QTimer           m_blinkTimer;
 };
 
 } // namespace qvim

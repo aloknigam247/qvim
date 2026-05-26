@@ -41,6 +41,9 @@ public:
     int     cursorShapeInt() const { return static_cast<int>(m_current.shape); }
     int     cellPercentage() const { return m_current.cellPercentage; }
     int     attrId() const { return m_current.attrId; }
+    int     blinkWait() const { return m_current.blinkWait; }
+    int     blinkOn()   const { return m_current.blinkOn; }
+    int     blinkOff()  const { return m_current.blinkOff; }
     bool    cursorStyleEnabled() const { return m_cursorStyleEnabled; }
 
 signals:
