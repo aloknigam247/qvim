@@ -60,6 +60,7 @@ set_tests_properties(test_cell_metrics PROPERTIES
 
 # Tier 2 — integration (offscreen QPA, real nvim --embed)
 qvim_add_test(test_attach_and_render             integration/test_attach_and_render.cpp)
+qvim_add_test(test_boot_perf                     integration/test_boot_perf.cpp)
 qvim_add_test(test_click_focuses_float           integration/test_click_focuses_float.cpp)
 qvim_add_test(test_click_skips_unfocusable_float integration/test_click_skips_unfocusable_float.cpp)
 qvim_add_test(test_cmdline                       integration/test_cmdline.cpp)
@@ -95,7 +96,9 @@ target_link_libraries(test_user_smoke PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_focuses_float           PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
+target_link_libraries(test_boot_perf PRIVATE qvim_libplugin Qt6::Quick)
+
+foreach(t test_attach_and_render test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

@@ -13,7 +13,14 @@ Window {
     Component.onCompleted: {
         const cols = Math.max(80, Math.floor(width  / Math.max(1, shell.cellWidth)))
         const rows = Math.max(24, Math.floor(height / Math.max(1, shell.cellHeight)))
-        $connector.attachUi(cols, rows)
+        // main.cpp fires nvim_ui_attach early (with 80x24 defaults) so its
+        // round-trip overlaps with QML cold load. Once GridItem has measured
+        // the real cell size, just resize — double-attach is an nvim error.
+        if ($connector.attached) {
+            $connector.tryResize(cols, rows)
+        } else {
+            $connector.attachUi(cols, rows)
+        }
         _syncTitleBar()
     }
 

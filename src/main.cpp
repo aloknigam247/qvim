@@ -1,7 +1,11 @@
 #include <QByteArray>
+#include <QDebug>
+#include <QElapsedTimer>
 #include <QGuiApplication>
+#include <QObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
 #include <QStandardPaths>
 #include <QFileInfo>
 #include <QDir>
@@ -31,10 +35,40 @@ QString locateNvim() {
     return QStringLiteral("nvim");
 }
 
+struct BootProfile {
+    const bool    enabled;
+    const QString outFile;
+    QElapsedTimer timer;
+    BootProfile()
+        : enabled(qEnvironmentVariableIntValue("QVIM_BOOT_PROFILE") != 0)
+        , outFile(qEnvironmentVariable("QVIM_BOOT_PROFILE_FILE")) {
+        if (enabled) timer.start();
+    }
+    void mark(const char* phase) {
+        if (!enabled) return;
+        const qint64 ms = timer.elapsed();
+        qDebug().noquote() << "[boot]" << phase << ms << "ms";
+        if (!outFile.isEmpty()) {
+            std::FILE* fp = nullptr;
+#ifdef _WIN32
+            (void)::fopen_s(&fp, outFile.toLocal8Bit().constData(), "a");
+#else
+            fp = std::fopen(outFile.toLocal8Bit().constData(), "a");
+#endif
+            if (fp) {
+                std::fprintf(fp, "[boot] %s %lld ms\n", phase, static_cast<long long>(ms));
+                std::fclose(fp);
+            }
+        }
+    }
+};
+
 } // namespace
 
 int main(int argc, char* argv[]) {
+    BootProfile boot;
     const qvim::QvimArgs cli = qvim::parseArgv(argc, argv);
+    boot.mark("argv parsed");
     if (cli.helpRequested) {
         std::printf(
             "Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
@@ -77,6 +111,7 @@ int main(int argc, char* argv[]) {
     qvim::setupApplicationIcon(app);
     qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
+    boot.mark("QGuiApplication ctor done");
 
     qvim::Config cfg;
     cfg.registerOption(QStringLiteral("rounded_highlights"),
@@ -85,17 +120,32 @@ int main(int argc, char* argv[]) {
 
     QStringList forwardArgs = cli.nvimForwardArgs;
     qvim::ConfigCliReader::extract(forwardArgs, cfg);
+    boot.mark("Config registered + CLI read");
 
     qvim::NvimConnector connector;
     qvim::ClipboardBridge clipboard;
     qvim::RecentProjectsModel recents;
     qvim::WindowChrome windowChrome;
+    boot.mark("NvimConnector ctor done");
 
     if (!connector.start(locateNvim(), forwardArgs)) {
         qFatal("Failed to start nvim. Ensure it is on PATH.");
         return 1;
     }
+    boot.mark("nvim --embed spawn returned");
     clipboard.attachTo(&connector);
+
+    // Fire nvim_ui_attach NOW with conservative defaults so the round-trip
+    // (nvim sources init, builds initial highlights + grid, responds)
+    // overlaps with QQmlApplicationEngine compilation/instantiation below
+    // instead of stacking serially after it. Main.qml's Component.onCompleted
+    // issues an nvim_ui_try_resize once GridItem has measured the real cell
+    // size against the window — nvim handles the resize cheaply. This is
+    // the single biggest cold-launch win: the ~400-700ms attach handshake
+    // and the ~300-600ms QML cold load now run concurrently instead of
+    // serially. Main.qml guards against double-attach via $connector.attached.
+    connector.attachUi(80, 24);
+    boot.mark("nvim_ui_attach sent (early)");
 
     // Push the resolved rounded_highlights list into HighlightTable on
     // startup and whenever Config changes — must be wired BEFORE the
@@ -117,8 +167,16 @@ int main(int argc, char* argv[]) {
     QObject::connect(&connector, &qvim::NvimConnector::disconnected,
                      &app, &QGuiApplication::quit);
     QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
-                     &cfg, [&connector, &cfg]() {
+                     &cfg, [&connector, &cfg, &boot]() {
+                         boot.mark("attachComplete signal");
                          qvim::ConfigGGlobalReader::read(connector, cfg);
+                     });
+    QObject::connect(&connector, &qvim::NvimConnector::flush,
+                     &connector, [&boot]() {
+                         static bool firstFlushSeen = false;
+                         if (firstFlushSeen) return;
+                         firstFlushSeen = true;
+                         boot.mark("first redraw flush received");
                      });
 
     if (cli.stdinAsBuffer) {
@@ -139,5 +197,18 @@ int main(int argc, char* argv[]) {
                      &app, []{ QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
     engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
+    boot.mark("engine.loadFromModule done");
+
+    if (!engine.rootObjects().isEmpty()) {
+        if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
+            QObject::connect(w, &QQuickWindow::frameSwapped, &app, [&boot]() {
+                static bool firstFrameSeen = false;
+                if (firstFrameSeen) return;
+                firstFrameSeen = true;
+                boot.mark("first frame swapped");
+            }, Qt::SingleShotConnection);
+        }
+    }
+
     return app.exec();
 }
