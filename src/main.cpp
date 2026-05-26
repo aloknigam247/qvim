@@ -1,3 +1,4 @@
+#include <QByteArray>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -5,6 +6,10 @@
 #include <QFileInfo>
 #include <QDir>
 #include <cstdio>
+#ifdef _WIN32
+#  include <fcntl.h>
+#  include <io.h>
+#endif
 
 #include "AppIcon.h"
 #include "ArgvParser.h"
@@ -48,6 +53,22 @@ int main(int argc, char* argv[]) {
     if (cli.versionRequested) {
         std::printf("qvim 0.1.0\n");
         return 0;
+    }
+
+    // `qvim -`: slurp stdin synchronously before Qt is up. Reading via the CRT
+    // works even though qvim is /SUBSYSTEM:WINDOWS — when the parent shell
+    // redirects stdin (e.g. `echo test | qvim -`), the inherited handle is a
+    // valid pipe. QProcess gives the embedded nvim its own RPC stdin pipe, so
+    // qvim's stdin stays ours to consume.
+    QByteArray stdinPayload;
+    if (cli.stdinAsBuffer) {
+#ifdef _WIN32
+        _setmode(_fileno(stdin), _O_BINARY);
+#endif
+        char buf[4096];
+        while (std::size_t n = std::fread(buf, 1, sizeof(buf), stdin)) {
+            stdinPayload.append(buf, static_cast<qsizetype>(n));
+        }
     }
 
     QGuiApplication app(argc, argv);
@@ -99,6 +120,13 @@ int main(int argc, char* argv[]) {
                      &cfg, [&connector, &cfg]() {
                          qvim::ConfigGGlobalReader::read(connector, cfg);
                      });
+
+    if (cli.stdinAsBuffer) {
+        QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
+                         &connector, [&connector, stdinPayload]() {
+                             connector.loadStdinIntoBuffer(stdinPayload);
+                         });
+    }
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("$config"),    &cfg);

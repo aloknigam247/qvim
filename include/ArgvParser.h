@@ -8,6 +8,11 @@ struct QvimArgs {
     QStringList nvimForwardArgs;
     bool helpRequested = false;
     bool versionRequested = false;
+    // `nvim -` reads the file content from stdin. With qvim, nvim --embed
+    // already owns its own stdin (the RPC pipe), so the `-` token is consumed
+    // here: main.cpp reads qvim's stdin and pushes the bytes into the first
+    // buffer over RPC after attach.
+    bool stdinAsBuffer = false;
 };
 
 // Parses qvim's process argv. qvim owns only `--help`/`-h`, `--version`/`-v`,

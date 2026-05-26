@@ -49,6 +49,12 @@ QvimArgs parseArgv(int argc, char** argv) {
             qDebug() << "qvim: ignoring reserved option" << arg;
             continue;
         }
+        if (arg == QStringLiteral("-")) {
+            // Consumed by qvim — forwarding to nvim --embed would conflict
+            // with the RPC channel that already owns nvim's stdin.
+            out.stdinAsBuffer = true;
+            continue;
+        }
         out.nvimForwardArgs << arg;
     }
     return out;

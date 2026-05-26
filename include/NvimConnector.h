@@ -114,6 +114,9 @@ public:
     Q_INVOKABLE void paste(const QString& text);
     Q_INVOKABLE void command(const QString& cmd);
     Q_INVOKABLE void execLua(const QString& code);
+    // Populates the current buffer with `bytes`, splitting on \n and trimming
+    // trailing \r. Used to implement `qvim -` (read stdin into buffer 1).
+    void loadStdinIntoBuffer(const QByteArray& bytes);
     // Direct option_set entry point. Used by the redraw dispatch (after
     // unpacking the msgpack value to QVariant) and by unit tests that don't
     // want to spin up an nvim process. O(1) per call.

@@ -277,6 +277,35 @@ void NvimConnector::command(const QString& cmd) {
         }, nullptr);
 }
 
+void NvimConnector::loadStdinIntoBuffer(const QByteArray& bytes) {
+    // Match `nvim -` semantics: a trailing newline is a line terminator, not
+    // a separator, so drop the synthetic empty last element split() produces.
+    QList<QByteArray> lines = bytes.split('\n');
+    if (!lines.isEmpty() && lines.last().isEmpty()) lines.removeLast();
+    for (QByteArray& l : lines) {
+        if (!l.isEmpty() && l.back() == '\r') l.chop(1);
+    }
+    m_rpc->request(QStringLiteral("nvim_buf_set_lines"),
+        [&lines](msgpack::packer<msgpack::sbuffer>& pk) {
+            pk.pack_array(5);
+            pk.pack(static_cast<int64_t>(0));   // buf 0 = current
+            pk.pack(static_cast<int64_t>(0));   // start
+            pk.pack(static_cast<int64_t>(-1));  // end
+            pk.pack(false);                     // strict_indexing
+            pk.pack_array(static_cast<uint32_t>(lines.size()));
+            for (const QByteArray& l : lines) {
+                pk.pack_str(static_cast<uint32_t>(l.size()));
+                pk.pack_str_body(l.constData(), static_cast<uint32_t>(l.size()));
+            }
+        }, nullptr);
+    // Clear modified so :q doesn't complain — buffer reflects "real" input.
+    m_rpc->notify(QStringLiteral("nvim_command"),
+        [](msgpack::packer<msgpack::sbuffer>& pk) {
+            pk.pack_array(1);
+            pk.pack(std::string("setlocal nomodified"));
+        });
+}
+
 void NvimConnector::execLua(const QString& code) {
     m_rpc->request(QStringLiteral("nvim_exec_lua"),
         [&code](msgpack::packer<msgpack::sbuffer>& pk) {
