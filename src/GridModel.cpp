@@ -90,7 +90,10 @@ void GridModel::resize(int gridId, int cols, int rows) {
     if (!newGrid && s.cols == cols && s.rows == rows) return;
     s.cols = cols;
     s.rows = rows;
-    s.cells.assign(static_cast<qsizetype>(cols) * rows, Cell{QStringLiteral(" "), 0, false});
+    s.cellRows.resize(rows);
+    for (auto& row : s.cellRows) {
+        row.assign(cols, Cell{QStringLiteral(" "), 0, false});
+    }
     ensureProxy(gridId)->setSize(cols, rows);
     emit sizeChanged();
 }
@@ -98,7 +101,9 @@ void GridModel::resize(int gridId, int cols, int rows) {
 void GridModel::clear(int gridId) {
     GridSurface* s = surface(gridId);
     if (!s) return;
-    for (auto& c : s->cells) c = Cell{QStringLiteral(" "), 0, false};
+    for (auto& row : s->cellRows) {
+        for (auto& c : row) c = Cell{QStringLiteral(" "), 0, false};
+    }
 }
 
 void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::object& cellsArr) {
@@ -138,20 +143,20 @@ void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::obje
         }
 
         const bool entryEmpty = text.isEmpty();
+        QVector<Cell>& rowCells = s->cellRows[row];
         for (int r = 0; r < repeat; ++r) {
             if (col >= s->cols) break;
-            const qsizetype idx = static_cast<qsizetype>(row) * s->cols + col;
             if (entryEmpty) {
                 if (prevWasNonEmpty) {
                     // Right half of a double-width glyph emitted by the previous cell.
-                    s->cells[idx] = Cell{QStringLiteral(""), hl, true};
+                    rowCells[col] = Cell{QStringLiteral(""), hl, true};
                     prevWasNonEmpty = false;
                 } else {
                     // Standalone empty cell -> render as a real blank.
-                    s->cells[idx] = Cell{QStringLiteral(" "), hl, false};
+                    rowCells[col] = Cell{QStringLiteral(" "), hl, false};
                 }
             } else {
-                s->cells[idx] = Cell{text, hl, false};
+                rowCells[col] = Cell{text, hl, false};
                 prevWasNonEmpty = true;
             }
             ++col;
@@ -164,22 +169,42 @@ void GridModel::scroll(int gridId, int top, int bot, int left, int right, int ro
     GridSurface* s = surface(gridId);
     if (!s) return;
 
+    // Fast path: a full-width scroll (left/right cover the whole grid) is what
+    // j/k/Ctrl-D/Ctrl-U emit at 200x60. Rotating the QVector<Cell> row handles
+    // is O(rows) implicit-share-pointer swaps regardless of cols, where the
+    // per-cell loop was O(rows*cols) ref-count touches. Newly revealed rows
+    // stay populated with their old contents; the grid_line events that
+    // follow grid_scroll overwrite them with the correct cells.
+    if (left == 0 && right == s->cols) {
+        if (rows > 0) {
+            std::rotate(s->cellRows.begin() + top,
+                        s->cellRows.begin() + top + rows,
+                        s->cellRows.begin() + bot);
+        } else {
+            const int n = -rows;
+            std::rotate(s->cellRows.begin() + top,
+                        s->cellRows.begin() + bot - n,
+                        s->cellRows.begin() + bot);
+        }
+        return;
+    }
+
+    // Partial-width scroll (split window with sibling columns to the side):
+    // we still need a per-cell copy within the [left, right) column band. Use
+    // std::copy across full rows where possible — gives the compiler a chance
+    // to vectorise the QString refcount touches.
     if (rows > 0) {
         for (int r = top; r < bot - rows; ++r) {
-            for (int c = left; c < right; ++c) {
-                const qsizetype dst = static_cast<qsizetype>(r) * s->cols + c;
-                const qsizetype src = static_cast<qsizetype>(r + rows) * s->cols + c;
-                s->cells[dst] = s->cells[src];
-            }
+            const QVector<Cell>& src = s->cellRows[r + rows];
+            QVector<Cell>& dst = s->cellRows[r];
+            std::copy(src.begin() + left, src.begin() + right, dst.begin() + left);
         }
     } else {
         const int n = -rows;
         for (int r = bot - 1; r >= top + n; --r) {
-            for (int c = left; c < right; ++c) {
-                const qsizetype dst = static_cast<qsizetype>(r) * s->cols + c;
-                const qsizetype src = static_cast<qsizetype>(r - n) * s->cols + c;
-                s->cells[dst] = s->cells[src];
-            }
+            const QVector<Cell>& src = s->cellRows[r - n];
+            QVector<Cell>& dst = s->cellRows[r];
+            std::copy(src.begin() + left, src.begin() + right, dst.begin() + left);
         }
     }
 }
@@ -221,7 +246,10 @@ void GridModel::setPos(int gridId, int x, int y, int w, int h) {
     if (w > 0 && h > 0 && (w != s.cols || h != s.rows)) {
         s.cols = w;
         s.rows = h;
-        s.cells.assign(static_cast<qsizetype>(w) * h, Cell{QStringLiteral(" "), 0, false});
+        s.cellRows.resize(h);
+        for (auto& row : s.cellRows) {
+            row.assign(w, Cell{QStringLiteral(" "), 0, false});
+        }
         emit sizeChanged();
     }
     auto* p = ensureProxy(gridId);
@@ -304,7 +332,7 @@ const Cell& GridModel::cell(int gridId, int row, int col) const {
     const GridSurface* s = surface(gridId);
     if (!s) return empty;
     if (row < 0 || row >= s->rows || col < 0 || col >= s->cols) return empty;
-    return s->cells[static_cast<qsizetype>(row) * s->cols + col];
+    return s->cellRows[row][col];
 }
 
 QString GridModel::dumpAscii(int gridId) const {
@@ -313,8 +341,9 @@ QString GridModel::dumpAscii(int gridId) const {
     QString out;
     out.reserve(static_cast<qsizetype>(s->rows) * (s->cols + 1));
     for (int r = 0; r < s->rows; ++r) {
+        const QVector<Cell>& rowCells = s->cellRows[r];
         for (int c = 0; c < s->cols; ++c) {
-            const Cell& cellRef = s->cells[static_cast<qsizetype>(r) * s->cols + c];
+            const Cell& cellRef = rowCells[c];
             out += cellRef.text.isEmpty() ? QChar(' ') : cellRef.text.at(0);
         }
         out += QChar('\n');

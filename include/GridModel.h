@@ -34,7 +34,14 @@ struct GridSurface {
     // win_float_pos. Default true so the QML delegate's MouseArea is enabled
     // unless explicitly turned off for an unfocusable float.
     bool          focusable  = true;
-    QVector<Cell> cells;                // row-major, size = rows*cols
+    // Row-of-rows storage. Picking row-pointer indirection over a flat
+    // row-major QVector<Cell> turns grid_scroll into an O(rows) std::rotate
+    // over QVector<Cell> handles (cheap implicit-share-pointer swap) instead
+    // of an O(rows*cols) per-Cell copy. Holding j/k now pays one ref-count
+    // touch per moved row rather than one per moved cell, which is the
+    // dominant scroll cost at 200x60. Each inner vector is exactly `cols`
+    // long; the `rows` int above is the count.
+    QVector<QVector<Cell>> cellRows;
 };
 
 // QObject wrapper exposing one grid's geometry as bindable properties. QML

@@ -35,6 +35,7 @@ qvim_add_test(test_msgpack_rpc         unit/test_msgpack_rpc.cpp)
 qvim_add_test(test_option_set_dispatch unit/test_option_set_dispatch.cpp)
 qvim_add_test(test_popupmenu_select    unit/test_popupmenu_select.cpp)
 qvim_add_test(test_resize_coalescer    unit/test_resize_coalescer.cpp)
+qvim_add_test(test_scroll_perf_micro   unit/test_scroll_perf_micro.cpp)
 
 # test_app_icon constructs QGuiApplication and needs the qico imageformat
 # plugin from vcpkg's debug Qt to decode :/icon.ico. The qvim post-build step
@@ -72,6 +73,8 @@ qvim_add_test(test_popupmenu                     integration/test_popupmenu.cpp)
 qvim_add_test(test_resize                        integration/test_resize.cpp)
 qvim_add_test(test_resize_smoothness             integration/test_resize_smoothness.cpp)
 qvim_add_test(test_runtime_set_options           integration/test_runtime_set_options.cpp)
+qvim_add_test(test_scroll_perf                   integration/test_scroll_perf.cpp)
+target_link_libraries(test_scroll_perf PRIVATE qvim_libplugin Qt6::Quick)
 qvim_add_test(test_tabline                       integration/test_tabline.cpp)
 qvim_add_test(test_title_updates                 integration/test_title_updates.cpp)
 qvim_add_test(test_titlebar_color                integration/test_titlebar_color.cpp)
@@ -92,7 +95,7 @@ target_link_libraries(test_user_smoke PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_focuses_float           PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
+foreach(t test_attach_and_render test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
