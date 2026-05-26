@@ -1,4 +1,5 @@
 #include "GridItem.h"
+#include "CellMetrics.h"
 #include "NvimConnector.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
@@ -120,15 +121,14 @@ void GridItem::setDebugOverlay(bool v) {
 }
 
 void GridItem::recomputeMetrics() {
+    // Delegated to computeCellMetrics for testability and to keep the
+    // integer-snap rationale (visual-mode seams from sub-pixel boundaries)
+    // in one place.
     const QFontMetricsF fm(m_font);
-    m_cellWidth  = fm.horizontalAdvance(QLatin1Char('M'));
-    // `linespace` is extra vertical pixels added per cell, vim-style: half
-    // above the baseline (raises ascent visually) and half below. We keep the
-    // baseline aligned with the original ascent + linespace/2 so the glyph
-    // sits centred in the taller row.
-    const qreal extra = static_cast<qreal>(std::max(0, m_linespace));
-    m_cellHeight = fm.height() + extra;
-    m_baseline   = fm.ascent() + extra / 2.0;
+    const CellMetrics cm = computeCellMetrics(fm, m_linespace);
+    m_cellWidth  = cm.cellWidth;
+    m_cellHeight = cm.cellHeight;
+    m_baseline   = cm.baseline;
 }
 
 void GridItem::onLinespaceChanged() {
