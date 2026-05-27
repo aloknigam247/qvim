@@ -12,7 +12,7 @@ Root rules in `D:\qvim\CLAUDE.md` still apply. This file adds C++-only specifics
 - `ConfigGGlobalReader.{h,cpp}` — populates Config from `g:qvim_<name>` once after attachComplete.
 - `MsgpackRpc.{h,cpp}` — nvim transport. Owns the unpacker arena. `msgpack::object` views into this arena.
 - `NvimConnector.{h,cpp}` — redraw event dispatch. Hot-path switch over event names.
-- `GridModel.{h,cpp}` — row-major cell grid. Single source of truth for what `paint()` reads.
+- `GridModel.{h,cpp}` — cell grid; single source of truth for what `paint()` reads. Storage is `QVector<QVector<Cell>>` (row-of-rows, NOT flat `QVector<Cell>`) so `scroll(...)` rotates row handles in O(rows) instead of cell-copying in O(rows × cols). Holding `j`/`k` on a 200×60 grid relies on this — flat storage measured ~1000µs/scroll vs ~5µs for the row-handle rotation. Don't regress.
 - `HighlightTable.{h,cpp}` — `hl_attr_define` cache, hashed lookup by id.
 - `ModeInfo.{h,cpp}` — cursor shape + mode index from `mode_info_set` / `mode_change`.
 - `GridItem.{h,cpp}` — `QQuickPaintedItem` renderer. `paint()` must stay pure.
@@ -58,7 +58,7 @@ ctest --preset dev --output-on-failure -R test_grid_model
 
 ## Templates
 
-- Row-major cell storage: `GridModel.cpp`.
+- Row-of-rows cell storage with O(rows) `std::rotate`-based scroll: `GridModel.cpp`. Keeps held-key scroll latency in the µs range.
 - Hashed attr cache: `HighlightTable.cpp`.
 - Redraw event dispatch: `NvimConnector.cpp`.
 - `QQuickPaintedItem` pure-paint renderer: `GridItem.cpp`.
