@@ -207,6 +207,17 @@ int main(int argc, char* argv[]) {
                 firstFrameSeen = true;
                 boot.mark("first frame swapped");
             }, Qt::SingleShotConnection);
+            // Main.qml keeps the window invisible until the first redraw flush
+            // arrives at the post-attach resized geometry — that's the moment
+            // the user actually sees the editor. Track it as a distinct boot
+            // phase so we can tell time-to-first-frame from time-to-visible.
+            QObject::connect(w, &QQuickWindow::visibleChanged, &app, [w, &boot]() {
+                static bool firstShowSeen = false;
+                if (firstShowSeen) return;
+                if (!w->isVisible()) return;
+                firstShowSeen = true;
+                boot.mark("window shown at real size");
+            });
         }
     }
 

@@ -72,9 +72,14 @@ private slots:
         QQmlApplicationEngine engine;
         QQuickWindow* window = loadMainQml(engine, &conn);
         QVERIFY2(window, "Main.qml failed to load");
-        QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
+        // Main.qml starts with visible: false (to hide the 80x24 attach-jump);
+        // it flips visible after the post-attach resize flush. QTest::mouseMove
+        // routes via geometry hit-test and needs an exposed window, so wait for
+        // visibility to settle before driving any mouse events.
+        QVERIFY(waitUntil([&]() { return window->isVisible(); }, 5000));
+        QVERIFY(QTest::qWaitForWindowExposed(window));
 
         // Enable mouse and put some content on line 1 to drag across.
         conn.command(QStringLiteral("set mouse=a"));
