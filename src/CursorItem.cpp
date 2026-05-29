@@ -277,10 +277,7 @@ void CursorItem::rescheduleBlink() {
 void CursorItem::paint(QPainter* painter) {
     GridModel* g = grid();
     HighlightTable* h = hl();
-    // No animated position yet means we haven't seen a cursorChanged signal
-    // since the connector arrived. Skip — the cursor blinks into view on the
-    // first signal (which sets m_animatedPos via the snap branch).
-    if (!g || !h || !m_hasAnimatedPos) {
+    if (!g || !h) {
         m_lastRect = {};
         return;
     }
@@ -316,10 +313,22 @@ void CursorItem::paint(QPainter* painter) {
     const CursorShape shape = m
         ? static_cast<CursorShape>(m->cursorShapeInt())
         : CursorShape::Block;
-    // Draw at the animated position (snapped to target outside animation),
-    // not at the target cell's calculated pixel. During a move animation,
-    // m_animatedPos sweeps between cells; the block + glyph travel together.
-    const QRectF rect = cursorRectAtPixel(m_animatedPos, m_cellWidth, m_cellHeight, shape);
+
+    // Visible pixel position. Once an animation has been seeded (i.e. we've
+    // seen at least one cursorChanged on this CursorItem), m_animatedPos
+    // sweeps between cells. Before then — typically the very first paint
+    // after attach, because nvim's initial grid_cursor_goto fires before
+    // CursorItem is constructed — fall back to the target cell so the
+    // cursor is visible on launch.
+    QPointF drawPos;
+    if (m_hasAnimatedPos) {
+        drawPos = m_animatedPos;
+    } else {
+        const int absRow = surface->y() + localRow;
+        const int absCol = surface->x() + localCol;
+        drawPos = QPointF(absCol * m_cellWidth, absRow * m_cellHeight);
+    }
+    const QRectF rect = cursorRectAtPixel(drawPos, m_cellWidth, m_cellHeight, shape);
 
     painter->setRenderHint(QPainter::TextAntialiasing, true);
     painter->fillRect(rect, curColor);
@@ -331,8 +340,8 @@ void CursorItem::paint(QPainter* painter) {
         if (!cell.text.isEmpty()) {
             painter->setPen(h->defaultBg());
             painter->setFont(m_font);
-            const qreal glyphX = m_animatedPos.x();
-            const qreal glyphY = m_animatedPos.y() + m_baseline;
+            const qreal glyphX = drawPos.x();
+            const qreal glyphY = drawPos.y() + m_baseline;
             if (isPua(cell.text[0])) {
                 // QTBUG-116417 workaround — Qt's shaper drops PUA codepoints,
                 // so block-mode nerd-font cursor glyphs need the QRawFont +
