@@ -5,7 +5,7 @@ Root `D:\qvim\CLAUDE.md` covers the three-tier philosophy. This file is operatio
 ## Tiers
 
 - **Tier 1 — `tests/unit/`** — headless, `QTEST_GUILESS_MAIN`. No nvim.
-  Targets: `test_cmdline_pos`, `test_grid_model`, `test_hidpi_rendering`, `test_highlight_table`, `test_input_fuzz`, `test_input_handler`, `test_msgpack_rpc`, `test_popupmenu_select`.
+  Targets: `test_cmdline_pos`, `test_cursor_blink`, `test_cursor_item`, `test_grid_model`, `test_hidpi_rendering`, `test_highlight_table`, `test_input_fuzz`, `test_input_handler`, `test_msgpack_rpc`, `test_popupmenu_select`.
 - **Tier 2 — `tests/integration/`** — real `nvim --embed`, `QT_QPA_PLATFORM=minimal`.
   Targets: `test_attach_and_render`, `test_cmdline`, `test_insert_and_quit`, `test_messages`, `test_multigrid`, `test_pixel_snapshot`, `test_popupmenu`, `test_resize`, `test_tabline`, `test_user_smoke`.
 - **Tier 3 — `tests/qml/`** — `qmltest` against QML in isolation. Single target `test_qml`.

@@ -40,7 +40,8 @@ include/                    # all project headers, flat, included as "Foo.h"
   GridModel.h               # cell grid (row-major)
   HighlightTable.h          # hl_attr cache
   ModeInfo.h                # cursor shape / mode index
-  GridItem.h                # QQuickPaintedItem renderer
+  GridItem.h                # QQuickPaintedItem renderer (cell content only)
+  CursorItem.h              # QQuickPaintedItem cursor overlay (sibling of grid)
   InputHandler.h            # QKeyEvent → nvim keycodes
   TablineModel.h / PopupMenuModel.h / CmdlineModel.h / ...
 src/                        # implementation .cpp files
@@ -59,7 +60,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-The post-build step in `CMakeLists.txt` deploys Qt DLLs + plugins next to `qvim.exe` because vcpkg's debug prefix is incompatible with `windeployqt`. Release deployment uses `qt_generate_deploy_app_script` (see CMakeLists).
+The post-build step in `CMakeLists.txt` deploys Qt DLLs + `qt.conf` + platform plugins + QML modules next to `qvim.exe` for BOTH Debug and Release builds. The block is parameterised on `CMAKE_BUILD_TYPE` (debug DLLs use the `d` suffix, debug vcpkg prefix has the extra `debug/` segment). `qt_generate_deploy_app_script` + `install(SCRIPT ...)` is still wired up for non-Debug consumers running `cmake --install` — but the build-tree exe at `build/<preset>/<Config>/qvim.exe` is launchable directly without an install step.
 
 ## Conventions
 
@@ -93,6 +94,7 @@ Three tiers (see `tests/CMakeLists.txt`):
 - `nvim_ui_try_resize` called from `geometryChange` will fire during cmdline_show reflow. With ext_multigrid this triggers `grid_resize` + `win_pos` for every grid — make sure these don't destroy QML delegates.
 - `QQuickPaintedItem::paint()` runs on the SceneGraph **render thread**, not the GUI thread. Any `QRawFont` / `QFontEngine`-backed object must be constructed AND destroyed on the render thread (the dtor also asserts thread affinity). If you cache one, hook `QQuickWindow::sceneGraphInvalidated` with `Qt::DirectConnection` to release it before the SceneGraph tears down.
 - After merging library-only `.cpp` changes into main, the incremental linker may skip relinking `qvim.exe` — the .lib changes, the .exe doesn't. Always force-rebuild with `cmake --build --preset dev --target qvim` before asking the user to verify a fix; otherwise they're testing a stale binary. Same trap exists for an agent's worktree exe: ctest can pass against the new .lib while `<worktree>/build/dev/Debug/qvim.exe` is still from an earlier build. Before validating an agent's worktree binary, check `ls -l <worktree>/build/dev/Debug/qvim.exe` against `git log -1 --format=%ci <branch>` — if the exe is older, delete it and rerun `cmake --build --preset dev --target qvim`.
+- `Q_PROPERTY(qreal baseline ...)` on a `QQuickPaintedItem` subclass silently fails: Qt's MOC emits "Final member baseline is overridden. The override won't be used." and QML treats the property as read-only (bindings like `cursorItem.baseline: baseGrid.baseline` produce "Invalid property assignment: baseline is a read-only property"). The trap is that the warning is on the property *override*, not the original — QQuickItem has an internal FINAL `baseline` member that shadows any subclass property of the same name. Rename to anything else (`cellBaseline`, `textBaseline`) to avoid the clash. Other Qt-reserved-name candidates that should not be Q_PROPERTYs on QQuickItem subclasses include `baselineOffset` (real Q_PROPERTY), `clip`, `enabled`, `focus`, `visible`, etc. — when in doubt, prefix with a domain word.
 - Bash tool's working directory persists across calls, including when an earlier call `cd`d into a worktree. Cherry-picking and other parent operations must use `git -C /d/qvim ...` or `cd /d/qvim && ...` explicitly — otherwise you commit/build/test in the wrong tree.
 - Boot-profile instrumentation is gated behind `QVIM_BOOT_PROFILE=1`. Phase timings go to `qDebug` (invisible under `/SUBSYSTEM:WINDOWS` launched from Explorer) **and** to the path in `QVIM_BOOT_PROFILE_FILE` when set. Use the file form for windowed launches: `$env:QVIM_BOOT_PROFILE=1; $env:QVIM_BOOT_PROFILE_FILE='D:\qvim\_boot.log'; qvim.exe`.
 - Qt 6.10 on Windows: `QFont::setFeature(QFont::Tag("liga"), 1)` / `setFeature("calt", 1)` does NOT enable OpenType ligatures for monospace fonts even though the API exists. Cascadia Code / JetBrainsMono ligatures that render in VS Code and Windows Terminal will NOT form in qvim through this path. A working ligature implementation needs a different approach (custom shaping via `QRawFont` + HarfBuzz directly, or `QTextLayout` with explicit feature config) — and a test that asserts on actual ligature *glyph substitution*, not pixel-band density (which responds to kerning changes alone, producing false positives).
