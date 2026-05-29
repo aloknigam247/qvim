@@ -94,6 +94,7 @@ void GridModel::resize(int gridId, int cols, int rows) {
     for (auto& row : s.cellRows) {
         row.assign(cols, Cell{QStringLiteral(" "), 0, false});
     }
+    s.dirty = true;
     ensureProxy(gridId)->setSize(cols, rows);
     emit sizeChanged();
 }
@@ -104,6 +105,7 @@ void GridModel::clear(int gridId) {
     for (auto& row : s->cellRows) {
         for (auto& c : row) c = Cell{QStringLiteral(" "), 0, false};
     }
+    s->dirty = true;
 }
 
 void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::object& cellsArr) {
@@ -112,6 +114,7 @@ void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::obje
     if (!s) return;
     if (row < 0 || row >= s->rows) return;
 
+    s->dirty = true;
     int col = colStart;
     int lastHl = 0;
     // Tracks whether the most recently emitted cell carried a non-empty glyph
@@ -168,6 +171,7 @@ void GridModel::scroll(int gridId, int top, int bot, int left, int right, int ro
     if (rows == 0 || left >= right || top >= bot) return;
     GridSurface* s = surface(gridId);
     if (!s) return;
+    s->dirty = true;
 
     // Fast path: a full-width scroll (left/right cover the whole grid) is what
     // j/k/Ctrl-D/Ctrl-U emit at 200x60. Rotating the QVector<Cell> row handles
@@ -250,6 +254,7 @@ void GridModel::setPos(int gridId, int x, int y, int w, int h) {
         for (auto& row : s.cellRows) {
             row.assign(w, Cell{QStringLiteral(" "), 0, false});
         }
+        s.dirty = true;
         emit sizeChanged();
     }
     auto* p = ensureProxy(gridId);

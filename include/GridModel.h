@@ -42,6 +42,13 @@ struct GridSurface {
     // dominant scroll cost at 200x60. Each inner vector is exactly `cols`
     // long; the `rows` int above is the count.
     QVector<QVector<Cell>> cellRows;
+    // Set whenever cell content changes (applyLine, scroll, clear, resize).
+    // GridItem::onFlush reads + clears this via takeDirty(gridId); if false,
+    // the flush triggers no update() — so pure cursor moves (which produce
+    // grid_cursor_goto + flush with no grid_line) skip the full row*col
+    // paint loop. Initial value true to ensure the first paint after
+    // construction runs.
+    bool dirty = true;
 };
 
 // QObject wrapper exposing one grid's geometry as bindable properties. QML
@@ -169,6 +176,21 @@ public:
     const Cell& cell(int row, int col) const { return cell(m_active, row, col); }
     int  cursorRowOf(int gridId) const { const auto* s = surface(gridId); return s ? s->cursorRow : 0; }
     int  cursorColOf(int gridId) const { const auto* s = surface(gridId); return s ? s->cursorCol : 0; }
+
+    // Returns the grid's dirty flag and clears it. Called by GridItem::onFlush
+    // to decide whether the flush actually needs a repaint. Cursor-only nvim
+    // events (grid_cursor_goto + flush, common when holding j/k inside the
+    // visible area at fullscreen) leave the grid clean — the CursorItem
+    // overlay handles its own per-cell repaint, and the grid item stays
+    // unchanged. Without this guard, every keystroke triggered a full
+    // rows*cols paint loop, dominating frame time at large grid sizes.
+    bool takeDirty(int gridId) {
+        auto* s = surface(gridId);
+        if (!s) return false;
+        const bool wasDirty = s->dirty;
+        s->dirty = false;
+        return wasDirty;
+    }
 
     QString dumpAscii() const { return dumpAscii(m_active); }
     QString dumpAscii(int gridId) const;

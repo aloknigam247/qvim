@@ -136,6 +136,68 @@ private slots:
         QCOMPARE(g.cell(0, 3).doubleWidth, true);
     }
 
+    // Dirty tracking — drives GridItem::onFlush's repaint gate.
+
+    void dirtyTrueAfterConstruction() {
+        // First paint after construction needs a full draw.
+        GridModel g;
+        QVERIFY(g.takeDirty(1));
+        QVERIFY(!g.takeDirty(1));  // takeDirty clears the flag
+    }
+
+    void resizeMarksDirty() {
+        GridModel g;
+        g.takeDirty(1);            // clear initial dirty
+        g.resize(10, 5);
+        QVERIFY(g.takeDirty(1));
+    }
+
+    void applyLineMarksDirty() {
+        GridModel g;
+        g.resize(5, 1);
+        g.takeDirty(1);
+        const auto h = packGridLineCells({{"a", 0, -1}, {"b", -1, -1}});
+        g.applyLine(0, 0, h.get());
+        QVERIFY(g.takeDirty(1));
+    }
+
+    void clearMarksDirty() {
+        GridModel g;
+        g.resize(5, 1);
+        g.takeDirty(1);
+        g.clear();
+        QVERIFY(g.takeDirty(1));
+    }
+
+    void scrollMarksDirty() {
+        GridModel g;
+        g.resize(5, 4);
+        g.takeDirty(1);
+        g.scroll(0, 4, 0, 5, 1);
+        QVERIFY(g.takeDirty(1));
+    }
+
+    void cursorMoveDoesNotMarkDirty() {
+        // The whole point of the dirty flag: cursor-only changes don't
+        // trigger a GridItem repaint. The cursor lives on a sibling overlay.
+        GridModel g;
+        g.resize(10, 5);
+        g.takeDirty(1);
+        g.setCursor(2, 3);
+        QVERIFY(!g.takeDirty(1));
+    }
+
+    void dirtyIsPerGrid() {
+        GridModel g;
+        g.resize(2, 5, 5);           // grid 2
+        g.takeDirty(1);
+        g.takeDirty(2);
+        const auto h = packGridLineCells({{"x", 0, -1}});
+        g.applyLine(2, 0, 0, h.get());
+        QVERIFY(!g.takeDirty(1));   // grid 1 untouched
+        QVERIFY(g.takeDirty(2));    // grid 2 dirty
+    }
+
     void dumpAsciiSnapshot() {
         GridModel g;
         g.resize(3, 2);
