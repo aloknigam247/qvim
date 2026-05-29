@@ -49,6 +49,28 @@ private slots:
         QCOMPARE(horiz.height(), 1.0);
     }
 
+    // Pixel-space variant for use during cursor-move animation, when
+    // m_animatedPos is between cells. Same shape math as the (row, col)
+    // overload, just takes the cell top-left directly. This is what
+    // CursorItem::paint() calls each frame.
+    void rectAtPixelMatchesCellMath() {
+        const QRectF cellBased = CursorItem::cursorRectFor(3, 5, 8.0, 16.0, CursorShape::Block);
+        const QRectF pixelBased = CursorItem::cursorRectAtPixel(QPointF(5 * 8.0, 3 * 16.0),
+                                                                8.0, 16.0, CursorShape::Block);
+        QCOMPARE(cellBased, pixelBased);
+    }
+
+    // Mid-cell position — the case that only happens during animation. The
+    // cursor rect should sit at the interpolated top-left, same shape.
+    void rectAtPixelHandlesFractionalPosition() {
+        const QRectF r = CursorItem::cursorRectAtPixel(QPointF(42.5, 19.3),
+                                                       8.0, 16.0, CursorShape::Block);
+        QCOMPARE(r.x(),      42.5);
+        QCOMPARE(r.y(),      19.3);
+        QCOMPARE(r.width(),  8.0);
+        QCOMPARE(r.height(), 16.0);
+    }
+
     // Rects from consecutive cursor positions must be unioned for the dirty
     // region passed to update(QRect), so the old cursor cell gets cleared and
     // the new one drawn in a single repaint. Direct math check on Qt's

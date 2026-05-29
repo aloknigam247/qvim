@@ -2,11 +2,14 @@
 
 #include <QElapsedTimer>
 #include <QFont>
+#include <QPointF>
 #include <QPointer>
 #include <QQuickPaintedItem>
 #include <QRectF>
 #include <QTimer>
+#include <QVariantAnimation>
 #include <qqmlregistration.h>
+#include <utility>
 
 #include "CursorBlinkState.h"
 #include "ModeInfo.h"
@@ -65,6 +68,12 @@ public:
     static QRectF cursorRectFor(int row, int col,
                                 qreal cellWidth, qreal cellHeight,
                                 CursorShape shape);
+    // Pixel-space variant used by paint() during cursor-move animation when
+    // the cursor's visible position is between cells. cellTopLeft is the
+    // top-left corner in the same coord space as cursorRectFor's output.
+    static QRectF cursorRectAtPixel(QPointF cellTopLeft,
+                                    qreal cellWidth, qreal cellHeight,
+                                    CursorShape shape);
 
 signals:
     void connectorChanged();
@@ -82,10 +91,16 @@ private:
     HighlightTable* hl()   const;
     ModeInfo*       mode() const;
 
-    // Current cursor rect in this item's coordinate space, or null if there
-    // is no active grid / cursor is off-grid. Reads activeGrid/cursor position
-    // off the model — no caching, called once per paint and per state change.
+    // The cursor's VISIBLE rect in this item's coordinate space, derived
+    // from m_animatedPos + current mode's shape. Returns null if no animated
+    // position has been seeded yet (no cursorChanged has fired).
     QRectF currentCursorRect() const;
+
+    // Top-left pixel of the TARGET cell (where nvim says the cursor should
+    // be). Used by onCursorActivity to know where to animate toward. Returns
+    // {false, {}} when the active grid is missing/hidden or the cursor is
+    // out-of-bounds (a transient state during grid destruction).
+    std::pair<bool, QPointF> targetCellTopLeft() const;
 
     void scheduleRepaint();   // update(QRect) over m_lastRect.united(currentRect)
     void rescheduleBlink();
@@ -106,6 +121,22 @@ private:
     // the old one needs repaint to clear stale cursor pixels, the new one
     // to render the cursor in place.
     QRectF           m_lastRect;
+
+    // Cursor-move animation. Drives a QPointF (cell top-left in this item's
+    // pixel space) between the previous and target cell over a short ease.
+    // 80ms / OutExpo is the Goneovim default — starts fast, decelerates into
+    // target, doesn't feel laggy for held j/k. Cursor SHAPE is read from
+    // ModeInfo at paint time (the animation does not interpolate shape).
+    //
+    // The animation runs UNCONDITIONALLY on every same-content cursor move,
+    // and is BYPASSED (snap) when the underlying cells changed in the same
+    // batch (scroll/paste/etc., detected via GridModel::isDirty before the
+    // GridItem flush gate clears it). Eased motion relative to text that
+    // also moved looks wrong, so scroll snaps even though it goes through
+    // the same cursorChanged signal.
+    QVariantAnimation m_moveAnim;
+    QPointF           m_animatedPos;
+    bool              m_hasAnimatedPos = false;
 };
 
 } // namespace qvim

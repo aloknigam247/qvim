@@ -4,12 +4,14 @@
 #include "HighlightTable.h"
 #include "NvimConnector.h"
 
+#include <QEasingCurve>
 #include <QFontDatabase>
 #include <QGlyphRun>
 #include <QList>
 #include <QPainter>
 #include <QPointF>
 #include <QRawFont>
+#include <QVariant>
 
 namespace qvim {
 
@@ -47,6 +49,18 @@ CursorItem::CursorItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
 
     m_blinkTimer.setSingleShot(true);
     connect(&m_blinkTimer, &QTimer::timeout, this, &CursorItem::onBlinkTimeout);
+
+    // Move animation: 80ms ease-out, position-only. valueChanged drives
+    // m_animatedPos and unions the swept rect into the next update() so
+    // both the old and new cells (and everything between, on a single tick)
+    // are redrawn. Stops on its own when the curve reaches t=1.
+    m_moveAnim.setDuration(80);
+    m_moveAnim.setEasingCurve(QEasingCurve::OutExpo);
+    connect(&m_moveAnim, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant& v) {
+                m_animatedPos = v.toPointF();
+                scheduleRepaint();
+            });
 }
 
 CursorItem::~CursorItem() = default;
@@ -121,7 +135,14 @@ ModeInfo*       CursorItem::mode() const { return m_conn ? m_conn->modeInfo()   
 QRectF CursorItem::cursorRectFor(int row, int col,
                                  qreal cellWidth, qreal cellHeight,
                                  CursorShape shape) {
-    QRectF rect(col * cellWidth, row * cellHeight, cellWidth, cellHeight);
+    return cursorRectAtPixel(QPointF(col * cellWidth, row * cellHeight),
+                             cellWidth, cellHeight, shape);
+}
+
+QRectF CursorItem::cursorRectAtPixel(QPointF cellTopLeft,
+                                     qreal cellWidth, qreal cellHeight,
+                                     CursorShape shape) {
+    QRectF rect(cellTopLeft.x(), cellTopLeft.y(), cellWidth, cellHeight);
     // Preserve the existing 15% hardcode from src/GridItem.cpp. Mode info's
     // cellPercentage is intentionally ignored for parity — wiring it through
     // is a separate change that affects visual behaviour.
@@ -134,28 +155,29 @@ QRectF CursorItem::cursorRectFor(int row, int col,
     return rect;
 }
 
-QRectF CursorItem::currentCursorRect() const {
+std::pair<bool, QPointF> CursorItem::targetCellTopLeft() const {
     GridModel* g = grid();
-    if (!g) return {};
+    if (!g) return {false, {}};
     const int active = g->activeGrid();
     auto* surface = g->surfaceFor(active);
-    if (!surface || !surface->visible()) return {};
-
-    const int gridCols = surface->cols();
-    const int gridRows = surface->rows();
+    if (!surface || !surface->visible()) return {false, {}};
     const int localRow = g->cursorRowOf(active);
     const int localCol = g->cursorColOf(active);
-    if (localRow < 0 || localRow >= gridRows ||
-        localCol < 0 || localCol >= gridCols) {
-        return {};
+    if (localRow < 0 || localRow >= surface->rows() ||
+        localCol < 0 || localCol >= surface->cols()) {
+        return {false, {}};
     }
-
     const int absRow = surface->y() + localRow;
     const int absCol = surface->x() + localCol;
+    return {true, QPointF(absCol * m_cellWidth, absRow * m_cellHeight)};
+}
+
+QRectF CursorItem::currentCursorRect() const {
+    if (!m_hasAnimatedPos) return {};
     const CursorShape shape = mode()
         ? static_cast<CursorShape>(mode()->cursorShapeInt())
         : CursorShape::Block;
-    return cursorRectFor(absRow, absCol, m_cellWidth, m_cellHeight, shape);
+    return cursorRectAtPixel(m_animatedPos, m_cellWidth, m_cellHeight, shape);
 }
 
 void CursorItem::scheduleRepaint() {
@@ -174,6 +196,40 @@ void CursorItem::scheduleRepaint() {
 void CursorItem::onCursorActivity() {
     m_blink.notifyActivity(m_clock.elapsed());
     rescheduleBlink();
+
+    const auto [ok, target] = targetCellTopLeft();
+    if (!ok) {
+        m_moveAnim.stop();
+        m_hasAnimatedPos = false;
+        scheduleRepaint();
+        return;
+    }
+
+    // Snap (no animation) when this is the first cursor we've seen OR when
+    // the underlying cells changed in the same batch — scroll / paste /
+    // anything where text moved alongside the cursor. Eased motion relative
+    // to scrolling text looks like the cursor is fighting the page.
+    GridModel* g = grid();
+    const bool gridDirty = g && g->isDirty(g->activeGrid());
+    const bool snap = !m_hasAnimatedPos || gridDirty;
+
+    if (snap) {
+        m_moveAnim.stop();
+        m_animatedPos = target;
+        m_hasAnimatedPos = true;
+    } else if (target != m_animatedPos) {
+        // Same-content move (j/k/h/l with no scroll, w/b/e, click) — ease in.
+        // Restart from the CURRENT animated position so a fast j-then-j chain
+        // doesn't ping-pong: each new keystroke continues from where the
+        // last animation got to, not from the previous target.
+        m_moveAnim.stop();
+        m_moveAnim.setStartValue(m_animatedPos);
+        m_moveAnim.setEndValue(target);
+        m_moveAnim.start();
+    }
+    // else: target == current animated position; nothing to animate, paint
+    // will redraw at the same spot (covers blink-reset and same-cell mode
+    // transitions).
     scheduleRepaint();
 }
 
@@ -221,7 +277,10 @@ void CursorItem::rescheduleBlink() {
 void CursorItem::paint(QPainter* painter) {
     GridModel* g = grid();
     HighlightTable* h = hl();
-    if (!g || !h) {
+    // No animated position yet means we haven't seen a cursorChanged signal
+    // since the connector arrived. Skip — the cursor blinks into view on the
+    // first signal (which sets m_animatedPos via the snap branch).
+    if (!g || !h || !m_hasAnimatedPos) {
         m_lastRect = {};
         return;
     }
@@ -233,12 +292,10 @@ void CursorItem::paint(QPainter* painter) {
         m_lastRect = {};
         return;
     }
-    const int gridCols = surface->cols();
-    const int gridRows = surface->rows();
     const int localRow = g->cursorRowOf(active);
     const int localCol = g->cursorColOf(active);
-    if (localRow < 0 || localRow >= gridRows ||
-        localCol < 0 || localCol >= gridCols) {
+    if (localRow < 0 || localRow >= surface->rows() ||
+        localCol < 0 || localCol >= surface->cols()) {
         m_lastRect = {};
         return;
     }
@@ -259,36 +316,38 @@ void CursorItem::paint(QPainter* painter) {
     const CursorShape shape = m
         ? static_cast<CursorShape>(m->cursorShapeInt())
         : CursorShape::Block;
-    const int absRow = surface->y() + localRow;
-    const int absCol = surface->x() + localCol;
-    const QRectF rect = cursorRectFor(absRow, absCol, m_cellWidth, m_cellHeight, shape);
+    // Draw at the animated position (snapped to target outside animation),
+    // not at the target cell's calculated pixel. During a move animation,
+    // m_animatedPos sweeps between cells; the block + glyph travel together.
+    const QRectF rect = cursorRectAtPixel(m_animatedPos, m_cellWidth, m_cellHeight, shape);
 
     painter->setRenderHint(QPainter::TextAntialiasing, true);
     painter->fillRect(rect, curColor);
 
     if (shape == CursorShape::Block && cursorOn) {
+        // Glyph is the TARGET cell's text — the cursor "carries" its
+        // destination glyph as it slides into place. Matches Goneovim.
         const Cell& cell = g->cell(active, localRow, localCol);
         if (!cell.text.isEmpty()) {
             painter->setPen(h->defaultBg());
             painter->setFont(m_font);
+            const qreal glyphX = m_animatedPos.x();
+            const qreal glyphY = m_animatedPos.y() + m_baseline;
             if (isPua(cell.text[0])) {
                 // QTBUG-116417 workaround — Qt's shaper drops PUA codepoints,
                 // so block-mode nerd-font cursor glyphs need the QRawFont +
-                // drawGlyphRun bypass. Mirrors src/GridItem.cpp lines 603-614.
+                // drawGlyphRun bypass.
                 const QRawFont raw = QRawFont::fromFont(m_font);
                 const QList<quint32> ids = raw.glyphIndexesForString(cell.text);
                 if (!ids.isEmpty()) {
                     QGlyphRun run;
                     run.setRawFont(raw);
                     run.setGlyphIndexes({ids.first()});
-                    run.setPositions({QPointF(absCol * m_cellWidth,
-                                              absRow * m_cellHeight + m_baseline)});
+                    run.setPositions({QPointF(glyphX, glyphY)});
                     painter->drawGlyphRun(QPointF(0, 0), run);
                 }
             } else {
-                painter->drawText(QPointF(absCol * m_cellWidth,
-                                          absRow * m_cellHeight + m_baseline),
-                                  cell.text);
+                painter->drawText(QPointF(glyphX, glyphY), cell.text);
             }
         }
     }
