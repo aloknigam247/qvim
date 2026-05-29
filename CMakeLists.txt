@@ -84,15 +84,22 @@ endif()
 target_link_libraries(qvim PRIVATE qvim_lib qvim_libplugin)
 set_target_properties(qvim PROPERTIES WIN32_EXECUTABLE TRUE)
 
-if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(WIN32)
     # vcpkg's Qt install splits debug/release across separate prefixes, and
     # windeployqt can't be redirected to the debug prefix. We deploy the
     # minimum runtime ourselves: Qt DLLs, the platform plugin, and the QML
     # modules our QML files actually import.
-    set(QVIM_DEBUG_BIN     "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/bin")
-    set(QVIM_DEBUG_PLUGINS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/Qt6/plugins")
-    set(QVIM_DEBUG_QML     "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/Qt6/qml")
-    set(QVIM_OUT_DIR       "$<TARGET_FILE_DIR:qvim>")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(QVIM_VCPKG_PREFIX "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug")
+        set(QVIM_QT_DLL_SUFFIX "d")
+    else()
+        set(QVIM_VCPKG_PREFIX "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+        set(QVIM_QT_DLL_SUFFIX "")
+    endif()
+    set(QVIM_QT_BIN     "${QVIM_VCPKG_PREFIX}/bin")
+    set(QVIM_QT_PLUGINS "${QVIM_VCPKG_PREFIX}/Qt6/plugins")
+    set(QVIM_QT_QML     "${QVIM_VCPKG_PREFIX}/Qt6/qml")
+    set(QVIM_OUT_DIR    "$<TARGET_FILE_DIR:qvim>")
 
     # qt.conf tells Qt to look in the local dir for plugins + QML modules.
     file(WRITE "${CMAKE_BINARY_DIR}/qt.conf"
@@ -101,9 +108,9 @@ Plugins = .
 Qml2Imports = .
 ")
 
-    # Glob all Qt6 debug DLLs — chasing individual dependencies is tedious and
+    # Glob all Qt6 DLLs — chasing individual dependencies is tedious and
     # the QML modules import indirect Qt libs that CMake's link-deps tracking misses.
-    file(GLOB QVIM_EXTRA_QT_DLLS "${QVIM_DEBUG_BIN}/Qt6*d.dll")
+    file(GLOB QVIM_EXTRA_QT_DLLS "${QVIM_QT_BIN}/Qt6*${QVIM_QT_DLL_SUFFIX}.dll")
 
     add_custom_command(TARGET qvim POST_BUILD
         # qt.conf next to qvim.exe so plugin/QML lookup is self-contained
@@ -117,24 +124,24 @@ Qml2Imports = .
         # Platform plugin (always required)
         COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/platforms"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QVIM_DEBUG_PLUGINS}/platforms/qwindowsd.dll"
-            "${QVIM_OUT_DIR}/platforms/qwindowsd.dll"
+            "${QVIM_QT_PLUGINS}/platforms/qwindows${QVIM_QT_DLL_SUFFIX}.dll"
+            "${QVIM_OUT_DIR}/platforms/qwindows${QVIM_QT_DLL_SUFFIX}.dll"
         # Minimal platform (for tests under QT_QPA_PLATFORM=minimal)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QVIM_DEBUG_PLUGINS}/platforms/qminimald.dll"
-            "${QVIM_OUT_DIR}/platforms/qminimald.dll"
+            "${QVIM_QT_PLUGINS}/platforms/qminimal${QVIM_QT_DLL_SUFFIX}.dll"
+            "${QVIM_OUT_DIR}/platforms/qminimal${QVIM_QT_DLL_SUFFIX}.dll"
         # ICO image format plugin (needed to load :/icon.ico for window icon)
         COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/imageformats"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QVIM_DEBUG_PLUGINS}/imageformats/qicod.dll"
-            "${QVIM_OUT_DIR}/imageformats/qicod.dll"
+            "${QVIM_QT_PLUGINS}/imageformats/qico${QVIM_QT_DLL_SUFFIX}.dll"
+            "${QVIM_OUT_DIR}/imageformats/qico${QVIM_QT_DLL_SUFFIX}.dll"
         # QML modules used by qvim's QML files
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            "${QVIM_DEBUG_QML}/QtQuick"          "${QVIM_OUT_DIR}/QtQuick"
+            "${QVIM_QT_QML}/QtQuick"          "${QVIM_OUT_DIR}/QtQuick"
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            "${QVIM_DEBUG_QML}/QtQml"            "${QVIM_OUT_DIR}/QtQml"
+            "${QVIM_QT_QML}/QtQml"            "${QVIM_OUT_DIR}/QtQml"
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            "${QVIM_DEBUG_QML}/QtTest"           "${QVIM_OUT_DIR}/QtTest"
+            "${QVIM_QT_QML}/QtTest"           "${QVIM_OUT_DIR}/QtTest"
         COMMENT "Deploying qt.conf + platform plugin + QML modules next to qvim.exe"
         VERBATIM
     )
