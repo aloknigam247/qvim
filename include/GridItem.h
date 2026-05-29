@@ -1,21 +1,17 @@
 #pragma once
 
-#include <QElapsedTimer>
 #include <QQuickPaintedItem>
 #include <QFont>
 #include <QFontMetricsF>
 #include <QPointer>
-#include <QTimer>
 #include <qqmlregistration.h>
 
-#include "CursorBlinkState.h"
 #include "HighlightTable.h"
 #include "NvimConnector.h"
 
 namespace qvim {
 
 class GridModel;
-class ModeInfo;
 
 class GridItem : public QQuickPaintedItem {
     Q_OBJECT
@@ -26,6 +22,11 @@ class GridItem : public QQuickPaintedItem {
     Q_PROPERTY(qreal   fontSize  READ fontSize  WRITE setFontSize  NOTIFY fontChanged)
     Q_PROPERTY(qreal   cellWidth  READ cellWidth  NOTIFY fontChanged)
     Q_PROPERTY(qreal   cellHeight READ cellHeight NOTIFY fontChanged)
+    // Renamed from "baseline" to avoid a name clash with a FINAL member on
+    // QQuickItem's metaobject (the Qt MOC silently ignores the override and
+    // the property reads as read-only from QML — broke Shell.qml's
+    // CursorItem.cellBaseline binding).
+    Q_PROPERTY(qreal   cellBaseline READ baseline NOTIFY fontChanged)
     Q_PROPERTY(bool    debugOverlay READ debugOverlay WRITE setDebugOverlay NOTIFY debugOverlayChanged)
 
 public:
@@ -48,6 +49,7 @@ public:
 
     qreal cellWidth()  const { return m_cellWidth; }
     qreal cellHeight() const { return m_cellHeight; }
+    qreal baseline()   const { return m_baseline; }
 
     bool debugOverlay() const { return m_debugOverlay; }
     void setDebugOverlay(bool v);
@@ -73,24 +75,18 @@ protected:
     void mouseReleaseEvent(QMouseEvent* ev) override;
     void wheelEvent(QWheelEvent* ev) override;
     void geometryChange(const QRectF& newGeom, const QRectF& oldGeom) override;
-    void focusInEvent(QFocusEvent* ev) override;
 
 private slots:
     void onGuifontChanged();
     void onLinespaceChanged();
     void onFlush();
-    void onBlinkTimeout();
 
 private:
     void recomputeMetrics();
     void maybeResizeUi();
     GridModel*      grid() const;
     HighlightTable* hl()   const;
-    ModeInfo*       mode() const;
     void sendMouse(QMouseEvent* ev, QEvent::Type type);
-    void onCursorActivity();
-    void onModeBlinkChanged();
-    void rescheduleBlink();
 
     QPointer<NvimConnector> m_conn;
     int      m_gridId       = 1;
@@ -106,9 +102,6 @@ private:
     qreal    m_baseline     = 12.0;
     bool     m_debugOverlay = false;
     int      m_linespace    = 0;
-    CursorBlinkState m_blink;
-    QElapsedTimer    m_clock;
-    QTimer           m_blinkTimer;
 };
 
 } // namespace qvim

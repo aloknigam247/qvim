@@ -23,8 +23,9 @@ Item {
     // whose x/y/cols/rows/visible/isFloat/zindex are real Q_PROPERTYs with
     // change notifications. A win_pos / grid_resize on an existing grid
     // re-evaluates these bindings in-place — the delegate is never destroyed,
-    // so GridItem's focus, cursor-blink phase, glyph cache (task #12), and
-    // per-hl_id font cache (task #8) all survive the geometry edit.
+    // so GridItem's focus, glyph cache (task #12), and per-hl_id font cache
+    // (task #8) all survive the geometry edit. Cursor blink phase lives on
+    // the sibling CursorItem below.
     Repeater {
         id: subGrids
         // Filter out grid 1 — baseGrid above already renders it. A delegate
@@ -54,6 +55,23 @@ Item {
             // through to the grid underneath rather than swallowing them.
             enabled: !surface || surface.isFocusable
         }
+    }
+
+    // Cursor overlay. Sibling of baseGrid so its texture composites on top of
+    // every grid (z above all sub-grids, below PopupMenu z=100 and Messages
+    // z=200 in Main.qml). Cursor blink and cursor moves invalidate only the
+    // previous + current cell on this item — the grid item never repaints for
+    // cursor activity. Bound to baseGrid's metrics so font/linespace changes
+    // propagate through Shell without a separate signal hop.
+    CursorItem {
+        anchors.fill: baseGrid
+        z: 99
+        connector:    $connector
+        cellWidth:    baseGrid.cellWidth
+        cellHeight:   baseGrid.cellHeight
+        cellBaseline: baseGrid.cellBaseline
+        fontName:     baseGrid.fontName
+        fontSize:     baseGrid.fontSize
     }
 
     MouseArea {

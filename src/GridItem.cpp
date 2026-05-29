@@ -3,7 +3,6 @@
 #include "NvimConnector.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
-#include "ModeInfo.h"
 #include "InputHandler.h"
 
 #include <QElapsedTimer>
@@ -56,10 +55,6 @@ GridItem::GridItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     m_font.setHintingPreference(QFont::PreferFullHinting);
     m_fontName = m_font.family();
     recomputeMetrics();
-    m_clock.start();
-    m_blink.notifyActivity(m_clock.elapsed());
-    m_blinkTimer.setSingleShot(true);
-    connect(&m_blinkTimer, &QTimer::timeout, this, &GridItem::onBlinkTimeout);
 }
 
 void GridItem::setGridId(int id) {
@@ -79,14 +74,9 @@ void GridItem::setConnector(NvimConnector* c) {
         connect(m_conn, &NvimConnector::flush,            this, &GridItem::onFlush);
         if (auto* g = grid()) {
             connect(g, &GridModel::sizeChanged,   this, [this]{ update(); });
-            connect(g, &GridModel::cursorChanged, this, [this]{ onCursorActivity(); });
         }
         if (auto* h = hl()) {
             connect(h, &HighlightTable::changed, this, [this]{ update(); });
-        }
-        if (auto* m = mode()) {
-            connect(m, &ModeInfo::currentChanged, this, [this]{ onModeBlinkChanged(); });
-            onModeBlinkChanged();
         }
     }
     emit connectorChanged();
@@ -167,45 +157,19 @@ void GridItem::onGuifontChanged() {
 }
 
 void GridItem::onFlush() {
-    update();
-}
-
-void GridItem::onBlinkTimeout() {
-    update();
-    rescheduleBlink();
-}
-
-void GridItem::onCursorActivity() {
-    m_blink.notifyActivity(m_clock.elapsed());
-    rescheduleBlink();
-    update();
-}
-
-void GridItem::onModeBlinkChanged() {
-    if (auto* m = mode()) {
-        m_blink.setBlinkParams(m->blinkWait(), m->blinkOn(), m->blinkOff());
-    } else {
-        m_blink.setBlinkParams(0, 0, 0);
+    // Skip update() when nvim's batch between flushes touched no cells on
+    // this grid (the common case for held j/k that doesn't scroll past the
+    // viewport: nvim emits grid_cursor_goto + flush only, no grid_line).
+    // The CursorItem overlay handles its own cursor-rect repaint per flush;
+    // without this guard, every keystroke at 300x100 fullscreen re-ran the
+    // full rows*cols paint loop on this item.
+    if (auto* g = grid(); g && g->takeDirty(m_gridId)) {
+        update();
     }
-    m_blink.notifyActivity(m_clock.elapsed());
-    rescheduleBlink();
-    update();
-}
-
-void GridItem::rescheduleBlink() {
-    const qint64 now = m_clock.elapsed();
-    const qint64 next = m_blink.nextChangeMs(now);
-    if (next == CursorBlinkState::kNoChange) {
-        m_blinkTimer.stop();
-        return;
-    }
-    const qint64 delay = std::max<qint64>(1, next - now);
-    m_blinkTimer.start(static_cast<int>(delay));
 }
 
 GridModel*      GridItem::grid() const { return m_conn ? m_conn->grid()       : nullptr; }
 HighlightTable* GridItem::hl()   const { return m_conn ? m_conn->highlights() : nullptr; }
-ModeInfo*       GridItem::mode() const { return m_conn ? m_conn->modeInfo()   : nullptr; }
 
 int GridItem::colAt(qreal x) const {
     if (m_cellWidth <= 0) return 0;
@@ -232,11 +196,6 @@ void GridItem::maybeResizeUi() {
 void GridItem::geometryChange(const QRectF& newGeom, const QRectF& oldGeom) {
     QQuickPaintedItem::geometryChange(newGeom, oldGeom);
     maybeResizeUi();
-}
-
-void GridItem::focusInEvent(QFocusEvent* ev) {
-    QQuickPaintedItem::focusInEvent(ev);
-    onCursorActivity();
 }
 
 void GridItem::paint(QPainter* painter) {
@@ -568,58 +527,9 @@ void GridItem::paint(QPainter* painter) {
                ns / 1000, cols, rows, fontCache.size());
     }
 
-    // Cursor — only render on the active grid (per ext_multigrid: the cursor
-    // lives on exactly one grid at a time, whichever was the last
-    // grid_cursor_goto target).
-    const bool isActive = (g->activeGrid() == m_gridId);
-    const bool cursorOn = m_blink.isOn(m_clock.elapsed());
-    if (isActive && (cursorOn || !mode() || !mode()->cursorStyleEnabled())) {
-        const int cr = g->cursorRowOf(m_gridId);
-        const int cc = g->cursorColOf(m_gridId);
-        if (cr >= 0 && cr < rows && cc >= 0 && cc < cols) {
-            HlAttr a = h->resolved(mode() ? mode()->attrId() : 0);
-            // Cursor colour resolution mirrors traditional vim: prefer the
-            // cursor highlight's bg, but if it's invalid OR matches the editor
-            // background (so the cursor would render invisibly on the canvas)
-            // fall back to defaultFg. Catches colorschemes that leave the
-            // `Cursor` group's bg unset or set to the editor bg.
-            QColor curColor = a.bg.isValid() ? a.bg : h->defaultFg();
-            if (curColor == h->defaultBg()) curColor = h->defaultFg();
-            QRectF rect(cc * m_cellWidth, cr * m_cellHeight, m_cellWidth, m_cellHeight);
-            const CursorShape shape = mode() ? static_cast<CursorShape>(mode()->cursorShapeInt())
-                                             : CursorShape::Block;
-            if (shape == CursorShape::Vertical) {
-                rect.setWidth(std::max(1.0, m_cellWidth * 0.15));
-            } else if (shape == CursorShape::Horizontal) {
-                rect.setY(rect.bottom() - std::max(1.0, m_cellHeight * 0.15));
-                rect.setHeight(std::max(1.0, m_cellHeight * 0.15));
-            }
-            painter->fillRect(rect, curColor);
-            if (shape == CursorShape::Block && cursorOn) {
-                const Cell& cell = g->cell(m_gridId, cr, cc);
-                if (!cell.text.isEmpty()) {
-                    painter->setPen(h->defaultBg());
-                    painter->setFont(m_font);
-                    if (isPua(cell.text[0])) {
-                        // Same Qt shaper-drops-PUA workaround as the row overlay
-                        // pass above: render via QGlyphRun to bypass the bug.
-                        const QRawFont raw = QRawFont::fromFont(m_font);
-                        const QList<quint32> ids = raw.glyphIndexesForString(cell.text);
-                        if (!ids.isEmpty()) {
-                            QGlyphRun run;
-                            run.setRawFont(raw);
-                            run.setGlyphIndexes({ids.first()});
-                            run.setPositions({QPointF(cc * m_cellWidth, cr * m_cellHeight + m_baseline)});
-                            painter->drawGlyphRun(QPointF(0, 0), run);
-                        }
-                    } else {
-                        painter->drawText(QPointF(cc * m_cellWidth, cr * m_cellHeight + m_baseline),
-                                          cell.text);
-                    }
-                }
-            }
-        }
-    }
+    // Cursor is rendered by CursorItem, a sibling overlay in Shell.qml.
+    // Splitting it out of GridItem::paint() avoids re-running this entire
+    // row×col loop on every blink half-cycle and every cursor move.
 
     if (m_debugOverlay) {
         painter->setPen(QColor(255, 0, 0, 200));
