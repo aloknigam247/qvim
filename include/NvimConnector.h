@@ -165,6 +165,7 @@ private:
     QString m_title;
     QString m_guifont;
     bool    m_attached = false;
+    bool    m_extMultigrid = false;
 
     // Defaults match the nvim ui-options defaults (see :h ui-options).
     bool    m_arabicshape    = true;

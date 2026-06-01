@@ -234,13 +234,16 @@ void NvimConnector::input(const QString& keys) {
 
 void NvimConnector::inputMouse(const QString& button, const QString& action,
                                const QString& modifier, int grid, int row, int col) {
+    // nvim_input_mouse requires grid=0 when ext_multigrid is not active so
+    // that nvim performs its own hit-testing (e.g. floating windows overlay).
+    const int effectiveGrid = m_extMultigrid ? grid : 0;
     m_rpc->notify(QStringLiteral("nvim_input_mouse"),
-        [&](msgpack::packer<msgpack::sbuffer>& pk) {
+        [&, effectiveGrid](msgpack::packer<msgpack::sbuffer>& pk) {
             pk.pack_array(6);
             pk.pack(button.toStdString());
             pk.pack(action.toStdString());
             pk.pack(modifier.toStdString());
-            pk.pack(static_cast<int64_t>(grid));
+            pk.pack(static_cast<int64_t>(effectiveGrid));
             pk.pack(static_cast<int64_t>(row));
             pk.pack(static_cast<int64_t>(col));
         });
