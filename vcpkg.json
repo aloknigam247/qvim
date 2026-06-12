@@ -7,7 +7,7 @@
     {
       "name": "qtbase",
       "default-features": false,
-      "features": ["gui", "widgets"]
+      "features": ["gui", "harfbuzz", "widgets"]
     },
     "qtdeclarative",
     "qtquickcontrols2",
