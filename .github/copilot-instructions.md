@@ -62,6 +62,15 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
+**Release build** (optimized + PDB for profiling/crash analysis):
+
+```pwsh
+cmake --preset release
+cmake --build --preset release
+```
+
+Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --preset dev --config Release` — that produces a Release build under the dev preset's multi-config solution (`build/dev/Release/`), which is not the intended release binary.
+
 The post-build step in `CMakeLists.txt` deploys Qt DLLs + `qt.conf` + platform plugins + QML modules next to `qvim.exe` for BOTH Debug and Release builds. The block is parameterised on `CMAKE_BUILD_TYPE` (debug DLLs use the `d` suffix, debug vcpkg prefix has the extra `debug/` segment). `qt_generate_deploy_app_script` + `install(SCRIPT ...)` is still wired up for non-Debug consumers running `cmake --install` — but the build-tree exe at `build/<preset>/<Config>/qvim.exe` is launchable directly without an install step.
 
 ## Conventions
