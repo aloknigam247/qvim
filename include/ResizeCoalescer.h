@@ -21,6 +21,11 @@ public:
     void setIntervalMs(int ms);
     Q_INVOKABLE void flushNow();
 
+    // Sync the coalescer after a direct tryResize bypasses it. Marks the
+    // given size as already-emitted and stops any pending timer so a stale
+    // coalesced request doesn't overwrite the direct resize.
+    void syncAfterDirectResize(int cols, int rows);
+
 signals:
     void resizeRequested(int cols, int rows);
 

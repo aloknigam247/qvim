@@ -25,6 +25,7 @@
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
 #include "RecentProjectsModel.h"
+#include "SessionCache.h"
 #include "WindowChrome.h"
 
 namespace {
@@ -135,7 +136,7 @@ int main(int argc, char* argv[]) {
     boot.mark("nvim --embed spawn returned");
     clipboard.attachTo(&connector);
 
-    // Fire nvim_ui_attach NOW with conservative defaults so the round-trip
+    // Fire nvim_ui_attach NOW with the best-known grid size so the round-trip
     // (nvim sources init, builds initial highlights + grid, responds)
     // overlaps with QQmlApplicationEngine compilation/instantiation below
     // instead of stacking serially after it. Main.qml's Component.onCompleted
@@ -144,7 +145,14 @@ int main(int argc, char* argv[]) {
     // the single biggest cold-launch win: the ~400-700ms attach handshake
     // and the ~300-600ms QML cold load now run concurrently instead of
     // serially. Main.qml guards against double-attach via $connector.attached.
-    connector.attachUi(80, 24);
+    //
+    // If a session cache exists with a valid (cols, rows) from the last run,
+    // use those dimensions — they'll match the real geometry when the font
+    // hasn't changed, eliminating the tryResize round-trip entirely.
+    const qvim::SessionCache sessionCache = qvim::SessionCache::load();
+    const int attachCols = sessionCache.isValid() ? sessionCache.cols : 80;
+    const int attachRows = sessionCache.isValid() ? sessionCache.rows : 24;
+    connector.attachUi(attachCols, attachRows);
     boot.mark("nvim_ui_attach sent (early)");
 
     // Push the resolved rounded_highlights list into HighlightTable on
@@ -165,7 +173,7 @@ int main(int argc, char* argv[]) {
                      });
 
     QObject::connect(&connector, &qvim::NvimConnector::disconnected,
-                     &app, &QGuiApplication::quit);
+                     &app, &QCoreApplication::quit);
     QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
                      &cfg, [&connector, &cfg, &boot]() {
                          boot.mark("attachComplete signal");
@@ -211,12 +219,21 @@ int main(int argc, char* argv[]) {
             // arrives at the post-attach resized geometry — that's the moment
             // the user actually sees the editor. Track it as a distinct boot
             // phase so we can tell time-to-first-frame from time-to-visible.
-            QObject::connect(w, &QQuickWindow::visibleChanged, &app, [w, &boot]() {
+            QObject::connect(w, &QQuickWindow::visibleChanged, &app, [w, &boot, &connector]() {
                 static bool firstShowSeen = false;
                 if (firstShowSeen) return;
                 if (!w->isVisible()) return;
                 firstShowSeen = true;
                 boot.mark("window shown at real size");
+                // Persist the final grid dimensions so the next launch can
+                // skip the placeholder→resize round-trip.
+                if (auto* g = connector.grid()) {
+                    qvim::SessionCache cache;
+                    cache.guifont = connector.guifont();
+                    cache.cols = g->gridCols(1);
+                    cache.rows = g->gridRows(1);
+                    if (cache.isValid()) qvim::SessionCache::save(cache);
+                }
             });
         }
     }

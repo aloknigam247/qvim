@@ -22,12 +22,22 @@ Window {
     property bool _shown: false
 
     Component.onCompleted: {
-        const cols = Math.max(80, Math.floor(width  / Math.max(1, shell.cellWidth)))
-        const rows = Math.max(24, Math.floor(height / Math.max(1, shell.cellHeight)))
-        _requestedCols = cols
-        _requestedRows = rows
+        _recomputeTarget()
         _maybeResize()
         _syncTitleBar()
+    }
+
+    // Recompute target (cols, rows) from the current window and cell dimensions.
+    // Called at startup and again if guifont changes before the window is shown.
+    function _recomputeTarget() {
+        const cw = Math.max(1, shell.cellWidth)
+        const ch = Math.max(1, shell.cellHeight)
+        const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
+        const availH = height - chromeH
+        const cols = Math.max(80, Math.floor(width  / cw))
+        const rows = Math.max(24, Math.floor(availH / ch))
+        _requestedCols = cols
+        _requestedRows = rows
     }
 
     // main.cpp fires nvim_ui_attach(80, 24) early (before this engine is
@@ -41,24 +51,28 @@ Window {
         if (_requestedCols === 0 || _requestedRows === 0) return
         if ($connector.attached) {
             $connector.tryResize(_requestedCols, _requestedRows)
+            _showSafetyTimer.restart()
         } else if (!_attachIssued) {
             _attachIssued = true
             $connector.attachUi(_requestedCols, _requestedRows)
         }
-        // (Re)start the safety timer from the moment we issued the resize/
-        // attach. If nvim never gets to the requested geometry within this
-        // window, force-show so the editor isn't stuck invisible. Starting
-        // it here (not at Component.onCompleted) means a slow attach round
-        // trip doesn't burn the safety budget before tryResize is even sent.
-        _showSafetyTimer.restart()
     }
 
     function _showIfReady() {
         if (_shown) return
         if (_requestedCols === 0 || _requestedRows === 0) return
         const g = $connector.grid
-        if (g.gridCols(1) === _requestedCols && g.gridRows(1) === _requestedRows) {
+        const gc = g.gridCols(1)
+        const gr = g.gridRows(1)
+        if (gc === _requestedCols && gr === _requestedRows) {
             _shown = true
+            const cw = shell.cellWidth
+            const ch = shell.cellHeight
+            if (cw > 0 && ch > 0) {
+                const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
+                window.width  = _requestedCols * cw
+                window.height = _requestedRows * ch + chromeH
+            }
             window.visible = true
         }
     }
@@ -74,6 +88,18 @@ Window {
         function onFlush() { _showIfReady() }
     }
 
+    // React to cellWidthChanged (not guifontChanged) because GridItem
+    // re-measures AFTER the guifontChanged signal — at that moment
+    // shell.cellWidth is still the old value.
+    Connections {
+        target: shell
+        function onCellWidthChanged() {
+            if (_shown) return
+            _recomputeTarget()
+            _maybeResize()
+        }
+    }
+
     Timer {
         id: _showSafetyTimer
         interval: 1000
@@ -81,6 +107,16 @@ Window {
         onTriggered: {
             if (!_shown) {
                 _shown = true
+                const g = $connector.grid
+                const gc = g.gridCols(1)
+                const gr = g.gridRows(1)
+                const cw = shell.cellWidth
+                const ch = shell.cellHeight
+                if (gc > 0 && gr > 0 && cw > 0 && ch > 0) {
+                    const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
+                    window.width  = gc * cw
+                    window.height = gr * ch + chromeH
+                }
                 window.visible = true
             }
         }
@@ -109,6 +145,7 @@ Window {
 
     Shell {
         id: shell
+        objectName: "shell"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: tabline.bottom

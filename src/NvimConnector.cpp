@@ -250,6 +250,9 @@ void NvimConnector::inputMouse(const QString& button, const QString& action,
 }
 
 void NvimConnector::tryResize(int cols, int rows) {
+    // Sync the coalescer so any stale pending request doesn't fire after
+    // this direct resize and overwrite it with old dimensions.
+    m_resizeCoalescer->syncAfterDirectResize(cols, rows);
     m_rpc->notify(QStringLiteral("nvim_ui_try_resize"),
         [cols, rows](msgpack::packer<msgpack::sbuffer>& pk) {
             pk.pack_array(2);

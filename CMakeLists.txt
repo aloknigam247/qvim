@@ -47,6 +47,7 @@ set(QVIM_LIB_SOURCES
     src/PopupMenuModel.cpp      include/PopupMenuModel.h
     src/RecentProjectsModel.cpp include/RecentProjectsModel.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
+    src/SessionCache.cpp        include/SessionCache.h
     src/TablineModel.cpp        include/TablineModel.h
     src/WindowChrome.cpp        include/WindowChrome.h
 )

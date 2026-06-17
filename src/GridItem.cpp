@@ -183,8 +183,6 @@ int GridItem::rowAt(qreal y) const {
 
 void GridItem::maybeResizeUi() {
     if (!m_conn || width() <= 0 || height() <= 0) return;
-    // Only the global grid (id=1) drives nvim_ui_try_resize — sub-grids are
-    // sized by nvim via win_pos/grid_resize, not by us.
     if (m_gridId != 1) return;
     const int cols = std::max(10, static_cast<int>(width()  / m_cellWidth));
     const int rows = std::max(3,  static_cast<int>(height() / m_cellHeight));

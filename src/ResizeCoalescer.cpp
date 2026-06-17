@@ -23,6 +23,14 @@ void ResizeCoalescer::flushNow() {
     onTimeout();
 }
 
+void ResizeCoalescer::syncAfterDirectResize(int cols, int rows) {
+    m_pendingCols = cols;
+    m_pendingRows = rows;
+    m_lastEmittedCols = cols;
+    m_lastEmittedRows = rows;
+    m_timer.stop();
+}
+
 void ResizeCoalescer::onTimeout() {
     if (m_pendingCols < 0 || m_pendingRows < 0) return;
     if (m_pendingCols == m_lastEmittedCols && m_pendingRows == m_lastEmittedRows) {
