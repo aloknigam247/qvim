@@ -338,15 +338,25 @@ void CursorItem::paint(QPainter* painter) {
         // destination glyph as it slides into place. Matches Goneovim.
         const Cell& cell = g->cell(active, localRow, localCol);
         if (!cell.text.isEmpty()) {
+            // Preserve the target cell's font style (italic/bold/underline/
+            // strikethrough) so the carry glyph matches how it renders in
+            // the grid below. Without this, an italic word would lose its
+            // slant under the block cursor.
+            const HlAttr cellAttr = h->resolved(cell.hlId);
+            QFont carryFont = m_font;
+            carryFont.setItalic(cellAttr.italic);
+            carryFont.setWeight(cellAttr.bold ? QFont::Bold : QFont::Normal);
+            carryFont.setStrikeOut(cellAttr.strikethrough);
+            carryFont.setUnderline(cellAttr.underline);
             painter->setPen(h->defaultBg());
-            painter->setFont(m_font);
+            painter->setFont(carryFont);
             const qreal glyphX = drawPos.x();
             const qreal glyphY = drawPos.y() + m_baseline;
             if (isPua(cell.text[0])) {
                 // QTBUG-116417 workaround — Qt's shaper drops PUA codepoints,
                 // so block-mode nerd-font cursor glyphs need the QRawFont +
                 // drawGlyphRun bypass.
-                const QRawFont raw = QRawFont::fromFont(m_font);
+                const QRawFont raw = QRawFont::fromFont(carryFont);
                 const QList<quint32> ids = raw.glyphIndexesForString(cell.text);
                 if (!ids.isEmpty()) {
                     QGlyphRun run;
