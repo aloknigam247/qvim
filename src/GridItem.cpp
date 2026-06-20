@@ -242,7 +242,9 @@ void GridItem::paint(QPainter* painter) {
                 if (!h->isRounded(cell.hlId)) { ++c; continue; }
                 const int c0 = c;
                 const int spanHl = cell.hlId;
-                while (c < cols && h->isRounded(g->cell(m_gridId, r, c).hlId)) ++c;
+                const QColor spanBg = h->resolved(spanHl).bg;
+                while (c < cols && h->isRounded(g->cell(m_gridId, r, c).hlId)
+                       && h->resolved(g->cell(m_gridId, r, c).hlId).bg == spanBg) ++c;
                 spans.push_back({r, c0, c, spanHl});
             }
         }
@@ -259,7 +261,8 @@ void GridItem::paint(QPainter* painter) {
                 const VisualSpan& pa = spans[i - 1];
                 const VisualSpan& pb = spans[i];
                 const bool sameGroup = pb.row == pa.row + 1 &&
-                                       pb.c0 < pa.c1 && pa.c0 < pb.c1;
+                                       pb.c0 < pa.c1 && pa.c0 < pb.c1 &&
+                                       h->resolved(pb.hlId).bg == h->resolved(pa.hlId).bg;
                 if (!sameGroup) groupStart.push_back(i);
             }
             groupStart.push_back(spans.size());
