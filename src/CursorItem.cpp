@@ -4,6 +4,8 @@
 #include "HighlightTable.h"
 #include "NvimConnector.h"
 
+#include <cstdlib>
+
 #include <QEasingCurve>
 #include <QFontDatabase>
 #include <QGlyphRun>
@@ -201,17 +203,39 @@ void CursorItem::onCursorActivity() {
     if (!ok) {
         m_moveAnim.stop();
         m_hasAnimatedPos = false;
+        m_prevRow = -1;
+        m_prevCol = -1;
         scheduleRepaint();
         return;
     }
+
+    // Compute absolute target row/col (same math targetCellTopLeft() uses,
+    // re-derived here so we can compare against m_prevRow/m_prevCol). Safe:
+    // targetCellTopLeft() already verified surface + bounds.
+    GridModel* g = grid();
+    const int active = g->activeGrid();
+    auto* surface = g->surfaceFor(active);
+    const int newRow = surface->y() + g->cursorRowOf(active);
+    const int newCol = surface->x() + g->cursorColOf(active);
 
     // Snap (no animation) when this is the first cursor we've seen OR when
     // the underlying cells changed in the same batch — scroll / paste /
     // anything where text moved alongside the cursor. Eased motion relative
     // to scrolling text looks like the cursor is fighting the page.
-    GridModel* g = grid();
     const bool gridDirty = g && g->isDirty(g->activeGrid());
-    const bool snap = !m_hasAnimatedPos || gridDirty;
+    const bool firstSeen = !m_hasAnimatedPos || m_prevRow < 0 || m_prevCol < 0;
+
+    // Distance gate: only ease for 1-cell adjacent moves. Longer jumps (gg,
+    // G, /search, %, H/M/L, ctrl-d/u, click-far) snap so we never see the
+    // cursor slide across many lines/columns at once.
+    bool farJump = false;
+    if (!firstSeen) {
+        const int dRow = std::abs(newRow - m_prevRow);
+        const int dCol = std::abs(newCol - m_prevCol);
+        farJump = (dRow > 1) || (dCol > 1);
+    }
+
+    const bool snap = firstSeen || gridDirty || farJump;
 
     if (snap) {
         m_moveAnim.stop();
@@ -230,6 +254,9 @@ void CursorItem::onCursorActivity() {
     // else: target == current animated position; nothing to animate, paint
     // will redraw at the same spot (covers blink-reset and same-cell mode
     // transitions).
+
+    m_prevRow = newRow;
+    m_prevCol = newCol;
     scheduleRepaint();
 }
 

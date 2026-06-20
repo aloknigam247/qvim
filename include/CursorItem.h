@@ -137,6 +137,14 @@ private:
     QVariantAnimation m_moveAnim;
     QPointF           m_animatedPos;
     bool              m_hasAnimatedPos = false;
+
+    // Previous absolute cell coords (row/col on the active grid plus its
+    // surface offset). Used to gate the move animation: smooth ease only on
+    // 1-cell adjacent moves (|dRow|<=1 && |dCol|<=1). Anything larger (gg, G,
+    // /search, %, H/M/L, ctrl-d/u) is a logical jump and should snap. -1
+    // sentinel means we have not seen a cursorChanged yet.
+    int               m_prevRow = -1;
+    int               m_prevCol = -1;
 };
 
 } // namespace qvim
