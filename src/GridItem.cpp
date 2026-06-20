@@ -138,7 +138,6 @@ QFont GridItem::buildRunFont(const HlAttr& a) const {
     QFont rf = m_font;
     rf.setWeight(a.bold ? QFont::Bold : QFont::Normal);
     rf.setItalic(a.italic);
-    rf.setUnderline(a.underline);
     rf.setStrikeOut(a.strikethrough);
     return rf;
 }
@@ -219,6 +218,10 @@ void GridItem::paint(QPainter* painter) {
     const int cols = g->gridCols(m_gridId);
     const int rows = g->gridRows(m_gridId);
     const QColor defaultBg = h->defaultBg();
+    // Hoist underline thickness: m_font is constant across the paint, so
+    // constructing QFontMetricsF per underlined run would allocate per cell
+    // in the hot path. Compute once and reuse.
+    const qreal underlineThickness = std::max(1.0, std::round(QFontMetricsF(m_font).lineWidth()));
 
     // Rounded-corner pass for cells flagged isRounded (from ext_hlstate's
     // info array on hl_attr_define, configured via g:qvim_rounded_highlights).
@@ -428,6 +431,10 @@ void GridItem::paint(QPainter* painter) {
                 lastPenColor = a.fg;
             }
             painter->drawText(QPointF(c * m_cellWidth, y + m_baseline), runText);
+
+            if (a.underline) {
+                painter->fillRect(QRectF(runRect.left(), y + m_cellHeight - underlineThickness, runRect.width(), underlineThickness), a.fg);
+            }
 
             if (a.undercurl) {
                 painter->setPen(a.sp);
