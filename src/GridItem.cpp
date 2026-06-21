@@ -115,12 +115,29 @@ void GridItem::recomputeMetrics() {
     // Delegated to computeCellMetrics for testability and to keep the
     // integer-snap rationale (visual-mode seams from sub-pixel boundaries)
     // in one place.
+    //
+    // The cellWidth chosen by computeCellMetrics (LCM-unit snapped for
+    // device-pixel alignment) usually differs from the font's natural
+    // horizontalAdvance for monospace characters. Without correction
+    // QPainter::drawText lays each glyph at its font-native advance, so
+    // over a row of N characters the visible text drifts away from the
+    // cell-boundary grid by N*(cellWidth - nativeAdvance) px. Cursor and
+    // click logic both use cellWidth, so the cursor block ends up over a
+    // visually different character than the buffer position it represents.
+    //
+    // QFont::setLetterSpacing(AbsoluteSpacing, delta) adds delta px after
+    // every glyph's advance. Setting delta = cellWidth - nativeAdvance
+    // forces the effective advance to equal cellWidth, so drawText layout
+    // and cell math agree pixel-for-pixel.
+    m_font.setLetterSpacing(QFont::AbsoluteSpacing, 0.0);
     const QFontMetricsF fm(m_font);
     const qreal dpr = window() ? window()->devicePixelRatio() : 1.0;
     const CellMetrics cm = computeCellMetrics(fm, m_linespace, dpr);
     m_cellWidth  = cm.cellWidth;
     m_cellHeight = cm.cellHeight;
     m_baseline   = cm.baseline;
+    const qreal nativeAdvance = fm.horizontalAdvance(QLatin1Char('M'));
+    m_font.setLetterSpacing(QFont::AbsoluteSpacing, m_cellWidth - nativeAdvance);
 }
 
 void GridItem::onLinespaceChanged() {
