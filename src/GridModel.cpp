@@ -227,7 +227,7 @@ void GridModel::setCursor(int gridId, int row, int col) {
 
 void GridModel::destroyGrid(int gridId) {
     if (gridId == 1) return;        // never destroy the global grid
-    if (m_grids.remove(gridId) > 0) {
+    if (m_grids.remove(gridId)) {
         if (m_active == gridId) m_active = 1;
         // Schedule the proxy for deletion via the event loop so any QML
         // delegate currently binding to it tears down its bindings first

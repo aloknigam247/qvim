@@ -18,7 +18,12 @@ find_package(msgpack-cxx CONFIG REQUIRED)
 qt_standard_project_setup(REQUIRES 6.10)
 
 if(MSVC)
-    add_compile_options(/W4 /permissive- /Zc:__cplusplus /Zc:preprocessor /utf-8)
+    # Treat angle-bracket includes as external (system) headers and suppress
+    # their warnings. Keeps /W4 strict for our own code while letting Qt's
+    # qnumeric.h / qvariant.h / qjsengine.h C4702 unreachable-code warnings
+    # through without polluting our build.
+    add_compile_options(/W4 /permissive- /Zc:__cplusplus /Zc:preprocessor /utf-8
+                        /external:anglebrackets /external:W0)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
     if(QVIM_ENABLE_ASAN)
         add_compile_options(/fsanitize=address)
