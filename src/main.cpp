@@ -13,6 +13,7 @@
 #ifdef _WIN32
 #  include <fcntl.h>
 #  include <io.h>
+#  include <windows.h>
 #endif
 
 #include "AppIcon.h"
@@ -104,6 +105,17 @@ int main(int argc, char* argv[]) {
             stdinPayload.append(buf, static_cast<qsizetype>(n));
         }
     }
+
+#ifdef _WIN32
+    // Detach from the parent shell's console so the shell prompt returns
+    // immediately. Under /SUBSYSTEM:WINDOWS Windows doesn't allocate its own
+    // console, but PowerShell still tracks the inherited std handles and
+    // waits for the child to release them before showing the next prompt.
+    // FreeConsole drops our reference; any subsequent stdio is no-op (we
+    // don't write to stdout/stderr after this point). Done AFTER the stdin
+    // slurp above so `qvim -` still works.
+    FreeConsole();
+#endif
 
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("qvim"));
