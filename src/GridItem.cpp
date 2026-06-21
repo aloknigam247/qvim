@@ -14,6 +14,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QQuickWindow>
 #include <QRegularExpression>
 #include <QVarLengthArray>
 #include <QVector>
@@ -115,7 +116,8 @@ void GridItem::recomputeMetrics() {
     // integer-snap rationale (visual-mode seams from sub-pixel boundaries)
     // in one place.
     const QFontMetricsF fm(m_font);
-    const CellMetrics cm = computeCellMetrics(fm, m_linespace);
+    const qreal dpr = window() ? window()->devicePixelRatio() : 1.0;
+    const CellMetrics cm = computeCellMetrics(fm, m_linespace, dpr);
     m_cellWidth  = cm.cellWidth;
     m_cellHeight = cm.cellHeight;
     m_baseline   = cm.baseline;
