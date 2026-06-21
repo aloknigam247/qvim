@@ -45,7 +45,6 @@ set(QVIM_LIB_SOURCES
     src/MsgpackRpc.cpp          include/MsgpackRpc.h
     src/NvimConnector.cpp       include/NvimConnector.h
     src/PopupMenuModel.cpp      include/PopupMenuModel.h
-    src/RecentProjectsModel.cpp include/RecentProjectsModel.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
     src/TablineModel.cpp        include/TablineModel.h

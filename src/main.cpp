@@ -24,7 +24,6 @@
 #include "HighlightTable.h"
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
-#include "RecentProjectsModel.h"
 #include "SessionCache.h"
 #include "WindowChrome.h"
 
@@ -125,7 +124,6 @@ int main(int argc, char* argv[]) {
 
     qvim::NvimConnector connector;
     qvim::ClipboardBridge clipboard;
-    qvim::RecentProjectsModel recents;
     qvim::WindowChrome windowChrome;
     boot.mark("NvimConnector ctor done");
 
@@ -198,7 +196,6 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("$config"),    &cfg);
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &connector);
     engine.rootContext()->setContextProperty(QStringLiteral("$clipboard"), &clipboard);
-    engine.rootContext()->setContextProperty(QStringLiteral("$recents"),   &recents);
     engine.rootContext()->setContextProperty(QStringLiteral("$windowChrome"), &windowChrome);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,

@@ -9,7 +9,7 @@ namespace qvim {
 // immediately — eliminating the placeholder→resize round-trip when the font
 // hasn't changed.
 //
-// Storage: %APPDATA%/qvim/session.json (same directory as recent.json).
+// Storage: %APPDATA%/qvim/session.json.
 struct SessionCache {
     QString guifont;
     int cols = 0;

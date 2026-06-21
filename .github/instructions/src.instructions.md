@@ -27,7 +27,6 @@ Root rules in `.github/copilot-instructions.md` still apply. This file adds C++-
 - `PopupMenuModel.{h,cpp}` — ext_popupmenu state.
 - `TablineModel.{h,cpp}` — ext_tabline state (tabs + buffers).
 - `ClipboardBridge.{h,cpp}` — implements nvim's clipboard provider via Qt clipboard.
-- `RecentProjectsModel.{h,cpp}` — non-nvim feature; JSON-backed list under `%APPDATA%\qvim`.
 - `ResizeCoalescer.{h,cpp}` — debounces window-resize → `nvim_ui_try_resize` RPCs (~24ms). Owned by `NvimConnector`; GridItem letterboxes between RPCs.
 - `WindowChrome.{h,cpp}` — Windows-only `DwmSetWindowAttribute` wrapper. `applyToWindow(QQuickWindow*, QColor)` repaints the OS caption to match nvim's editor bg.
 
