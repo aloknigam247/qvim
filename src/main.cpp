@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <cstdio>
+#include <future>
 #ifdef _WIN32
 #  include <fcntl.h>
 #  include <io.h>
@@ -82,7 +83,14 @@ int main(int argc, char* argv[]) {
             "  -v, --version    Show qvim version and exit.\n"
             "\n"
             "Everything else (e.g. `foo.txt`, `-O a.txt b.txt`, `+10 foo.txt`,\n"
-            "`-c \"set number\" foo.txt`) is forwarded to nvim.\n");
+            "`-c \"set number\" foo.txt`) is forwarded to nvim.\n"
+            "\n"
+            "Reading stdin (`qvim -`):\n"
+            "  PowerShell intercepts the literal `-` token for its own pipeline\n"
+            "  handling, which delays spawning qvim by several seconds. Use cmd\n"
+            "  or Start-Process to avoid the delay:\n"
+            "    cmd /c \"echo hello | qvim -\"\n"
+            "    Start-Process qvim '-' -RedirectStandardInput in.txt\n");
         return 0;
     }
     if (cli.versionRequested) {
@@ -95,15 +103,37 @@ int main(int argc, char* argv[]) {
     // redirects stdin (e.g. `echo test | qvim -`), the inherited handle is a
     // valid pipe. QProcess gives the embedded nvim its own RPC stdin pipe, so
     // qvim's stdin stays ours to consume.
-    QByteArray stdinPayload;
+    // Stdin slurp happens on a background thread so the rest of qvim's boot
+    // (Qt construction, nvim spawn, QML load) is not blocked by the pipe.
+    // PowerShell's pipeline can hold the pipe writer open for seconds even
+    // after the producer has exited; doing this synchronously stalled the
+    // visible launch to multi-second times for `echo X | qvim -`. The future
+    // is awaited later when loadStdinIntoBuffer needs the bytes.
+    //
+    // Only slurp when stdin is actually redirected (pipe or file). If stdin
+    // is the inherited console (the user typed `qvim -` interactively without
+    // piping anything in), fread would block forever waiting for keystrokes
+    // that never come. The background thread would leak.
+    std::future<QByteArray> stdinFuture;
+    bool stdinIsRedirected = false;
     if (cli.stdinAsBuffer) {
 #ifdef _WIN32
-        _setmode(_fileno(stdin), _O_BINARY);
+        const DWORD t = GetFileType(GetStdHandle(STD_INPUT_HANDLE));
+        stdinIsRedirected = (t == FILE_TYPE_PIPE || t == FILE_TYPE_DISK);
+        if (stdinIsRedirected) _setmode(_fileno(stdin), _O_BINARY);
+#else
+        stdinIsRedirected = !isatty(fileno(stdin));
 #endif
-        char buf[4096];
-        while (std::size_t n = std::fread(buf, 1, sizeof(buf), stdin)) {
-            stdinPayload.append(buf, static_cast<qsizetype>(n));
-        }
+    }
+    if (cli.stdinAsBuffer && stdinIsRedirected) {
+        stdinFuture = std::async(std::launch::async, []() {
+            QByteArray buf;
+            char chunk[4096];
+            while (std::size_t n = std::fread(chunk, 1, sizeof(chunk), stdin)) {
+                buf.append(chunk, static_cast<qsizetype>(n));
+            }
+            return buf;
+        });
     }
 
 #ifdef _WIN32
@@ -112,8 +142,7 @@ int main(int argc, char* argv[]) {
     // console, but PowerShell still tracks the inherited std handles and
     // waits for the child to release them before showing the next prompt.
     // FreeConsole drops our reference; any subsequent stdio is no-op (we
-    // don't write to stdout/stderr after this point). Done AFTER the stdin
-    // slurp above so `qvim -` still works.
+    // don't write to stdout/stderr after this point).
     FreeConsole();
 #endif
 
@@ -197,10 +226,10 @@ int main(int argc, char* argv[]) {
                          boot.mark("first redraw flush received");
                      });
 
-    if (cli.stdinAsBuffer) {
+    if (cli.stdinAsBuffer && stdinIsRedirected) {
         QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
-                         &connector, [&connector, stdinPayload]() {
-                             connector.loadStdinIntoBuffer(stdinPayload);
+                         &connector, [&connector, fut = std::make_shared<std::future<QByteArray>>(std::move(stdinFuture))]() {
+                             connector.loadStdinIntoBuffer(fut->get());
                          });
     }
 
