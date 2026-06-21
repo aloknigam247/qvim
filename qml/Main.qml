@@ -174,4 +174,29 @@ Window {
         anchors.fill: parent
         z: 200
     }
+
+    Shortcut {
+        sequence: "F11"
+        context: Qt.WindowShortcut
+        onActivated: {
+            const willBeFullscreen = window.visibility !== Window.FullScreen
+            if (willBeFullscreen) {
+                // Pre-issue tryResize so nvim resizes the grid IN PARALLEL with
+                // the OS fullscreen animation. Otherwise the user sees the
+                // window expand instantly but the grid lag by the RPC RTT.
+                const scr = window.screen
+                if (scr) {
+                    const cw = Math.max(1, shell.cellWidth)
+                    const ch = Math.max(1, shell.cellHeight)
+                    const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
+                    const cols = Math.max(1, Math.floor(scr.width / cw))
+                    const rows = Math.max(1, Math.floor((scr.height - chromeH) / ch))
+                    $connector.tryResize(cols, rows)
+                }
+                window.visibility = Window.FullScreen
+            } else {
+                window.visibility = Window.Windowed
+            }
+        }
+    }
 }
