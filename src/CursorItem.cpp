@@ -374,7 +374,10 @@ void CursorItem::paint(QPainter* painter) {
             carryFont.setItalic(cellAttr.italic);
             carryFont.setWeight(cellAttr.bold ? QFont::Bold : QFont::Normal);
             carryFont.setStrikeOut(cellAttr.strikethrough);
-            carryFont.setUnderline(cellAttr.underline);
+            // Underline is drawn manually below as a fillRect at cell bottom
+            // to match GridItem's paint geometry (the cursor fillRect above
+            // overwrote the grid's underline that already painted at this
+            // cell, so we have to redraw it on top of the cursor block).
             painter->setPen(h->defaultBg());
             painter->setFont(carryFont);
             const qreal glyphX = drawPos.x();
@@ -394,6 +397,11 @@ void CursorItem::paint(QPainter* painter) {
                 }
             } else {
                 painter->drawText(QPointF(glyphX, glyphY), cell.text);
+            }
+            if (cellAttr.underline) {
+                const qreal thickness = std::max(1.0, std::round(QFontMetricsF(carryFont).lineWidth()));
+                painter->fillRect(QRectF(drawPos.x(), drawPos.y() + m_cellHeight - thickness,
+                                         m_cellWidth, thickness), h->defaultBg());
             }
         }
     }
