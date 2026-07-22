@@ -1,10 +1,6 @@
----
-applyTo: "qml/**"
----
-
 # qml/ — agent guide (delta)
 
-Root `.github/copilot-instructions.md` defines the reactive-proxy and focus rules. This file is the QML-side checklist.
+Root `AGENTS.md` defines the reactive-proxy and focus rules. This file is the QML-side checklist.
 
 ## Conventions
 

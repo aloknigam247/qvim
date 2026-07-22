@@ -30,7 +30,7 @@ ctest verifies code correctness. This skill verifies feature correctness — wha
 
 ### 1. Force-rebuild the qvim binary
 
-The incremental linker skips relinking `qvim.exe` when only the .lib changed (see project `.github/copilot-instructions.md` gotcha). A stale exe means you're validating a previous version. Always run:
+The incremental linker skips relinking `qvim.exe` when only the .lib changed (see project `AGENTS.md` gotcha). A stale exe means you're validating a previous version. Always run:
 
 ```pwsh
 cmake --build --preset dev --target qvim

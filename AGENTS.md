@@ -52,6 +52,8 @@ tests/
   qml/                      # tier 3, qmltest
 ```
 
+Directory-scoped instructions live in nested `AGENTS.md` files that auto-load when working on files in that subtree: `qml/AGENTS.md`, `src/AGENTS.md`, `tests/AGENTS.md`.
+
 ## Build
 
 ```pwsh
@@ -59,6 +61,15 @@ cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ```
+
+**Release build** (optimized + PDB for profiling/crash analysis):
+
+```pwsh
+cmake --preset release
+cmake --build --preset release
+```
+
+Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --preset dev --config Release` — that produces a Release build under the dev preset's multi-config solution (`build/dev/Release/`), which is not the intended release binary.
 
 The post-build step in `CMakeLists.txt` deploys Qt DLLs + `qt.conf` + platform plugins + QML modules next to `qvim.exe` for BOTH Debug and Release builds. The block is parameterised on `CMAKE_BUILD_TYPE` (debug DLLs use the `d` suffix, debug vcpkg prefix has the extra `debug/` segment). `qt_generate_deploy_app_script` + `install(SCRIPT ...)` is still wired up for non-Debug consumers running `cmake --install` — but the build-tree exe at `build/<preset>/<Config>/qvim.exe` is launchable directly without an install step.
 
@@ -93,9 +104,9 @@ Three tiers (see `tests/CMakeLists.txt`):
 - Concurrent builds against `D:\qvim\build\dev` contend on `vcpkg-running.lock` and `qvim_lib.pdb`. Serialise builds when running multiple agents, or build individual `.vcxproj` targets via MSBuild to skip the vcpkg-configure step.
 - `nvim_ui_try_resize` called from `geometryChange` will fire during cmdline_show reflow. With ext_multigrid this triggers `grid_resize` + `win_pos` for every grid — make sure these don't destroy QML delegates.
 - `QQuickPaintedItem::paint()` runs on the SceneGraph **render thread**, not the GUI thread. Any `QRawFont` / `QFontEngine`-backed object must be constructed AND destroyed on the render thread (the dtor also asserts thread affinity). If you cache one, hook `QQuickWindow::sceneGraphInvalidated` with `Qt::DirectConnection` to release it before the SceneGraph tears down.
-- After merging library-only `.cpp` changes into main, the incremental linker may skip relinking `qvim.exe` — the .lib changes, the .exe doesn't. Always force-rebuild with `cmake --build --preset dev --target qvim` before asking the user to verify a fix; otherwise they're testing a stale binary. Same trap exists for an agent's worktree exe: ctest can pass against the new .lib while `<worktree>/build/dev/Debug/qvim.exe` is still from an earlier build. Before validating an agent's worktree binary, check `ls -l <worktree>/build/dev/Debug/qvim.exe` against `git log -1 --format=%ci <branch>` — if the exe is older, delete it and rerun `cmake --build --preset dev --target qvim`.
+- After merging library-only `.cpp` changes into main, the incremental linker may skip relinking `qvim.exe` — the .lib changes, the .exe doesn't. Always force-rebuild with `cmake --build --preset dev --target qvim` before asking the user to verify a fix; otherwise they're testing a stale binary. Same trap exists for an agent's worktree exe: ctest can pass against the new .lib while `<worktree>/build/dev/Debug/qvim.exe` is still from an earlier build. Before validating an agent's worktree binary, check `Get-Item <worktree>/build/dev/Debug/qvim.exe` mtime against `git log -1 --format=%ci <branch>` — if the exe is older, delete it and rerun `cmake --build --preset dev --target qvim`.
 - `Q_PROPERTY(qreal baseline ...)` on a `QQuickPaintedItem` subclass silently fails: Qt's MOC emits "Final member baseline is overridden. The override won't be used." and QML treats the property as read-only (bindings like `cursorItem.baseline: baseGrid.baseline` produce "Invalid property assignment: baseline is a read-only property"). The trap is that the warning is on the property *override*, not the original — QQuickItem has an internal FINAL `baseline` member that shadows any subclass property of the same name. Rename to anything else (`cellBaseline`, `textBaseline`) to avoid the clash. Other Qt-reserved-name candidates that should not be Q_PROPERTYs on QQuickItem subclasses include `baselineOffset` (real Q_PROPERTY), `clip`, `enabled`, `focus`, `visible`, etc. — when in doubt, prefix with a domain word.
-- Bash tool's working directory persists across calls, including when an earlier call `cd`d into a worktree. Cherry-picking and other parent operations must use `git -C /d/qvim ...` or `cd /d/qvim && ...` explicitly — otherwise you commit/build/test in the wrong tree.
+- The `powershell` tool runs each command in a **fresh process** — working directory, environment variables, and shell state do not persist across calls. Cherry-picking and other parent-checkout operations must `cd D:\qvim` (or use `git -C D:\qvim ...`) explicitly in the same command — otherwise you commit/build/test in the wrong tree.
 - Boot-profile instrumentation is gated behind `QVIM_BOOT_PROFILE=1`. Phase timings go to `qDebug` (invisible under `/SUBSYSTEM:WINDOWS` launched from Explorer) **and** to the path in `QVIM_BOOT_PROFILE_FILE` when set. Use the file form for windowed launches: `$env:QVIM_BOOT_PROFILE=1; $env:QVIM_BOOT_PROFILE_FILE='D:\qvim\_boot.log'; qvim.exe`.
 - Qt 6.10 on Windows: `QFont::setFeature(QFont::Tag("liga"), 1)` / `setFeature("calt", 1)` does NOT enable OpenType ligatures for monospace fonts even though the API exists. Cascadia Code / JetBrainsMono ligatures that render in VS Code and Windows Terminal will NOT form in qvim through this path. A working ligature implementation needs a different approach (custom shaping via `QRawFont` + HarfBuzz directly, or `QTextLayout` with explicit feature config) — and a test that asserts on actual ligature *glyph substitution*, not pixel-band density (which responds to kerning changes alone, producing false positives).
 - PowerShell's `Set-Content` writes CRLF on Windows. nvim's `-u init.vim` reads CRLF as a `^M` literal at the end of each line, so commands like `autocmd VimEnter * startinsert` become `startinsert^M` and fail with `E488: Trailing characters`. When generating init.vim from a script (e.g. `scripts/screenshot-qvim.ps1` test fixtures), use `[IO.File]::WriteAllText($path, "set ...`n...")` instead — backtick-n in a double-quoted PowerShell string is a single LF.
@@ -119,20 +130,20 @@ When fanning out a batch that touches any shared file:
 
 ### Worktree path discipline (agents)
 
-Agents launched with `isolation: "worktree"` get a worktree at `D:\qvim\.claude\worktrees\agent-<id>` but **do not get path translation**. The Edit/Write tools take absolute paths verbatim.
+Agents launched with `isolation: "worktree"` get a dedicated worktree checkout but **do not get path translation**. The edit/create tools take absolute paths verbatim.
 
-- **Never** use `D:\qvim\` in agent Edit/Write/Bash calls — those writes go to main, bypass isolation, and stomp other agents.
-- Always derive paths from `git rev-parse --show-toplevel` or `$PWD`. The agent preamble (`.claude/agent-preamble.md`) states this; reuse that preamble for any new fanout batch.
+- **Never** use `D:\qvim\` in agent edit/create/powershell calls — those writes go to main, bypass isolation, and stomp other agents.
+- Always derive paths from `git rev-parse --show-toplevel` or `$PWD` — never hardcode the main checkout path in an agent's edit/create/powershell calls.
 
 ## Visual validation
 
-For paint-path / font / cursor / selection changes, the authoritative validation is a screenshot of the rendered qvim window (tests can pass while the user-visible feature is broken — see "Verify, don't assume" above).
+For paint-path / font / cursor / selection changes, the authoritative validation is a screenshot of the rendered qvim window (tests can pass while the user-visible feature is broken — see "Verify, don't assume" above). The `visual-validate-qvim` skill under `.github/skills/` automates this.
 
 ```pwsh
 pwsh scripts/screenshot-qvim.ps1 -File D:\path\to\test.txt -InitFile D:\path\to\init.vim -OutPath D:\out.png
 ```
 
-Then `Read` the PNG and inspect. Notes on the capture pipeline:
+Then view the PNG and inspect. Notes on the capture pipeline:
 - Qt Quick's SceneGraph doesn't honor `WM_PRINTCLIENT`, so naive `PrintWindow` returns a black client area. The script uses `PrintWindow` with `PW_RENDERFULLCONTENT (0x2)`, which captures DirectComposition / hardware surfaces.
 - Windows blocks `SetForegroundWindow` from non-foreground processes; the script does its best with `ShowWindow(SW_RESTORE)` + `SetForegroundWindow`, but if the captured image shows another window's content, the qvim window wasn't actually foregrounded — bump `-SettleMs` or launch into a non-overlapping rect.
 - Pass `-u <init.vim>` (not `-c "set ..."`) for guifont with spaces — `-c` args get re-tokenised by nvim and `Cascadia\ Code` gets mis-split.

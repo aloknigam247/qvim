@@ -1,10 +1,6 @@
----
-applyTo: "src/**"
----
-
 # src/ — agent guide (delta)
 
-Root rules in `.github/copilot-instructions.md` still apply. This file adds C++-only specifics.
+Root rules in `AGENTS.md` still apply. This file adds C++-only specifics.
 
 ## File-to-responsibility map
 

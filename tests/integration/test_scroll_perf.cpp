@@ -3,7 +3,7 @@
 // through Qt's focus chain (QTest::keyClick on the QQuickWindow) so the test
 // covers the real keypress -> input encode -> nvim RPC -> grid_scroll/line ->
 // paint pipeline. Bypassing focus via conn.input() would hide focus-class
-// regressions per CLAUDE.md smoke-harness guidance.
+// regressions per AGENTS.md smoke-harness guidance.
 //
 // Skippable with QVIM_SKIP_PERF=1.
 

@@ -1,6 +1,6 @@
 # tests/ — agent guide (delta)
 
-Root `D:\qvim\CLAUDE.md` covers the three-tier philosophy. This file is operational.
+Root `AGENTS.md` covers the three-tier philosophy. This file is operational.
 
 ## Tiers
 

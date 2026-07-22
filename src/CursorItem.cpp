@@ -30,7 +30,7 @@ bool isPua(QChar c) {
 
 CursorItem::CursorItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setFlag(ItemHasContents, true);
-    // Cursor item must never take focus — qml/CLAUDE.md mandates focus stay
+    // Cursor item must never take focus — qml/AGENTS.md mandates focus stay
     // on the long-lived baseGrid in Shell.qml so it survives Repeater rebuilds.
     setAcceptedMouseButtons(Qt::NoButton);
     setAcceptHoverEvents(false);
