@@ -10,6 +10,7 @@ Turn a rough task, bug, or idea into a **well-formed GitHub issue** that a *diff
 ## Principles
 
 - **Discuss first, create last.** Never run `gh issue create` until the user has reviewed the drafted issue and explicitly accepted it.
+- **Always rubber-duck the draft.** Every triage runs the rubber-duck agent over the drafted issue to catch flawed root causes, invariant violations, and weak tests *before* the user sees it.
 - **The issue is for another agent, at another time.** Write it as a self-contained task: enough context, file references, and acceptance criteria that an agent with zero conversation history can pick it up and implement it.
 - **Ask for missing details.** Do not guess when scope, expected behavior, or acceptance criteria are ambiguous.
 
@@ -98,8 +99,16 @@ Pick the categories that genuinely apply (usually one primary, occasionally a se
      - **Visual gate.** For paint-path / font / cursor / selection / highlight changes, require capturing the rendered window via `scripts/screenshot-qvim.ps1` (or the `visual-validate-qvim` skill) and inspecting it — a green ctest run alone is not proof.
    - **Out of scope** — what this task must not touch.
    - Add a footer line: `Categories: <comma-separated categories>`.
-3. Write the draft to `tmp/triage-issue.md` (git-ignored) so the user can edit it directly, and also show a summary in chat including the proposed **title** and **categories/labels**.
-4. **Ask the user to accept, edit, or reject** using the `ask_user` tool (accept / edit / reject). If they choose "edit", let them edit `tmp/triage-issue.md` (and/or adjust categories) and wait for confirmation, then re-read the file.
+3. Write the draft to `tmp/triage-issue.md` (git-ignored) so the user can edit it directly.
+4. **Validate the draft with the rubber-duck agent — always, no exceptions.** Before showing the draft to the user, launch the **rubber-duck** agent (via the Task tool) and have it review `tmp/triage-issue.md`. This step is mandatory for every triage. The rubber-duck prompt must include:
+   - The full drafted issue (or instruct it to read `tmp/triage-issue.md`).
+   - The subagent's investigation report (`affected`, `codeSnippets`, `rootCause`, `approach`, `testing`) so it can check the draft against the actual findings.
+   - The instruction to catch: incorrect or unverified root cause, `file:line` references that don't match reality, an approach that violates a qvim invariant (paint-path purity, per-frame redraw cost, no `msgpack::object` copies, render-thread affinity, well-bracketed nvim keycodes, 4-element `hl_attr_define`), acceptance criteria that aren't concretely verifiable, and testing requirements that use soft assertions (`qWarning`/pixel-band) instead of hard `QVERIFY`/`QCOMPARE`, target the wrong test tier, or fail to pin *this specific* fix.
+   - The instruction to report only substantive issues (bugs, logic/design flaws, missing coverage) — not style/wording nits.
+
+   Act on the rubber-duck's findings: revise `tmp/triage-issue.md` (and re-run the investigation subagent if it surfaced a factual gap) until the substantive findings are resolved. Only then proceed to present the draft.
+5. Show a summary in chat including the proposed **title** and **categories/labels**, and note that the rubber-duck review passed.
+6. **Ask the user to accept, edit, or reject** using the `ask_user` tool (accept / edit / reject). If they choose "edit", let them edit `tmp/triage-issue.md` (and/or adjust categories) and wait for confirmation, then re-read the file.
 
 ### 5. Create the GitHub issue — only if accepted
 
