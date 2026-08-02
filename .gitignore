@@ -17,3 +17,4 @@ compile_commands.json
 *.exe
 qml/.qmlls.ini
 qtquickcontrols2.conf
+tmp/
