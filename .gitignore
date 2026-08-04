@@ -18,3 +18,4 @@ compile_commands.json
 qml/.qmlls.ini
 qtquickcontrols2.conf
 tmp/
+.worktree/
