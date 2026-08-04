@@ -80,21 +80,35 @@ QString InputHandler::keyToNvim(QKeyEvent* ev) {
         if (c.unicode() < 0x20) {
             if ((mods & Qt::ControlModifier) && key >= Qt::Key_A && key <= Qt::Key_Z) {
                 const QChar letter = QChar('a' + (key - Qt::Key_A));
-                Qt::KeyboardModifiers rest = mods & ~Qt::ShiftModifier;
-                return QStringLiteral("<%1%2>").arg(modString(rest), letter);
+                // Shift is never encoded by a control character, so it must
+                // survive into the prefix — otherwise <C-S-i> is
+                // indistinguishable from <C-i> (which is also <Tab>).
+                return QStringLiteral("<%1%2>").arg(modString(mods), letter);
             }
             return {};
         }
 
         if (mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
+            // Ctrl+Shift+<letter>: Qt may deliver the uppercase character, which
+            // case-folds to the same keycode as plain Ctrl+letter, so Shift is
+            // the only distinguishing information and must be kept. Alt/Meta are
+            // excluded because AltGr (= Ctrl+Alt on Windows) legitimately
+            // produces composed text that must not be replaced by the raw letter.
+            const bool ctrlShiftLetter =
+                (mods & Qt::ControlModifier) && (mods & Qt::ShiftModifier) &&
+                !(mods & (Qt::AltModifier | Qt::MetaModifier)) &&
+                key >= Qt::Key_A && key <= Qt::Key_Z;
+
             Qt::KeyboardModifiers rest = mods;
             // Shift is already encoded by uppercase when text reflects it; strip it.
-            rest &= ~Qt::ShiftModifier;
+            if (!ctrlShiftLetter) rest &= ~Qt::ShiftModifier;
             // Inside a <...> token the angle brackets themselves must be
             // referred to by name, otherwise the keycode is ambiguous
             // (e.g. <C-<lt>> would nest brackets; <C->> would terminate early).
             QString keyPart;
-            if      (c == QChar('<'))  keyPart = QStringLiteral("lt");
+            // Lowercase so both Qt deliveries of Ctrl+Shift+letter agree.
+            if      (ctrlShiftLetter)  keyPart = QChar('a' + (key - Qt::Key_A));
+            else if (c == QChar('<'))  keyPart = QStringLiteral("lt");
             else if (c == QChar('>'))  keyPart = QStringLiteral("gt");
             else if (c == QChar(' '))  keyPart = QStringLiteral("Space");
             else if (c == QChar('|'))  keyPart = QStringLiteral("Bar");

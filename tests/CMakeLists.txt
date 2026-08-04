@@ -68,6 +68,7 @@ qvim_add_test(test_click_focuses_float           integration/test_click_focuses_
 qvim_add_test(test_click_skips_unfocusable_float integration/test_click_skips_unfocusable_float.cpp)
 qvim_add_test(test_cmdline                       integration/test_cmdline.cpp)
 qvim_add_test(test_config_g_globals              integration/test_config_g_globals.cpp)
+qvim_add_test(test_ctrl_shift_mapping            integration/test_ctrl_shift_mapping.cpp)
 qvim_add_test(test_insert_and_quit               integration/test_insert_and_quit.cpp)
 qvim_add_test(test_messages                      integration/test_messages.cpp)
 qvim_add_test(test_multigrid                     integration/test_multigrid.cpp)
@@ -104,7 +105,7 @@ target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin 
 target_link_libraries(test_boot_no_resize_jump PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_boot_perf           PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_window_snap)
+foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_window_snap)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

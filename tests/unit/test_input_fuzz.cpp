@@ -220,6 +220,22 @@ private slots:
                  qPrintable(QStringLiteral("Ctrl+Shift+< produced \"%1\": %2").arg(out, err)));
     }
 
+    void regression_ctrlShiftLetter() {
+        // Ctrl+Shift+i must keep Shift, otherwise it collapses to <C-i> (which
+        // nvim also reads as <Tab>) and a <C-S-i> mapping can never fire.
+        // modString() emits S- before C-, and nvim canonicalises <S-C-i> and
+        // <C-S-i> to the same key.
+        for (const QString& text : {QStringLiteral("\x09"), QStringLiteral("I")}) {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_I,
+                         Qt::ControlModifier | Qt::ShiftModifier, text);
+            const QString out = InputHandler::keyToNvim(&ev);
+            QCOMPARE(out, QStringLiteral("<S-C-i>"));
+            const QString err = validateBrackets(out);
+            QVERIFY2(err.isEmpty(),
+                     qPrintable(QStringLiteral("Ctrl+Shift+i produced \"%1\": %2").arg(out, err)));
+        }
+    }
+
     void fuzz() {
         const uint64_t seed = resolveSeed();
         qInfo("fuzz seed = 0x%llx", static_cast<unsigned long long>(seed));
