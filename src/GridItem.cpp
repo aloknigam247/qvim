@@ -255,6 +255,11 @@ void GridItem::paint(QPainter* painter) {
             int c0;
             int c1;
             int hlId;
+            // Background of the line this span is embedded in, sampled from the
+            // nearest adjacent non-rounded cell. Invalid when the row offers
+            // nothing to inherit (span touches both edges, or both neighbours
+            // are themselves rounded) — see the backing-fill loop below.
+            QColor backBg;
         };
         QVarLengthArray<VisualSpan, 32> spans;
         for (int r = 0; r < rows; ++r) {
@@ -267,12 +272,53 @@ void GridItem::paint(QPainter* painter) {
                 const QColor spanBg = h->resolved(spanHl).bg;
                 while (c < cols && h->isRounded(g->cell(m_gridId, r, c).hlId)
                        && h->resolved(g->cell(m_gridId, r, c).hlId).bg == spanBg) ++c;
-                spans.push_back({r, c0, c, spanHl});
+
+                // Sample the ambient background from an immediate neighbour.
+                // O(1) on purpose: this runs per span in the paint hot path,
+                // so we probe the two adjacent cells only and fall back to the
+                // default rather than scanning the row.
+                QColor backBg;
+                if (c0 > 0) {
+                    const int leftHl = g->cell(m_gridId, r, c0 - 1).hlId;
+                    if (!h->isRounded(leftHl)) backBg = h->resolved(leftHl).bg;
+                }
+                if (!backBg.isValid() && c < cols) {
+                    const int rightHl = g->cell(m_gridId, r, c).hlId;
+                    if (!h->isRounded(rightHl)) backBg = h->resolved(rightHl).bg;
+                }
+                spans.push_back({r, c0, c, spanHl, backBg});
             }
         }
 
         if (!spans.empty()) {
             const qreal radius = 5.0;
+
+            // Backing pass. The rounded outline below deliberately cuts convex
+            // corners so something other than the pill shows through — but the
+            // run loop skips per-cell background fills for rounded cells, so
+            // without this the only paint underneath is the whole-item
+            // default-bg clear above. A pill sitting on a CursorLine (or any
+            // line whose ambient background isn't the protocol default) would
+            // then show default-coloured notches at every corner.
+            //
+            // Repaint each span's cell rect with the ambient background sampled
+            // during collection. Runs before Antialiasing is enabled so these
+            // axis-aligned rects rasterise hard-edged and cannot leave seams
+            // against the run loop's own (also aliased) fills.
+            //
+            // Skipped when the span draws no pill (same guard as the group loop
+            // below), and when there is nothing to inherit — a span whose
+            // ambient IS the default must keep showing the default.
+            for (const VisualSpan& s : spans) {
+                if (!s.backBg.isValid() || s.backBg == defaultBg) continue;
+                const QColor pillBg = h->resolved(s.hlId).bg;
+                if (!pillBg.isValid() || pillBg == defaultBg) continue;
+                painter->fillRect(QRectF(s.c0 * m_cellWidth,
+                                         s.row * m_cellHeight,
+                                         (s.c1 - s.c0) * m_cellWidth,
+                                         m_cellHeight),
+                                  s.backBg);
+            }
 
             // Group spans into connected polygons. Two spans are in the same
             // group iff they sit on consecutive rows AND their column ranges

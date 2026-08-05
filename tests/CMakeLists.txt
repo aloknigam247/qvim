@@ -36,6 +36,7 @@ qvim_add_test(test_msgpack_rpc         unit/test_msgpack_rpc.cpp)
 qvim_add_test(test_option_set_dispatch unit/test_option_set_dispatch.cpp)
 qvim_add_test(test_popupmenu_select    unit/test_popupmenu_select.cpp)
 qvim_add_test(test_resize_coalescer    unit/test_resize_coalescer.cpp)
+qvim_add_test(test_rounded_highlight   unit/test_rounded_highlight.cpp)
 qvim_add_test(test_scroll_perf_micro   unit/test_scroll_perf_micro.cpp)
 qvim_add_test(test_session_cache       unit/test_session_cache.cpp)
 
