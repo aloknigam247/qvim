@@ -651,11 +651,12 @@ void GridItem::mouseReleaseEvent(QMouseEvent* ev) { sendMouse(ev, QEvent::MouseB
 
 void GridItem::wheelEvent(QWheelEvent* ev) {
     if (!m_conn) { ev->ignore(); return; }
-    const QString dir = InputHandler::wheelFor(ev->angleDelta().y(), ev->modifiers());
-    if (dir.isEmpty()) { ev->ignore(); return; }
+    const auto w = InputHandler::wheelFor(ev->angleDelta().x(), ev->angleDelta().y(),
+                                          ev->modifiers());
+    if (!w.valid) { ev->ignore(); return; }
     const int row = rowAt(ev->position().y());
     const int col = colAt(ev->position().x());
-    m_conn->inputMouse(QStringLiteral("wheel"), dir, QString(), m_gridId, row, col);
+    m_conn->inputMouse(w.button, w.action, w.modifier, m_gridId, row, col);
     ev->accept();
 }
 

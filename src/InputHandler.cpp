@@ -162,13 +162,20 @@ InputHandler::MouseInput InputHandler::mouseFor(QMouseEvent* ev, QEvent::Type ty
     return m;
 }
 
-QString InputHandler::wheelFor(int deltaY, Qt::KeyboardModifiers mods) {
-    if (deltaY == 0) return {};
-    QString mod;
-    if (mods & Qt::ShiftModifier)   mod += QStringLiteral("S-");
-    if (mods & Qt::ControlModifier) mod += QStringLiteral("C-");
-    if (mods & Qt::AltModifier)     mod += QStringLiteral("M-");
-    return mod + (deltaY > 0 ? QStringLiteral("up") : QStringLiteral("down"));
+InputHandler::MouseInput InputHandler::wheelFor(int deltaX, int deltaY,
+                                                Qt::KeyboardModifiers mods) {
+    MouseInput m;
+    if (deltaX == 0 && deltaY == 0) return m;
+    m.button = QStringLiteral("wheel");
+    // Widen before qAbs: qAbs(INT_MIN) is undefined and asserts in debug Qt.
+    if (qAbs(static_cast<qint64>(deltaX)) > qAbs(static_cast<qint64>(deltaY))) {
+        m.action = deltaX > 0 ? QStringLiteral("left") : QStringLiteral("right");
+    } else {
+        m.action = deltaY > 0 ? QStringLiteral("up") : QStringLiteral("down");
+    }
+    m.modifier = modString(mods);
+    m.valid = true;
+    return m;
 }
 
 } // namespace qvim

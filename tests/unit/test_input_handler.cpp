@@ -116,6 +116,67 @@ private slots:
         QCOMPARE(translate(Qt::Key_Right, Qt::NoModifier, QString()), QStringLiteral("<Right>"));
         QCOMPARE(translate(Qt::Key_Up, Qt::ControlModifier, QString()), QStringLiteral("<C-Up>"));
     }
+
+    // --- wheelFor -----------------------------------------------------------
+    // Sign convention: positive deltaX == user scrolled LEFT (Qt negates the
+    // Windows WM_MOUSEHWHEEL delta), and nvim's action "left" pans the view
+    // left. Verified against Qt source, neovim-qt, Neovide, and a live nvim.
+
+    void wheelVerticalUnchanged() {
+        const auto up = InputHandler::wheelFor(0, 120, Qt::NoModifier);
+        QVERIFY(up.valid);
+        QCOMPARE(up.button,   QStringLiteral("wheel"));
+        QCOMPARE(up.action,   QStringLiteral("up"));
+        QCOMPARE(up.modifier, QString());
+        QCOMPARE(InputHandler::wheelFor(0, -120, Qt::NoModifier).action, QStringLiteral("down"));
+    }
+
+    void wheelHorizontal() {
+        QCOMPARE(InputHandler::wheelFor(120, 0, Qt::NoModifier).action,  QStringLiteral("left"));
+        QCOMPARE(InputHandler::wheelFor(-120, 0, Qt::NoModifier).action, QStringLiteral("right"));
+    }
+
+    void wheelDominantAxis() {
+        QCOMPARE(InputHandler::wheelFor(10, 120, Qt::NoModifier).action,   QStringLiteral("up"));
+        QCOMPARE(InputHandler::wheelFor(10, -120, Qt::NoModifier).action,  QStringLiteral("down"));
+        QCOMPARE(InputHandler::wheelFor(120, 10, Qt::NoModifier).action,   QStringLiteral("left"));
+        QCOMPARE(InputHandler::wheelFor(-120, -10, Qt::NoModifier).action, QStringLiteral("right"));
+        // Ties resolve to vertical, preserving pre-change behaviour.
+        QCOMPARE(InputHandler::wheelFor(120, 120, Qt::NoModifier).action,  QStringLiteral("up"));
+        QCOMPARE(InputHandler::wheelFor(-120, 120, Qt::NoModifier).action, QStringLiteral("up"));
+        QCOMPARE(InputHandler::wheelFor(120, -120, Qt::NoModifier).action, QStringLiteral("down"));
+    }
+
+    // Regression: nvim_input_mouse exact-matches the action against
+    // up/down/left/right, so a modifier folded into the action string makes
+    // nvim reject the event as "invalid button or action" and drop it.
+    void wheelModifiersAreSeparate() {
+        const auto s = InputHandler::wheelFor(120, 0, Qt::ShiftModifier);
+        QCOMPARE(s.action,   QStringLiteral("left"));      // NOT "S-left"
+        QCOMPARE(s.modifier, QStringLiteral("S-"));
+        const auto c = InputHandler::wheelFor(0, 120, Qt::ControlModifier);
+        QCOMPARE(c.action,   QStringLiteral("up"));        // NOT "C-up"
+        QCOMPARE(c.modifier, QStringLiteral("C-"));
+        const auto all = InputHandler::wheelFor(
+            -120, 0, Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
+        QCOMPARE(all.action,   QStringLiteral("right"));
+        QCOMPARE(all.modifier, QStringLiteral("S-C-M-"));
+    }
+
+    void wheelZeroIgnored() {
+        QVERIFY(!InputHandler::wheelFor(0, 0, Qt::NoModifier).valid);
+        QVERIFY(!InputHandler::wheelFor(0, 0, Qt::ShiftModifier).valid);  // no bare "S-"
+    }
+
+    void wheelExtremeDeltas() {
+        // qAbs(INT_MIN) is UB, so wheelFor widens to qint64 before comparing.
+        QCOMPARE(InputHandler::wheelFor(INT_MIN, 0, Qt::NoModifier).action,
+                 QStringLiteral("right"));
+        QCOMPARE(InputHandler::wheelFor(0, INT_MIN, Qt::NoModifier).action,
+                 QStringLiteral("down"));
+        QCOMPARE(InputHandler::wheelFor(INT_MIN, 1, Qt::NoModifier).action,
+                 QStringLiteral("right"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestInputHandler)
