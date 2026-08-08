@@ -43,6 +43,7 @@ set(QVIM_LIB_SOURCES
     src/CursorItem.cpp          include/CursorItem.h
     src/GridItem.cpp            include/GridItem.h
     src/GridModel.cpp           include/GridModel.h
+    src/GridRuns.cpp            include/GridRuns.h
     src/HighlightTable.cpp      include/HighlightTable.h
     src/InputHandler.cpp        include/InputHandler.h
     src/MessagesModel.cpp       include/MessagesModel.h
@@ -50,9 +51,11 @@ set(QVIM_LIB_SOURCES
     src/MsgpackRpc.cpp          include/MsgpackRpc.h
     src/NvimConnector.cpp       include/NvimConnector.h
     src/PopupMenuModel.cpp      include/PopupMenuModel.h
+    src/RectNodePool.cpp        include/RectNodePool.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
     src/TablineModel.cpp        include/TablineModel.h
+    src/TextNodePool.cpp        include/TextNodePool.h
     src/WindowChrome.cpp        include/WindowChrome.h
 )
 

@@ -23,9 +23,10 @@
 #include <QColor>
 #include <QGuiApplication>
 #include <QImage>
-#include <QPainter>
 #include <QScreen>
 #include <msgpack.hpp>
+
+#include "support/QuickRasterizer.h"
 
 #include "GridItem.h"
 #include "GridModel.h"
@@ -103,6 +104,8 @@ class TestRoundedHighlight : public QObject {
 
 private slots:
     void initTestCase() {
+        // Must precede any QQuickWindow: the scene graph backend is chosen once.
+        QuickRasterizer::useSoftwareBackend();
         if (QGuiApplication::primaryScreen() == nullptr) {
             QSKIP("No primary screen available (headless without minimal QPA).");
         }
@@ -287,18 +290,17 @@ private:
             item.setHeight(std::ceil(ch() * rows));
         }
 
+        // Renders through the real scene graph. Probing pixels produced by a
+        // test-only QPainter path would let the shipping renderer break while
+        // these assertions stayed green.
         QImage render() {
-            QImage img(static_cast<int>(item.width()),
-                       static_cast<int>(item.height()),
-                       QImage::Format_ARGB32);
-            img.setDevicePixelRatio(1.0);
-            img.fill(Qt::transparent);
-            QPainter p(&img);
-            p.setRenderHint(QPainter::Antialiasing, false);
-            item.paint(&p);
-            p.end();
+            const QImage img = raster.render(&item);
+            if (!raster.isUnscaled())
+                qFatal("render surface is scaled; probes assume 1 logical px == 1 device px");
             return img.convertToFormat(QImage::Format_RGB32);
         }
+
+        QuickRasterizer raster;
 
         // Top-left corner of the pill's cell box. The rounded path cuts this
         // corner off, so this pixel is inside the rounded cell but outside the

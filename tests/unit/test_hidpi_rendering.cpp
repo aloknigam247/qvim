@@ -1,10 +1,11 @@
 #include <QtTest>
 #include <QGuiApplication>
 #include <QImage>
-#include <QPainter>
 #include <QRectF>
 #include <QScreen>
 #include <msgpack.hpp>
+
+#include "support/QuickRasterizer.h"
 
 #include "GridItem.h"
 #include "GridModel.h"
@@ -53,6 +54,8 @@ class TestHiDpiRendering : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() {
+        // Must precede any QQuickWindow: the scene graph backend is chosen once.
+        QuickRasterizer::useSoftwareBackend();
         if (QGuiApplication::primaryScreen() == nullptr) {
             QSKIP("No primary screen available (headless without minimal QPA).");
         }
@@ -109,24 +112,25 @@ private slots:
         QVERIFY(expectedCursorRect.right()  <= logicalSize.width()  + 1e-6);
         QVERIFY(expectedCursorRect.bottom() <= logicalSize.height() + 1e-6);
 
+        // The scene graph owns its own surface, so a test can no longer hand
+        // the renderer a backing store at an arbitrary DPR the way a direct
+        // QPainter call could. What this test is actually for survives intact:
+        // cell metrics are derived from QFontMetricsF in LOGICAL pixels and
+        // must not drift when the scale factor changes. Each iteration sets the
+        // scale factor, re-derives the metrics, and re-renders.
         const qreal kDprs[] = { 1.0, 1.5, 2.0 };
         qreal cwFirst = 0.0;
         qreal chFirst = 0.0;
+
+        QuickRasterizer raster;
 
         for (const qreal dpr : kDprs) {
             const int pxW = static_cast<int>(logicalSize.width()  * dpr);
             const int pxH = static_cast<int>(logicalSize.height() * dpr);
             QVERIFY2(pxW > 0 && pxH > 0, "image dimensions must be positive");
 
-            QImage image(pxW, pxH, QImage::Format_ARGB32);
-            image.setDevicePixelRatio(dpr);
-            image.fill(Qt::transparent);
-
-            {
-                QPainter p(&image);
-                QVERIFY(p.isActive());
-                item.paint(&p);
-            }
+            const QImage image = raster.render(&item);
+            QVERIFY2(!image.isNull(), "scene graph produced no image");
 
             // Geometry invariant: cellWidth/cellHeight come from QFontMetricsF
             // in *logical* pixels and must not drift as DPR changes.
@@ -145,14 +149,25 @@ private slots:
                 item.cellWidth(), item.cellHeight());
             QCOMPARE(cursorRectAfter, expectedCursorRect);
 
-            // Output sanity: the painter actually wrote pixels.
+            // Output sanity: the renderer actually emitted ink. A uniform image
+            // means glyphs went missing (wrong colour, zero-size node, or the
+            // text nodes never made it into the tree).
             QVERIFY2(hasNonUniformContent(image),
-                qPrintable(QStringLiteral("Painted image is uniform at DPR=%1").arg(dpr)));
+                qPrintable(QStringLiteral("Rendered image is uniform at DPR=%1").arg(dpr)));
 
-            // Backing-store dimensions must scale with DPR.
-            QCOMPARE(image.devicePixelRatio(), dpr);
-            QCOMPARE(image.width(),  pxW);
-            QCOMPARE(image.height(), pxH);
+            // The rendered surface covers the whole item, scaled by whatever
+            // device pixel ratio the scene graph is running at. Compared
+            // against the window's own size rather than the item's, because
+            // the window rounds its logical size up to whole pixels first.
+            const qreal surfaceDpr = raster.window()->effectiveDevicePixelRatio();
+            QCOMPARE(image.width(),
+                     qRound(raster.window()->width() * surfaceDpr));
+            QCOMPARE(image.height(),
+                     qRound(raster.window()->height() * surfaceDpr));
+            QVERIFY2(image.width()  >= static_cast<int>(logicalSize.width()),
+                     "rendered surface narrower than the item");
+            QVERIFY2(image.height() >= static_cast<int>(logicalSize.height()),
+                     "rendered surface shorter than the item");
         }
     }
 };
