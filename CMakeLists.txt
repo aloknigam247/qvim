@@ -43,6 +43,7 @@ set(QVIM_LIB_SOURCES
     src/CursorItem.cpp          include/CursorItem.h
     src/GridItem.cpp            include/GridItem.h
     src/GridModel.cpp           include/GridModel.h
+    src/GridRuns.cpp            include/GridRuns.h
     src/HighlightTable.cpp      include/HighlightTable.h
     src/InputHandler.cpp        include/InputHandler.h
     src/MessagesModel.cpp       include/MessagesModel.h

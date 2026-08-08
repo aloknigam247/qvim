@@ -2,6 +2,7 @@
 #include "CellMetrics.h"
 #include "NvimConnector.h"
 #include "GridModel.h"
+#include "GridRuns.h"
 #include "HighlightTable.h"
 #include "InputHandler.h"
 
@@ -240,55 +241,22 @@ void GridItem::paint(QPainter* painter) {
     // in the hot path. Compute once and reuse.
     const qreal underlineThickness = std::max(1.0, std::round(QFontMetricsF(m_font).lineWidth()));
 
+    // Single traversal of the grid, resolved into draw-ready runs. Keeping the
+    // walk out of the painter makes it unit-testable without a window and lets
+    // the background, glyph and decoration passes share one pass over the model.
+    const GridRuns runs = buildGridRuns(*g, *h, m_gridId);
+
     // Rounded-corner pass for cells flagged isRounded (from ext_hlstate's
     // info array on hl_attr_define, configured via g:qvim_rounded_highlights).
-    // Walk the grid collecting per-row spans, group connected spans into
-    // closed rectilinear polygons (one per multi-row selection blob), and
-    // emit a single rounded path per polygon. Every corner of the polygon is
-    // rounded — convex outer corners bulge away from the interior, concave
-    // inner corners bulge into it (VS Code-style inverse rounding). Drawn
-    // before the run loop so glyphs paint on top; the run loop skips per-cell
-    // bg fills for isRounded cells so the rounded shape isn't overpainted.
+    // Group connected spans into closed rectilinear polygons (one per multi-row
+    // selection blob) and emit a single rounded path per polygon. Every corner
+    // of the polygon is rounded — convex outer corners bulge away from the
+    // interior, concave inner corners bulge into it (VS Code-style inverse
+    // rounding). Drawn before the run loop so glyphs paint on top; the run loop
+    // skips per-cell bg fills for isRounded cells so the rounded shape isn't
+    // overpainted.
     {
-        struct VisualSpan {
-            int row;
-            int c0;
-            int c1;
-            int hlId;
-            // Background of the line this span is embedded in, sampled from the
-            // nearest adjacent non-rounded cell. Invalid when the row offers
-            // nothing to inherit (span touches both edges, or both neighbours
-            // are themselves rounded) — see the backing-fill loop below.
-            QColor backBg;
-        };
-        QVarLengthArray<VisualSpan, 32> spans;
-        for (int r = 0; r < rows; ++r) {
-            int c = 0;
-            while (c < cols) {
-                const Cell& cell = g->cell(m_gridId, r, c);
-                if (!h->isRounded(cell.hlId)) { ++c; continue; }
-                const int c0 = c;
-                const int spanHl = cell.hlId;
-                const QColor spanBg = h->resolved(spanHl).bg;
-                while (c < cols && h->isRounded(g->cell(m_gridId, r, c).hlId)
-                       && h->resolved(g->cell(m_gridId, r, c).hlId).bg == spanBg) ++c;
-
-                // Sample the ambient background from an immediate neighbour.
-                // O(1) on purpose: this runs per span in the paint hot path,
-                // so we probe the two adjacent cells only and fall back to the
-                // default rather than scanning the row.
-                QColor backBg;
-                if (c0 > 0) {
-                    const int leftHl = g->cell(m_gridId, r, c0 - 1).hlId;
-                    if (!h->isRounded(leftHl)) backBg = h->resolved(leftHl).bg;
-                }
-                if (!backBg.isValid() && c < cols) {
-                    const int rightHl = g->cell(m_gridId, r, c).hlId;
-                    if (!h->isRounded(rightHl)) backBg = h->resolved(rightHl).bg;
-                }
-                spans.push_back({r, c0, c, spanHl, backBg});
-            }
-        }
+        const QVector<PillSpan>& spans = runs.pills;
 
         if (!spans.empty()) {
             const qreal radius = 5.0;
@@ -309,7 +277,7 @@ void GridItem::paint(QPainter* painter) {
             // Skipped when the span draws no pill (same guard as the group loop
             // below), and when there is nothing to inherit — a span whose
             // ambient IS the default must keep showing the default.
-            for (const VisualSpan& s : spans) {
+            for (const PillSpan& s : spans) {
                 if (!s.backBg.isValid() || s.backBg == defaultBg) continue;
                 const QColor pillBg = h->resolved(s.hlId).bg;
                 if (!pillBg.isValid() || pillBg == defaultBg) continue;
@@ -326,8 +294,8 @@ void GridItem::paint(QPainter* painter) {
             QVarLengthArray<int, 16> groupStart;
             groupStart.push_back(0);
             for (int i = 1; i < spans.size(); ++i) {
-                const VisualSpan& pa = spans[i - 1];
-                const VisualSpan& pb = spans[i];
+                const PillSpan& pa = spans[i - 1];
+                const PillSpan& pb = spans[i];
                 const bool sameGroup = pb.row == pa.row + 1 &&
                                        pb.c0 < pa.c1 && pa.c0 < pb.c1 &&
                                        h->resolved(pb.hlId).bg == h->resolved(pa.hlId).bg;
@@ -419,90 +387,59 @@ void GridItem::paint(QPainter* painter) {
     QHash<int, QRawFont> rawFontCache;
     rawFontCache.reserve(8);
 
-    // Returns true if `c` is in the Unicode Private Use Area (BMP U+E000-U+F8FF)
-    // or starts a supplementary PUA-A/B surrogate pair. Used to detect cells
-    // whose glyphs need the QGlyphRun overlay pass (see below).
-    auto isPua = [](QChar c) -> bool {
-        const ushort u = c.unicode();
-        if (u >= 0xE000 && u <= 0xF8FF) return true;
-        // Supplementary PUA-A (U+F0000-U+FFFFD) lives in surrogate range
-        // U+DB80-U+DBBF; PUA-B (U+100000-U+10FFFD) in U+DBC0-U+DBFF.
-        return c.isHighSurrogate() && u >= 0xDB80;
-    };
-
     // Track last applied painter state to avoid redundant setFont/setPen calls
     // both within a row and across consecutive rows.
     int     lastHlIdFont = INT_MIN;
     int     lastHlIdPen  = INT_MIN;
     QColor  lastPenColor;
 
+    // Walk the precomputed runs, which are already ordered row-major and
+    // left-to-right. Per run we emit background, glyphs and decorations in the
+    // same sequence the old inline loop did, so a later run's background still
+    // overpaints an earlier run's glyph overflow.
+    int runIdx = 0;
+    int puaIdx = 0;
     for (int r = 0; r < rows; ++r) {
         const qreal y = r * m_cellHeight;
         const QRectF rowRect(0.0, y, m_cellWidth * cols, m_cellHeight);
         painter->save();
         painter->setClipRect(rowRect);
 
-        // Track whether this row contains any Private Use Area codepoint. Set
-        // during run-building (no extra iteration). Used to gate the overlay
-        // pass at row end so PUA-free rows (the common case in code buffers)
-        // pay zero extra cost.
-        bool rowHasPua = false;
-
-        int c = 0;
-        while (c < cols) {
-            const Cell& start = g->cell(m_gridId, r, c);
-            const int runHl = start.hlId;
-            int runEnd = c + 1;
-            while (runEnd < cols && g->cell(m_gridId, r, runEnd).hlId == runHl) ++runEnd;
-
-            const HlAttr a = h->resolved(runHl);
-            const QRectF runRect(c * m_cellWidth, y, (runEnd - c) * m_cellWidth, m_cellHeight);
-            if (a.bg != defaultBg && !h->isRounded(runHl)) {
-                painter->fillRect(runRect, a.bg);
-            }
-
-            QString runText;
-            runText.reserve(runEnd - c);
-            for (int cc = c; cc < runEnd; ++cc) {
-                const Cell& cell = g->cell(m_gridId, r, cc);
-                // Right-half markers of double-width glyphs contribute no glyph
-                // of their own; the left cell's glyph already spans both columns.
-                if (cell.doubleWidth) continue;
-                if (cell.text.isEmpty()) {
-                    runText += QChar(' ');
-                } else {
-                    runText += cell.text;
-                    if (!rowHasPua && isPua(cell.text[0])) rowHasPua = true;
-                }
-            }
+        for (; runIdx < runs.runs.size() && runs.runs[runIdx].row == r; ++runIdx) {
+            const CellRun& run = runs.runs[runIdx];
+            const QRectF runRect(run.c0 * m_cellWidth, y,
+                                 (run.c1 - run.c0) * m_cellWidth, m_cellHeight);
+            if (run.fillBg) painter->fillRect(runRect, run.bg);
 
             // Only rebuild/apply font when the hl_id (and therefore the font
             // attribute set) actually changes. painter->save()/restore() per
             // row does NOT invalidate our cached state because we re-apply
-            // before drawing whenever lastHlIdFont != runHl.
-            if (runHl != lastHlIdFont) {
-                auto it = fontCache.find(runHl);
-                if (it == fontCache.end()) {
-                    it = fontCache.insert(runHl, buildRunFont(a));
-                }
+            // before drawing whenever lastHlIdFont != run.hlId.
+            if (run.hlId != lastHlIdFont) {
+                auto it = fontCache.find(run.hlId);
+                if (it == fontCache.end())
+                    it = fontCache.insert(run.hlId, buildRunFont(h->resolved(run.hlId)));
                 painter->setFont(it.value());
-                lastHlIdFont = runHl;
+                lastHlIdFont = run.hlId;
             }
-            if (runHl != lastHlIdPen || a.fg != lastPenColor) {
-                painter->setPen(a.fg);
-                lastHlIdPen = runHl;
-                lastPenColor = a.fg;
+            if (run.hlId != lastHlIdPen || run.fg != lastPenColor) {
+                painter->setPen(run.fg);
+                lastHlIdPen  = run.hlId;
+                lastPenColor = run.fg;
             }
-            painter->drawText(QPointF(c * m_cellWidth, y + m_baseline), runText);
+            painter->drawText(QPointF(run.c0 * m_cellWidth, y + m_baseline), run.text);
 
-            if (a.underline) {
-                painter->fillRect(QRectF(runRect.left(), y + m_cellHeight - underlineThickness, runRect.width(), underlineThickness), a.fg);
+            if (run.underline) {
+                painter->fillRect(QRectF(runRect.left(),
+                                         y + m_cellHeight - underlineThickness,
+                                         runRect.width(), underlineThickness),
+                                  run.fg);
             }
 
-            if (a.undercurl) {
-                painter->setPen(a.sp);
-                lastPenColor = a.sp;
-                lastHlIdPen = INT_MIN; // force pen re-apply on next text run
+            if (run.undercurl) {
+                painter->setPen(run.sp);
+                lastPenColor = run.sp;
+                lastHlIdPen  = INT_MIN; // force pen re-apply on next text run
                 const qreal yy = y + m_cellHeight - 1.5;
                 QPainterPath path;
                 path.moveTo(runRect.left(), yy);
@@ -512,8 +449,6 @@ void GridItem::paint(QPainter* painter) {
                 }
                 painter->drawPath(path);
             }
-
-            c = runEnd;
         }
 
         // PUA overlay pass. Qt 6's text shaper drops Private Use Area
@@ -523,65 +458,44 @@ void GridItem::paint(QPainter* painter) {
         // no glyph for nerd-font icons, powerline separators, etc., even when
         // the resolved font's cmap has them. The Qt-blessed workaround is to
         // bypass the shaper via QRawFont's direct cmap lookup + drawGlyphRun.
-        // We only take this path when the row actually has PUA cells; rows
-        // without PUA keep the drawText codepath untouched (and so retain
-        // Qt's automatic font fallback, which is what makes characters like
-        // U+1F600 render via the system emoji font when the primary font
-        // lacks them).
-        if (rowHasPua) {
-            int cc = 0;
-            while (cc < cols) {
-                const Cell& cell = g->cell(m_gridId, r, cc);
-                if (cell.doubleWidth || cell.text.isEmpty() || !isPua(cell.text[0])) {
-                    ++cc; continue;
+        // Rows without PUA never enter this loop and so keep the plain
+        // drawText path (and with it Qt's automatic font fallback, which is
+        // what makes characters like U+1F600 render via the system emoji font
+        // when the primary font lacks them).
+        for (; puaIdx < runs.puaClusters.size() && runs.puaClusters[puaIdx].row == r; ++puaIdx) {
+            const PuaCluster& cluster = runs.puaClusters[puaIdx];
+            const HlAttr ha = h->resolved(cluster.hlId);
+
+            auto fit = fontCache.find(cluster.hlId);
+            if (fit == fontCache.end()) fit = fontCache.insert(cluster.hlId, buildRunFont(ha));
+            auto rit = rawFontCache.find(cluster.hlId);
+            if (rit == rawFontCache.end())
+                rit = rawFontCache.insert(cluster.hlId, QRawFont::fromFont(fit.value()));
+
+            QList<quint32> glyphs;
+            QList<QPointF> positions;
+            glyphs.reserve(cluster.c1 - cluster.c0);
+            positions.reserve(cluster.c1 - cluster.c0);
+            for (int i = cluster.c0; i < cluster.c1; ++i) {
+                const Cell& pcell = g->cell(m_gridId, r, i);
+                if (pcell.doubleWidth) continue;
+                const QList<quint32> ids = rit.value().glyphIndexesForString(pcell.text);
+                if (!ids.isEmpty()) {
+                    glyphs.append(ids.first());
+                    positions.append(QPointF(i * m_cellWidth, y + m_baseline));
                 }
+            }
 
-                // Extend the cluster while consecutive cells share the hl_id
-                // AND are PUA. Splitting at hl_id changes lets each cluster use
-                // a single pen color + single QGlyphRun call.
-                const int clusterHl = cell.hlId;
-                int clusterEnd = cc + 1;
-                while (clusterEnd < cols) {
-                    const Cell& next = g->cell(m_gridId, r, clusterEnd);
-                    if (next.doubleWidth) { ++clusterEnd; continue; }
-                    if (next.hlId != clusterHl) break;
-                    if (next.text.isEmpty() || !isPua(next.text[0])) break;
-                    ++clusterEnd;
-                }
-
-                const HlAttr ha = h->resolved(clusterHl);
-                auto fit = fontCache.find(clusterHl);
-                if (fit == fontCache.end()) fit = fontCache.insert(clusterHl, buildRunFont(ha));
-                auto rit = rawFontCache.find(clusterHl);
-                if (rit == rawFontCache.end()) rit = rawFontCache.insert(clusterHl, QRawFont::fromFont(fit.value()));
-
-                QList<quint32> glyphs;
-                QList<QPointF> positions;
-                glyphs.reserve(clusterEnd - cc);
-                positions.reserve(clusterEnd - cc);
-                for (int i = cc; i < clusterEnd; ++i) {
-                    const Cell& pcell = g->cell(m_gridId, r, i);
-                    if (pcell.doubleWidth) continue;
-                    const QList<quint32> ids = rit.value().glyphIndexesForString(pcell.text);
-                    if (!ids.isEmpty()) {
-                        glyphs.append(ids.first());
-                        positions.append(QPointF(i * m_cellWidth, y + m_baseline));
-                    }
-                }
-
-                if (!glyphs.isEmpty()) {
-                    painter->setPen(ha.fg);
-                    QGlyphRun run;
-                    run.setRawFont(rit.value());
-                    run.setGlyphIndexes(glyphs);
-                    run.setPositions(positions);
-                    painter->drawGlyphRun(QPointF(0, 0), run);
-                    // Pen color may have changed; force next run's pen re-apply.
-                    lastHlIdPen = INT_MIN;
-                    lastPenColor = QColor();
-                }
-
-                cc = clusterEnd;
+            if (!glyphs.isEmpty()) {
+                painter->setPen(ha.fg);
+                QGlyphRun run;
+                run.setRawFont(rit.value());
+                run.setGlyphIndexes(glyphs);
+                run.setPositions(positions);
+                painter->drawGlyphRun(QPointF(0, 0), run);
+                // Pen color may have changed; force next run's pen re-apply.
+                lastHlIdPen  = INT_MIN;
+                lastPenColor = QColor();
             }
         }
 
@@ -593,6 +507,7 @@ void GridItem::paint(QPainter* painter) {
         lastHlIdPen  = INT_MIN;
         lastPenColor = QColor();
     }
+
 
     if (kProfilePaint) {
         const qint64 ns = paintTimer.nsecsElapsed();
