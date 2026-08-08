@@ -7,7 +7,9 @@ cmake_path(NATIVE_PATH QVIM_TEST_QML_IMPORT_DIR  QVIM_TEST_QML_IMPORT_DIR_NATIVE
 
 function(qvim_add_test name)
     qt_add_executable(${name} ${ARGN})
-    target_link_libraries(${name} PRIVATE qvim_lib Qt6::Test)
+    target_link_libraries(${name} PRIVATE qvim_lib Qt6::Test Qt6::Quick)
+    # tests/support/QuickRasterizer.h is included as "support/QuickRasterizer.h".
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES
         TIMEOUT 60
@@ -109,7 +111,7 @@ target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin 
 target_link_libraries(test_boot_no_resize_jump PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_boot_perf           PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_pixel_snapshot test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
+foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
@@ -118,6 +120,10 @@ endforeach()
 
 
 # Pixel-snapshot test needs to find tests/golden/ relative to the source tree.
+# It is deliberately NOT in the minimal-QPA list above: it drives no nvim, and
+# the minimal platform has an empty font database and cannot grab a window, so
+# under it the "snapshot" would be a blank image that no font regression could
+# ever disturb.
 set_tests_properties(test_pixel_snapshot PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )
@@ -132,4 +138,16 @@ set_tests_properties(test_qml PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE}"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
     TIMEOUT 30
+)
+
+# Pixel-probe tests address the rendered image in logical coordinates and, for
+# test_pixel_snapshot, compare it against a golden stored at 1:1. Disable Qt's
+# high-DPI scaling so one logical pixel is one device pixel regardless of the
+# host's display scale; without this the golden is not portable between
+# machines. QuickRasterizer::isUnscaled() makes a missing setting a hard fail.
+set_tests_properties(
+    test_hidpi_rendering
+    test_pixel_snapshot
+    test_rounded_highlight
+    PROPERTIES ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
 )

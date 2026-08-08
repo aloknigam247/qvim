@@ -12,6 +12,7 @@
 #include <QList>
 #include <QPainter>
 #include <QPointF>
+#include <QQuickWindow>
 #include <QRawFont>
 #include <QVariant>
 
@@ -28,17 +29,14 @@ bool isPua(QChar c) {
 }
 } // namespace
 
-CursorItem::CursorItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
+CursorItem::CursorItem(QQuickItem* parent) : QQuickItem(parent) {
     setFlag(ItemHasContents, true);
     // Cursor item must never take focus — qml/AGENTS.md mandates focus stay
     // on the long-lived baseGrid in Shell.qml so it survives Repeater rebuilds.
     setAcceptedMouseButtons(Qt::NoButton);
     setAcceptHoverEvents(false);
-    // Transparent background so non-cursor pixels in the item composite the
-    // grid below through. QQuickPaintedItem clears the dirty region to
-    // fillColor before paint() runs, so update(rect) on the previous cursor
-    // cell automatically clears it back to transparent.
-    setFillColor(Qt::transparent);
+    // The item emits geometry only where the cursor is; everywhere else it
+    // contributes no nodes at all, so the grid below composites through.
 
     m_font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     m_font.setPointSizeF(m_fontSize);
@@ -183,16 +181,11 @@ QRectF CursorItem::currentCursorRect() const {
 }
 
 void CursorItem::scheduleRepaint() {
-    const QRectF current = currentCursorRect();
-    QRectF dirty = current;
-    if (!m_lastRect.isNull()) {
-        dirty = dirty.isNull() ? m_lastRect : dirty.united(m_lastRect);
-    }
-    if (dirty.isNull()) {
-        update();
-        return;
-    }
-    update(dirty.toAlignedRect());
+    // QQuickItem has no partial-invalidation entry point, and it does not need
+    // one: the item's whole output is a couple of quads plus one glyph, so a
+    // full rebuild is cheaper than tracking dirty rects was under
+    // QQuickPaintedItem (where a partial update still re-rasterised a texture).
+    update();
 }
 
 void CursorItem::onCursorActivity() {
@@ -273,21 +266,15 @@ void CursorItem::onModeBlinkChanged() {
 
 void CursorItem::onBlinkTimeout() {
     // Single-cell repaint — cursor cell only, no blink reset.
-    const QRectF current = currentCursorRect();
-    if (!current.isNull()) {
-        update(current.toAlignedRect());
-    }
+    update();
     rescheduleBlink();
 }
 
 void CursorItem::onFlush() {
     // The cell under the cursor may have changed content (e.g. `r<char>` in
-    // normal mode does not move the cursor). Repaint the cursor rect so the
-    // block-mode glyph stays in sync with the underlying cell. One cell.
-    const QRectF current = currentCursorRect();
-    if (!current.isNull()) {
-        update(current.toAlignedRect());
-    }
+    // normal mode does not move the cursor). Repaint so the block-mode glyph
+    // stays in sync with the underlying cell.
+    update();
 }
 
 void CursorItem::rescheduleBlink() {
@@ -301,12 +288,49 @@ void CursorItem::rescheduleBlink() {
     m_blinkTimer.start(static_cast<int>(delay));
 }
 
-void CursorItem::paint(QPainter* painter) {
+QSGNode* CursorItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
+    // A null oldNode means the scene graph destroyed the previous tree, so the
+    // cached slot pointers are dangling. Drop them without deleting.
+    if (!oldNode) {
+        m_blockRoot = m_textRoot = m_lineRoot = nullptr;
+        m_blockPool.forget();
+        m_linePool.forget();
+        m_textPool.forget();
+    }
+
+    QSGNode* root = oldNode;
+    if (!root) {
+        root = new QSGNode;
+        // Three fixed slots, created once: the cursor block, the carried glyph
+        // above it, then the underline on top. Same layering GridItem uses, so
+        // a descender crossing an underline looks the same under the cursor as
+        // it does in the grid.
+        m_blockRoot = new QSGNode;
+        m_textRoot  = new QSGNode;
+        m_lineRoot  = new QSGNode;
+        root->appendChildNode(m_blockRoot);
+        root->appendChildNode(m_textRoot);
+        root->appendChildNode(m_lineRoot);
+    }
+
+    m_blockPool.beginFrame(m_blockRoot, window());
+    m_linePool.beginFrame(m_lineRoot, window());
+    m_textPool.beginFrame(m_textRoot, window());
+
+    // Every early return still has to commit an empty frame, otherwise the
+    // previous frame's cursor stays on screen.
+    const auto commit = [&] {
+        m_blockPool.endFrame();
+        m_linePool.endFrame();
+        m_textPool.endFrame();
+        return root;
+    };
+
     GridModel* g = grid();
     HighlightTable* h = hl();
     if (!g || !h) {
         m_lastRect = {};
-        return;
+        return commit();
     }
     ModeInfo* m = mode();
 
@@ -314,23 +338,21 @@ void CursorItem::paint(QPainter* painter) {
     auto* surface = g->surfaceFor(active);
     if (!surface || !surface->visible()) {
         m_lastRect = {};
-        return;
+        return commit();
     }
     const int localRow = g->cursorRowOf(active);
     const int localCol = g->cursorColOf(active);
     if (localRow < 0 || localRow >= surface->rows() ||
         localCol < 0 || localCol >= surface->cols()) {
         m_lastRect = {};
-        return;
+        return commit();
     }
 
     const bool cursorOn = m_blink.isOn(m_clock.elapsed());
     const bool drawCursor = cursorOn || !m || !m->cursorStyleEnabled();
     if (!drawCursor) {
-        // Blink-off phase: the dirty region was already cleared to fillColor
-        // (transparent) by QQuickPaintedItem, so the grid below shows through.
         m_lastRect = {};
-        return;
+        return commit();
     }
 
     HlAttr a = h->resolved(m ? m->attrId() : 0);
@@ -343,7 +365,7 @@ void CursorItem::paint(QPainter* painter) {
 
     // Visible pixel position. Once an animation has been seeded (i.e. we've
     // seen at least one cursorChanged on this CursorItem), m_animatedPos
-    // sweeps between cells. Before then — typically the very first paint
+    // sweeps between cells. Before then — typically the very first frame
     // after attach, because nvim's initial grid_cursor_goto fires before
     // CursorItem is constructed — fall back to the target cell so the
     // cursor is visible on launch.
@@ -357,56 +379,41 @@ void CursorItem::paint(QPainter* painter) {
     }
     const QRectF rect = cursorRectAtPixel(drawPos, m_cellWidth, m_cellHeight, shape);
 
-    painter->setRenderHint(QPainter::TextAntialiasing, true);
-    painter->fillRect(rect, curColor);
+    m_blockPool.add(rect, curColor);
 
     if (shape == CursorShape::Block && cursorOn) {
         // Glyph is the TARGET cell's text — the cursor "carries" its
         // destination glyph as it slides into place. Matches Goneovim.
         const Cell& cell = g->cell(active, localRow, localCol);
         if (!cell.text.isEmpty()) {
-            // Preserve the target cell's font style (italic/bold/underline/
-            // strikethrough) so the carry glyph matches how it renders in
-            // the grid below. Without this, an italic word would lose its
-            // slant under the block cursor.
+            // Preserve the target cell's font style (italic/bold/strikethrough)
+            // so the carry glyph matches how it renders in the grid below.
+            // Without this, an italic word would lose its slant under the
+            // block cursor.
             const HlAttr cellAttr = h->resolved(cell.hlId);
             QFont carryFont = m_font;
             carryFont.setItalic(cellAttr.italic);
             carryFont.setWeight(cellAttr.bold ? QFont::Bold : QFont::Normal);
             carryFont.setStrikeOut(cellAttr.strikethrough);
-            // Underline is drawn manually below as a fillRect at cell bottom
-            // to match GridItem's paint geometry (the cursor fillRect above
-            // overwrote the grid's underline that already painted at this
-            // cell, so we have to redraw it on top of the cursor block).
-            painter->setPen(h->defaultBg());
-            painter->setFont(carryFont);
-            const qreal glyphX = drawPos.x();
-            const qreal glyphY = drawPos.y() + m_baseline;
-            if (isPua(cell.text[0])) {
-                // QTBUG-116417 workaround — Qt's shaper drops PUA codepoints,
-                // so block-mode nerd-font cursor glyphs need the QRawFont +
-                // drawGlyphRun bypass.
-                const QRawFont raw = QRawFont::fromFont(carryFont);
-                const QList<quint32> ids = raw.glyphIndexesForString(cell.text);
-                if (!ids.isEmpty()) {
-                    QGlyphRun run;
-                    run.setRawFont(raw);
-                    run.setGlyphIndexes({ids.first()});
-                    run.setPositions({QPointF(glyphX, glyphY)});
-                    painter->drawGlyphRun(QPointF(0, 0), run);
-                }
-            } else {
-                painter->drawText(QPointF(glyphX, glyphY), cell.text);
-            }
+
+            // A single cell at an explicit x, so the PUA zero-advance defect
+            // (QTBUG-116417) that collapses multi-glyph runs cannot bite here:
+            // nothing is ever positioned relative to this glyph.
+            m_textPool.addText(0, cell.text, carryFont, h->defaultBg(),
+                               QPointF(drawPos.x(), drawPos.y() + m_baseline));
+
             if (cellAttr.underline) {
+                // The cursor block above overwrote the grid's underline at this
+                // cell, so redraw it on top of the block.
                 const qreal thickness = std::max(1.0, std::round(QFontMetricsF(carryFont).lineWidth()));
-                painter->fillRect(QRectF(drawPos.x(), drawPos.y() + m_cellHeight - thickness,
-                                         m_cellWidth, thickness), h->defaultBg());
+                m_linePool.add(QRectF(drawPos.x(), drawPos.y() + m_cellHeight - thickness,
+                                      m_cellWidth, thickness), h->defaultBg());
             }
         }
     }
 
     m_lastRect = rect;
+    return commit();
 }
 
 } // namespace qvim

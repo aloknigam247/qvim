@@ -1,19 +1,23 @@
 #pragma once
 
-#include <QQuickPaintedItem>
+#include <QQuickItem>
 #include <QFont>
 #include <QFontMetricsF>
 #include <QPointer>
+#include <QSGNode>
 #include <qqmlregistration.h>
 
 #include "HighlightTable.h"
 #include "NvimConnector.h"
+#include "RectNodePool.h"
+#include "TextNodePool.h"
 
 namespace qvim {
 
 class GridModel;
+struct GridRuns;
 
-class GridItem : public QQuickPaintedItem {
+class GridItem : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(qvim::NvimConnector* connector READ connector WRITE setConnector NOTIFY connectorChanged)
@@ -33,7 +37,7 @@ public:
     explicit GridItem(QQuickItem* parent = nullptr);
     ~GridItem() override;
 
-    void paint(QPainter* painter) override;
+    QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) override;
 
     NvimConnector* connector() const { return m_conn; }
     void setConnector(NvimConnector* c);
@@ -88,6 +92,13 @@ private:
     HighlightTable* hl()   const;
     void sendMouse(QMouseEvent* ev, QEvent::Type type);
 
+    // Renders the rounded pills and undercurls of the frame into a texture node
+    // under m_decoRoot, or tears the node down when the frame has neither.
+    // These are the only genuinely vector-shaped output; keeping them in
+    // QPainter avoids reimplementing bezier tessellation, and both features are
+    // rare enough that the common frame pays nothing.
+    void updateDecorations(const GridRuns& runs, HighlightTable* h);
+
     QPointer<NvimConnector> m_conn;
     int      m_gridId       = 1;
     // Initial family is the OS-supplied fixed-width font (Consolas on Windows,
@@ -102,6 +113,19 @@ private:
     qreal    m_baseline     = 12.0;
     bool     m_debugOverlay = false;
     int      m_linespace    = 0;
+
+    // Scene-graph state. Owned by the returned root node (which Qt destroys),
+    // so these are observing pointers only — they are dropped, never deleted,
+    // when updatePaintNode is handed a null oldNode after a scene-graph
+    // invalidation. All of it is touched exclusively on the render thread.
+    QSGNode*         m_bgRoot    = nullptr;
+    QSGNode*         m_decoRoot  = nullptr;
+    QSGNode*         m_decoNode  = nullptr;
+    QSGNode*         m_textRoot  = nullptr;
+    QSGNode*         m_lineRoot  = nullptr;
+    RectNodePool     m_bgPool;
+    RectNodePool     m_linePool;
+    TextNodePool     m_textPool;
 };
 
 } // namespace qvim

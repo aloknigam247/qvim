@@ -4,7 +4,8 @@
 #include <QFont>
 #include <QPointF>
 #include <QPointer>
-#include <QQuickPaintedItem>
+#include <QQuickItem>
+#include <QSGNode>
 #include <QRectF>
 #include <QTimer>
 #include <QVariantAnimation>
@@ -14,6 +15,8 @@
 #include "CursorBlinkState.h"
 #include "ModeInfo.h"
 #include "NvimConnector.h"
+#include "RectNodePool.h"
+#include "TextNodePool.h"
 
 namespace qvim {
 
@@ -28,7 +31,7 @@ class HighlightTable;
 // The cursor lives on exactly one grid at a time (the last grid_cursor_goto
 // target, exposed as GridModel::activeGrid()). A single CursorItem reads
 // surfaceFor(activeGrid) to find the right pixel offset for sub-grids.
-class CursorItem : public QQuickPaintedItem {
+class CursorItem : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(qvim::NvimConnector* connector READ connector WRITE setConnector NOTIFY connectorChanged)
@@ -44,7 +47,7 @@ public:
     explicit CursorItem(QQuickItem* parent = nullptr);
     ~CursorItem() override;
 
-    void paint(QPainter* painter) override;
+    QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) override;
 
     NvimConnector* connector() const { return m_conn; }
     void setConnector(NvimConnector* c);
@@ -62,7 +65,7 @@ public:
     void    setFontSize(qreal v);
 
     // Pure rect math, static so unit tests can exercise it without
-    // instantiating a QQuickPaintedItem (which needs a QGuiApplication).
+    // instantiating a QQuickItem (which needs a QGuiApplication).
     // row/col are absolute cell coordinates within the item's own coordinate
     // space (already offset by the active grid's surface position).
     static QRectF cursorRectFor(int row, int col,
@@ -145,6 +148,16 @@ private:
     // sentinel means we have not seen a cursorChanged yet.
     int               m_prevRow = -1;
     int               m_prevCol = -1;
+
+    // Scene-graph state. Owned by the returned root node, so these are
+    // observing pointers only and are dropped, never deleted, when
+    // updatePaintNode is handed a null oldNode. Render thread only.
+    QSGNode*     m_blockRoot = nullptr;
+    QSGNode*     m_textRoot  = nullptr;
+    QSGNode*     m_lineRoot  = nullptr;
+    RectNodePool m_blockPool;
+    RectNodePool m_linePool;
+    TextNodePool m_textPool;
 };
 
 } // namespace qvim

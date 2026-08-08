@@ -51,9 +51,11 @@ set(QVIM_LIB_SOURCES
     src/MsgpackRpc.cpp          include/MsgpackRpc.h
     src/NvimConnector.cpp       include/NvimConnector.h
     src/PopupMenuModel.cpp      include/PopupMenuModel.h
+    src/RectNodePool.cpp        include/RectNodePool.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
     src/TablineModel.cpp        include/TablineModel.h
+    src/TextNodePool.cpp        include/TextNodePool.h
     src/WindowChrome.cpp        include/WindowChrome.h
 )
 

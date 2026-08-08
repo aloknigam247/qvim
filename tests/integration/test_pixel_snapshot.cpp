@@ -46,10 +46,11 @@
 #include <QImage>
 #include <QImageReader>
 #include <QImageWriter>
-#include <QPainter>
 #include <QString>
 #include <QtTest>
 #include <msgpack.hpp>
+
+#include "support/QuickRasterizer.h"
 
 #include "GridItem.h"
 #include "GridModel.h"
@@ -224,21 +225,16 @@ private slots:
         item.setWidth(pxW);
         item.setHeight(pxH);
 
-        // Render at DPR=1.0 deterministically. We paint GridItem directly
-        // into a QImage rather than going through QQuickWindow::grabWindow()
-        // — the latter is brittle under the offscreen/minimal QPA platform
-        // (no GL context, scene-graph backend selection differs across hosts)
-        // whereas a direct QPainter invocation of paint() exercises the same
-        // rendering code path with full determinism. This matches what
-        // test_hidpi_rendering.cpp already does.
-        QImage image(pxW, pxH, QImage::Format_ARGB32);
-        image.setDevicePixelRatio(1.0);
-        image.fill(hl->defaultBg());
-        {
-            QPainter p(&image);
-            QVERIFY(p.isActive());
-            item.paint(&p);
-        }
+        // Render at DPR=1.0 through the real scene graph, offscreen via
+        // QQuickRenderControl with the software adaptation. QQuickWindow::
+        // grabWindow() is not usable here (it returns null under the minimal
+        // QPA platform), and a test-only QPainter path would defeat the point
+        // of a golden: it could stay stable while the shipping renderer broke.
+        QuickRasterizer raster;
+        QImage image = raster.render(&item).convertToFormat(QImage::Format_ARGB32);
+        QVERIFY2(!image.isNull(), "scene graph produced no image");
+        QVERIFY2(raster.isUnscaled(),
+                 "render surface is scaled; the golden is stored at 1:1");
         QCOMPARE(image.width(),  pxW);
         QCOMPARE(image.height(), pxH);
 
