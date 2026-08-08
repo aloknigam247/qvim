@@ -43,9 +43,14 @@ void TextNodePool::addText(int key, const QString& text, const QFont& font,
         // QQuickPaintedItem path both produce grayscale AA, which deposits
         // visibly more ink than VS Code for the same font (issue #15).
         node->setRenderType(QSGTextNode::NativeRendering);
-        node->setColor(color);
         m_keyToIndex.insert(key, slot);
     }
+
+    // Set unconditionally rather than only on first use of the slot. Callers
+    // currently key on hl_id, which fully determines the colour, but a future
+    // pass that reuses an existing key with a different colour would otherwise
+    // silently inherit the first caller's.
+    node->setColor(color);
 
     // One unwrapped line. The grid supplies every x position itself, so the
     // layout is only ever asked to shape a single run.

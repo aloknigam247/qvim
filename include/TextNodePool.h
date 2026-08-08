@@ -47,6 +47,12 @@ public:
     // Deleting them here would be a double free.
     void forget();
 
+    // Node inspection for tests. NativeRendering is the entire point of the
+    // scene-graph port (issue #15), and no pixel test can catch a silent flip
+    // back to QtRendering because the suite runs on the software backend.
+    int          nodeCount() const { return int(m_nodes.size()); }
+    QSGTextNode* nodeAt(int i) const { return m_nodes.value(i); }
+
 private:
     QSGNode*              m_parent = nullptr;
     QQuickWindow*         m_window = nullptr;

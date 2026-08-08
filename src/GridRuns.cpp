@@ -90,6 +90,10 @@ GridRuns buildGridRuns(const GridModel& grid, const HighlightTable& hl, int grid
     out.runs.reserve(rows * 4);
 
     for (int r = 0; r < rows; ++r) {
+        // Set while building this row's runs, so the cluster scan is skipped
+        // entirely on PUA-free rows — the common case in code buffers.
+        bool rowHasPua = false;
+
         int c = 0;
         while (c < cols) {
             const int runHl = grid.cell(gridId, r, c).hlId;
@@ -119,15 +123,28 @@ GridRuns buildGridRuns(const GridModel& grid, const HighlightTable& hl, int grid
                 // Right-half markers of double-width glyphs contribute no glyph
                 // of their own; the left cell's glyph already spans both columns.
                 if (cell.doubleWidth) continue;
-                if (cell.text.isEmpty()) run.text += QChar(' ');
-                else                     run.text += cell.text;
+                if (cell.text.isEmpty()) { run.text += QChar(' '); continue; }
+                // PUA cells are blanked out of the run text and drawn by the
+                // cluster pass instead, which positions each one at its own x.
+                // Leaving them in would make rendering depend on an unspecified
+                // Qt shaper behaviour: whether it drops PUA codepoints or gives
+                // them a zero advance. The former renders correctly by accident,
+                // the latter double-draws the icon and shifts every later glyph
+                // in the run. Substituting a space makes the outcome the same
+                // either way, and the cluster pass covers every PUA cell.
+                if (isPuaChar(cell.text[0])) {
+                    run.text += QChar(' ');
+                    rowHasPua = true;
+                    continue;
+                }
+                run.text += cell.text;
             }
 
             out.runs.push_back(std::move(run));
             c = runEnd;
         }
 
-        collectPuaClusters(grid, gridId, r, cols, out.puaClusters);
+        if (rowHasPua) collectPuaClusters(grid, gridId, r, cols, out.puaClusters);
     }
 
     return out;

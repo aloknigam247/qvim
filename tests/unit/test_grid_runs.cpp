@@ -215,6 +215,30 @@ private slots:
         QCOMPARE(runs.puaClusters[0].hlId, 1);
     }
 
+    // PUA cells are drawn only by the cluster pass, so they must be blanked out
+    // of the run text. If they were left in, correctness would hinge on an
+    // unspecified Qt shaper behaviour: dropping PUA renders fine by accident,
+    // while giving it a zero advance draws the icon twice and shifts every
+    // later glyph in the run to the left.
+    void puaCellsAreBlankedFromRunText() {
+        GridModel g;
+        HighlightTable hl;
+        g.resize(4, 1);
+        // U+E0B0, 'a', U+E0B6, 'b' — all one hl_id, so all one run.
+        auto cells = packGridLineCells({{"\xee\x82\xb0", 1, -1}, {"a", 1, -1},
+                                        {"\xee\x82\xb6", 1, -1}, {"b", 1, -1}});
+        g.applyLine(0, 0, cells.get());
+
+        const GridRuns runs = buildGridRuns(g, hl, 1);
+
+        QCOMPARE(runs.runs.size(), 1);
+        QCOMPARE(runs.runs[0].text, QStringLiteral(" a b"));
+        // Non-PUA cells keep their true column, so the run text stays exactly
+        // as wide as the run — the cluster pass supplies the icons.
+        QCOMPARE(runs.runs[0].text.size(), 4);
+        QCOMPARE(runs.puaClusters.size(), 2);
+    }
+
     void splitsPuaClustersAtHighlightBoundary() {
         GridModel g;
         HighlightTable hl;

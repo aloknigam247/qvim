@@ -42,6 +42,7 @@ qvim_add_test(test_resize_coalescer    unit/test_resize_coalescer.cpp)
 qvim_add_test(test_rounded_highlight   unit/test_rounded_highlight.cpp)
 qvim_add_test(test_scroll_perf_micro   unit/test_scroll_perf_micro.cpp)
 qvim_add_test(test_session_cache       unit/test_session_cache.cpp)
+qvim_add_test(test_text_node_pool      unit/test_text_node_pool.cpp)
 
 # test_app_icon constructs QGuiApplication and needs the qico imageformat
 # plugin from vcpkg's debug Qt to decode :/icon.ico. The qvim post-build step
@@ -149,5 +150,6 @@ set_tests_properties(
     test_hidpi_rendering
     test_pixel_snapshot
     test_rounded_highlight
+    test_text_node_pool
     PROPERTIES ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
 )

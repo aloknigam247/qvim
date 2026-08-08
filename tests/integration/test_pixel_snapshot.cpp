@@ -129,6 +129,13 @@ class TestPixelSnapshot : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() {
+        // The golden is compared pixel-for-pixel, so the renderer backend must
+        // not vary by machine. Without this the RHI/D3D11 backend is picked
+        // wherever it is available and the software rasteriser elsewhere,
+        // producing a diff that looks like a renderer regression but is only
+        // backend selection. Must run before any QQuickWindow is constructed.
+        QuickRasterizer::useSoftwareBackend();
+
         // Pin platform-level scaling so the QImage backing store matches the
         // golden across machines. These env vars are also set by CTest, but
         // setting them belt-and-braces protects against ad-hoc runs.
