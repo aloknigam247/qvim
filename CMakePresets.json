@@ -71,6 +71,17 @@
       "execution": {
         "stopOnFailure": false
       }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "stopOnFailure": false
+      }
     }
   ]
 }

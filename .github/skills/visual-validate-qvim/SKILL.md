@@ -33,10 +33,10 @@ ctest verifies code correctness. This skill verifies feature correctness — wha
 The incremental linker skips relinking `qvim.exe` when only the .lib changed (see project `AGENTS.md` gotcha). A stale exe means you're validating a previous version. Always run:
 
 ```pwsh
-cmake --build --preset dev --target qvim
+cmake --build --preset release --target qvim
 ```
 
-If you're validating an agent's worktree branch, build inside the worktree, not the main checkout, and confirm with `Get-Item <worktree>/build/dev/Debug/qvim.exe` that the mtime is post-commit.
+If you're validating an agent's worktree branch, build inside the worktree, not the main checkout, and confirm with `Get-Item <worktree>/build/release/RelWithDebInfo/qvim.exe` that the mtime is post-commit.
 
 ### 2. Generate fixture files with LF endings
 
@@ -70,7 +70,7 @@ $out = "$tmp\shot.png"
 pwsh D:\qvim\scripts\screenshot-qvim.ps1 -File "$tmp\sample.txt" -InitFile "$tmp\init.vim" -OutPath $out
 ```
 
-Use `-Exe "D:\qvim\build\release\RelWithDebInfo\qvim.exe"` if you want the release build's render (closer to user experience, faster animation). Default targets `build\dev\Debug\qvim.exe`.
+Use `-Exe "D:\qvim\build\dev\Debug\qvim.exe"` if you want the Debug build's render (slower animation, assert-heavy). Default targets `build\release\RelWithDebInfo\qvim.exe`.
 
 If the script reports "qvim has no main window after Nms", bump `-SettleMs 8000`. If the captured image shows another window's content, the qvim window wasn't actually foregrounded — same fix, or close any blocking modal first.
 

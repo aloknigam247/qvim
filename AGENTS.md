@@ -25,7 +25,7 @@ qvim is a Neovim GUI client written in C++23 / Qt 6.10 / QML, talking to an embe
 
 ### Verify, don't assume
 
-- For changes to the paint path, font handling, or redraw dispatch: run the integration tests (`ctest --preset dev -R 'attach_and_render|resize|insert_and_quit'`) and confirm they still pass.
+- For changes to the paint path, font handling, or redraw dispatch: run the integration tests (`ctest --preset release -R 'attach_and_render|resize|insert_and_quit'`) and confirm they still pass.
 - For changes to `InputHandler`: `test_input_handler` must pass, and prefer adding a fuzz case if you touched key encoding.
 - For changes that affect QML: `test_qml` must pass.
 - Don't claim "should work" — run the test.
@@ -57,19 +57,20 @@ Directory-scoped instructions live in nested `AGENTS.md` files that auto-load wh
 ## Build
 
 ```pwsh
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
+
+Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --preset dev --config Release` — that produces a Release build under the dev preset's multi-config solution (`build/dev/Release/`), which is not the intended release binary.
+
+**Debug build** (breakpoints, sanitizers, assert-heavy inspection — the escape hatch):
+
+```pwsh
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ```
-
-**Release build** (optimized + PDB for profiling/crash analysis):
-
-```pwsh
-cmake --preset release
-cmake --build --preset release
-```
-
-Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --preset dev --config Release` — that produces a Release build under the dev preset's multi-config solution (`build/dev/Release/`), which is not the intended release binary.
 
 **Which build to use.** When implementing or validating a feature, prefer the **Release** preset — that's the binary users actually run. Use the Debug (`dev`) build **only** when you actually need to debug (breakpoints, sanitizers, assert-heavy inspection). If there's no active reason for Debug, build and test Release.
 
@@ -126,7 +127,7 @@ When fanning out a batch that touches any shared file:
 
 1. Agents commit to their worktree branch and **STOP** — no self-merge. Self-merging racing on shared files (CMakeLists, main.cpp, tests/CMakeLists.txt) reliably loses commits via `reset --hard $prevHead` on build-failure paths.
 2. The parent (you) cherry-picks branches into main sequentially. Use `git cherry-pick <sha>`, not rebase — rebase replays through every intermediate commit and conflicts on each one; cherry-pick re-applies just the target's delta against current main.
-3. After each merge: `cmake --build --preset dev` to verify, then force-rebuild qvim if only the .lib changed (see Gotchas).
+3. After each merge: `cmake --build --preset release` to verify, then force-rebuild qvim if only the .lib changed (see Gotchas).
 4. Delete the worktree + branch only AFTER the user verifies the merged behaviour. A test-passing branch can still produce a visually broken binary; keep the worktree until the manual smoke confirms.
 5. If a cherry-picked commit must be backed out, prefer `git rebase --onto <good-base> <bad-commit> main` to drop it cleanly from history instead of `git revert`. Revert commits clutter the log and leave the original commit + its revert both visible. Use revert only when the bad commit has been pushed and others may have based work on it.
 

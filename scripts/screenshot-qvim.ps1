@@ -15,7 +15,7 @@
 # Returns the PNG path on stdout on success.
 
 param(
-    [string]$Exe       = "D:\qvim\build\dev\Debug\qvim.exe",
+    [string]$Exe       = "D:\qvim\build\release\RelWithDebInfo\qvim.exe",
     [string]$File      = "",
     [string]$InitFile  = "",                          # -u <path> for nvim
     [string[]]$ExtraArgs = @(),                       # appended to argv
