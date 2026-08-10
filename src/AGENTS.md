@@ -49,12 +49,13 @@ Root rules in `AGENTS.md` still apply. This file adds C++-only specifics.
 
 Iterate on a single `.cpp` without re-running vcpkg-configure:
 ```pwsh
-msbuild <WORKTREE>\build\dev\qvim_lib.vcxproj /p:Configuration=Debug /m
+msbuild <WORKTREE>\build\release\qvim_lib.vcxproj /p:Configuration=RelWithDebInfo /m
+msbuild <WORKTREE>\build\dev\qvim_lib.vcxproj /p:Configuration=Debug /m       # Debug escape hatch
 ```
 Full build + tests (worktree):
 ```pwsh
-cmake --build --preset dev
-ctest --preset dev --output-on-failure -R test_grid_model
+cmake --build --preset release
+ctest --preset release --output-on-failure -R test_grid_model
 ```
 
 ## Templates

@@ -13,11 +13,11 @@ Root `AGENTS.md` covers the three-tier philosophy. This file is operational.
 ## Build/test cheatsheet
 
 ```pwsh
-ctest --preset dev --output-on-failure                              # all
-ctest --preset dev --output-on-failure -R '^test_grid_model$'       # single
-ctest --preset dev -R 'attach_and_render|resize|insert_and_quit'    # paint
-ctest --preset dev -R 'test_input'                                  # InputHandler
-ctest --preset dev -R '^test_qml$'                                  # QML
+ctest --preset release --output-on-failure                              # all
+ctest --preset release --output-on-failure -R '^test_grid_model$'       # single
+ctest --preset release -R 'attach_and_render|resize|insert_and_quit'    # paint
+ctest --preset release -R 'test_input'                                  # InputHandler
+ctest --preset release -R '^test_qml$'                                  # QML
 ```
 
 Register a new test by alphabetical insert in `tests/CMakeLists.txt` via `qvim_add_test(name path)`. Tier 2 tests must also be added to the `foreach(t ...)` list that sets the nvim-required `ENVIRONMENT`.

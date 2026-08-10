@@ -65,25 +65,25 @@ $sha = git -C $env:VCPKG_ROOT rev-parse HEAD
 
 ```pwsh
 cd D:\qvim
-cmake --preset dev
+cmake --preset release   # or: cmake --preset dev  (Debug escape hatch)
 ```
 
 The first configure runs vcpkg, which **compiles Qt 6.10.3 from source — expect 1–3 hours**. Subsequent configures reuse the cache (~10s).
 
-Produces `D:\qvim\build\dev\qvim.sln` plus MSBuild project files.
+Produces `D:\qvim\build\release\qvim.sln` (or `build\dev\qvim.sln` for Debug) plus MSBuild project files.
 
 ## 6. Build
 
 ```pwsh
-cmake --build --preset dev
+cmake --build --preset release   # or: cmake --build --preset dev
 ```
 
-Produces `D:\qvim\build\dev\Debug\qvim.exe` and 11 test binaries. With `windeployqt` wired into post-build (see CMakeLists.txt), Qt DLLs + plugins are copied next to each `.exe` automatically — no env vars needed at launch.
+Produces `D:\qvim\build\release\RelWithDebInfo\qvim.exe` (Debug: `D:\qvim\build\dev\Debug\qvim.exe`) and 11 test binaries. With `windeployqt` wired into post-build (see CMakeLists.txt), Qt DLLs + plugins are copied next to each `.exe` automatically — no env vars needed at launch.
 
 ## 7. Run the tests
 
 ```pwsh
-ctest --preset dev
+ctest --preset release   # or: ctest --preset dev
 ```
 
 - 4 unit tests (Tier 1, <2s)
@@ -95,7 +95,7 @@ Total wall clock: <30s. Expected result: **11/11 passing**.
 ## 8. Launch
 
 ```pwsh
-D:\qvim\build\dev\Debug\qvim.exe
+D:\qvim\build\release\RelWithDebInfo\qvim.exe   # or: D:\qvim\build\dev\Debug\qvim.exe
 ```
 
 A window opens, attaches to nvim, and you'll see a `[No Name]` buffer with cursor in normal mode.
@@ -119,5 +119,5 @@ A window opens, attaches to nvim, and you'll see a `[No Name]` buffer with curso
 git -C $env:VCPKG_ROOT pull
 $sha = git -C $env:VCPKG_ROOT rev-parse HEAD
 (Get-Content D:\qvim\vcpkg-configuration.json -Raw) -replace '"baseline": "[a-f0-9]+"', "`"baseline`": `"$sha`"" | Set-Content D:\qvim\vcpkg-configuration.json -NoNewline
-cmake --preset dev   # vcpkg picks up the new baseline
+cmake --preset release   # vcpkg picks up the new baseline  (or: cmake --preset dev)
 ```

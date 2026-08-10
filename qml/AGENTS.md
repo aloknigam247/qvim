@@ -27,8 +27,8 @@ A `QHash<id, X>` re-emitted as a property nukes Repeater delegates on every nvim
 ## Build/test cheatsheet
 
 ```pwsh
-cmake --build --preset dev
-ctest --preset dev --output-on-failure -R '^test_qml$'
+cmake --build --preset release
+ctest --preset release --output-on-failure -R '^test_qml$'
 ```
 
 ## Templates

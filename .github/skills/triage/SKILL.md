@@ -59,7 +59,7 @@ The subagent must **return a structured report** containing:
 - `components` — the component(s) involved
 - `rootCause` — for bugs, the confirmed root cause with file:line references (or "n/a")
 - `approach` — the proposed implementation approach
-- `testing` — test files/impact, the exact `ctest --preset dev -R <selector>` (or targeted test binary), a concrete **regression test snippet** whose assertions pin *this specific* fixed behavior (see Testing requirements below), and whether a screenshot/`visual-validate-qvim` gate is required
+- `testing` — test files/impact, the exact `ctest --preset release -R <selector>` (or targeted test binary), a concrete **regression test snippet** whose assertions pin *this specific* fixed behavior (see Testing requirements below), and whether a screenshot/`visual-validate-qvim` gate is required
 - `openQuestions` — anything still unclear
 
 If the subagent returns `openQuestions`, resolve them with the user (via `ask_user`) before drafting the issue.
@@ -95,7 +95,7 @@ Pick the categories that genuinely apply (usually one primary, occasionally a se
      - **Existing tests that will break** and must be updated (name them, and say how).
      - **New test cases** that add/validate the fix — proposed test function/method names and the specific behavior/assertion each covers. Include a concrete **regression test code snippet** (fenced) that the future agent can drop in. Use `QSignalSpy` for redraw assertions and `dumpAscii()` for grid snapshots per repo convention.
      - **Pin the fix, not incidental state.** Each new test's assertions must fail today (before the fix) and pass only once *this specific* change is made, and must target the fixed behavior narrowly — assert the exact grid/highlight/cursor/keycode value that changes, not a broad snapshot or unrelated surrounding state — via a **hard `QVERIFY`/`QCOMPARE`**, never a `qWarning` or soft pixel-band heuristic (which respond to kerning/sub-pixel changes and produce false positives).
-     - The exact command to run for validation, e.g. `ctest --preset dev -R 'attach_and_render|resize|insert_and_quit'` for paint-path/redraw changes, `ctest --preset dev -R test_input_handler` for `InputHandler`, `ctest --preset dev -R test_qml` for QML. Note that the build must pass under `/W4 /permissive-` with warnings treated as bugs.
+     - The exact command to run for validation, e.g. `ctest --preset release -R 'attach_and_render|resize|insert_and_quit'` for paint-path/redraw changes, `ctest --preset release -R test_input_handler` for `InputHandler`, `ctest --preset release -R test_qml` for QML. Note that the build must pass under `/W4 /permissive-` with warnings treated as bugs.
      - **Visual gate.** For paint-path / font / cursor / selection / highlight changes, require capturing the rendered window via `scripts/screenshot-qvim.ps1` (or the `visual-validate-qvim` skill) and inspecting it — a green ctest run alone is not proof.
    - **Out of scope** — what this task must not touch.
    - Add a footer line: `Categories: <comma-separated categories>`.
