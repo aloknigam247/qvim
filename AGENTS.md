@@ -84,6 +84,7 @@ The post-build step in `CMakeLists.txt` deploys Qt DLLs + `qt.conf` + platform p
 - Tests use `QSignalSpy` for redraw assertions and `dumpAscii()` for grid snapshots.
 - **Reactive QObject-proxy for Repeater delegates.** When a `QHash<id, X>` backs Repeater delegates and the delegate needs to react to field changes on `X`, expose a `Q_INVOKABLE QObject* xFor(id)` returning a proxy whose fields are `Q_PROPERTY` with NOTIFY signals. Bindings re-evaluate in-place; the delegate is never destroyed (preserves focus, glyph cache, blink phase). **Never** use the `model = null; model = list` Repeater-rebuild antipattern — it nukes activeFocusItem and per-instance caches on every nvim window event.
 - `Component.onCompleted: forceActiveFocus()` only fires once. To survive later layout reflows, focus must be owned by an item that is itself never destroyed (e.g. the long-lived `baseGrid`, not a Repeater delegate).
+- **Keep `README.md` in sync.** When you add a feature or change information that `README.md` already describes (overview facts, architecture/data-flow, component names, versions, supported platforms), update `README.md` in the same change. Do not let the README drift from reality.
 
 ## Testing
 
