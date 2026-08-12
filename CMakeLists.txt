@@ -116,18 +116,38 @@ Plugins = .
 Qml2Imports = .
 ")
 
-    # Glob all Qt6 DLLs — chasing individual dependencies is tedious and
-    # the QML modules import indirect Qt libs that CMake's link-deps tracking misses.
-    file(GLOB QVIM_EXTRA_QT_DLLS "${QVIM_QT_BIN}/Qt6*${QVIM_QT_DLL_SUFFIX}.dll")
+    # Explicit list of the Qt6 runtime DLLs qvim actually loads (measured from
+    # Process.Modules on a real launch). This replaces a blanket
+    # `file(GLOB Qt6*.dll)` that copied EVERY Qt6 module — Qt6Widgets,
+    # Qt6PrintSupport, Qt6ShaderTools, every QuickControls2 style — none of which
+    # qvim loads. Those unused files still cost cold-start time: Qt's plugin/QML
+    # discovery stats+reads them and Windows Defender scans each on first sight.
+    # VCPKG_APPLOCAL_DEPS continues to supply the non-Qt transitive deps
+    # (freetype/harfbuzz/icu/pcre2/zlib/brotli/...), which windeployqt does NOT.
+    set(QVIM_QT_RUNTIME_DLLS
+        Qt6Core
+        Qt6Gui
+        Qt6Network
+        Qt6Qml
+        Qt6QmlMeta
+        Qt6QmlModels
+        Qt6QmlWorkerScript
+        Qt6Quick
+    )
+    set(QVIM_QT_DLL_PATHS "")
+    foreach(_qtdll ${QVIM_QT_RUNTIME_DLLS})
+        list(APPEND QVIM_QT_DLL_PATHS
+            "${QVIM_QT_BIN}/${_qtdll}${QVIM_QT_DLL_SUFFIX}.dll")
+    endforeach()
 
     add_custom_command(TARGET qvim POST_BUILD
         # qt.conf next to qvim.exe so plugin/QML lookup is self-contained
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_BINARY_DIR}/qt.conf"
             "${QVIM_OUT_DIR}/qt.conf"
-        # Extra Qt DLLs needed by QML modules (CMake's link-deps tracking misses these)
+        # Only the Qt6 modules qvim loads (not the whole Qt6*.dll set)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${QVIM_EXTRA_QT_DLLS}
+            ${QVIM_QT_DLL_PATHS}
             "${QVIM_OUT_DIR}/"
         # Platform plugin (always required)
         COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/platforms"
@@ -143,14 +163,32 @@ Qml2Imports = .
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${QVIM_QT_PLUGINS}/imageformats/qico${QVIM_QT_DLL_SUFFIX}.dll"
             "${QVIM_OUT_DIR}/imageformats/qico${QVIM_QT_DLL_SUFFIX}.dll"
-        # QML modules used by qvim's QML files
+        # QML modules — ONLY what qvim imports (QtQuick + QtQuick.Window) plus the
+        # QtQml core they depend on. Previously the whole QtQuick tree (~70MB with
+        # Controls/Dialogs/Particles/Effects/Shapes/NativeStyle + PDBs) was copied
+        # wholesale — the dominant cold-start payload source.
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/QtQuick"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QVIM_QT_QML}/QtQuick/qmldir"
+            "${QVIM_QT_QML}/QtQuick/plugins.qmltypes"
+            "${QVIM_QT_QML}/QtQuick/qtquick2plugin${QVIM_QT_DLL_SUFFIX}.dll"
+            "${QVIM_OUT_DIR}/QtQuick/"
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            "${QVIM_QT_QML}/QtQuick"          "${QVIM_OUT_DIR}/QtQuick"
+            "${QVIM_QT_QML}/QtQuick/Window"   "${QVIM_OUT_DIR}/QtQuick/Window"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${QVIM_OUT_DIR}/QtQml"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QVIM_QT_QML}/QtQml/qmldir"
+            "${QVIM_QT_QML}/QtQml/plugins.qmltypes"
+            "${QVIM_QT_QML}/QtQml/qmlplugin${QVIM_QT_DLL_SUFFIX}.dll"
+            "${QVIM_OUT_DIR}/QtQml/"
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            "${QVIM_QT_QML}/QtQml"            "${QVIM_OUT_DIR}/QtQml"
+            "${QVIM_QT_QML}/QtQml/Models"        "${QVIM_OUT_DIR}/QtQml/Models"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${QVIM_QT_QML}/QtQml/WorkerScript"  "${QVIM_OUT_DIR}/QtQml/WorkerScript"
+        # QtTest QML module — tier-3 qmltest needs it; harmless for the app.
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
             "${QVIM_QT_QML}/QtTest"           "${QVIM_OUT_DIR}/QtTest"
-        COMMENT "Deploying qt.conf + platform plugin + QML modules next to qvim.exe"
+        COMMENT "Deploying trimmed Qt runtime (loaded DLLs + imported QML modules) next to qvim.exe"
         VERBATIM
     )
 endif()

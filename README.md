@@ -63,3 +63,30 @@ directly.
 - The redraw event stream from `nvim --embed` is the single source of truth for screen state.
 - `paint()` is a pure function of (`GridModel`, `HighlightTable`, `ModeInfo`, cursor state) and
   never reaches back into RPC state from the paint path.
+
+## Launch performance (Windows cold start)
+
+The first launch of qvim *after a build or update* can take 10-20 seconds, while every subsequent
+launch is ~1 second. This is not qvim code — it is **Microsoft Defender's real-time "first-sight"
+scan** of `qvim.exe` and the Qt DLLs it loads. Defender caches its verdict by file **content hash**,
+so the scan cost is paid once per unique build and then launches are fast — until the next rebuild
+produces new bytes and the whole scan happens again.
+
+Two things keep cold start down:
+
+- **The deploy is trimmed to only the Qt modules qvim actually loads.** The post-build step copies an
+  explicit list of ~20 runtime DLLs plus the `QtQuick`, `QtQml`, and `QtTest` QML modules that are
+  imported, instead of the whole Qt Quick tree (Controls/Dialogs/Particles/Effects, ~150 MB). Fewer
+  and smaller files means less for Defender to scan on first sight.
+
+- **A Defender exclusion collapses the cold launch outright** (~8s → ~1.5s in measurement, a 5×
+  win). Run this once, from an **elevated** PowerShell, against your build output directory:
+
+  ```pwsh
+  pwsh -NoProfile -File scripts\add-defender-exclusion.ps1
+  ```
+
+  By default it excludes `build\release\RelWithDebInfo`; pass `-Path <dir>` for a custom install
+  location, or `-Remove` to undo. An excluded directory is no longer scanned by real-time
+  protection, so only exclude build output you produce and trust — never a broad location like your
+  whole user profile or a downloads folder.
