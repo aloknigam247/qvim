@@ -10,6 +10,17 @@ Root `AGENTS.md` covers the three-tier philosophy. This file is operational.
   Targets: `test_attach_and_render`, `test_cmdline`, `test_insert_and_quit`, `test_messages`, `test_multigrid`, `test_pixel_snapshot`, `test_popupmenu`, `test_resize`, `test_tabline`, `test_user_smoke`.
 - **Tier 3 — `tests/qml/`** — `qmltest` against QML in isolation. Single target `test_qml`.
 
+## Deploy integrity — `test_deploy_manifest`
+
+The top-level `CMakeLists.txt` POST_BUILD step deploys an **explicit, hand-picked** list of Qt DLLs + QML modules (not a blanket `Qt6*.dll` glob) to keep the cold-start footprint small. `tests/check_deploy.ps1` (ctest `test_deploy_manifest`) guards that list: it reads the deployed binaries' PE imports and scans `qml/` for `import Qt…`, then asserts everything required is actually deployed. It is deterministic (no launch, ~2.5s) — every other test loads Qt from the full vcpkg tree on `PATH` and so cannot catch a deploy omission.
+
+**When it fails, you do NOT edit the test.** A new Qt module or QML import makes it fail with a `FIX:` hint pointing back at the deploy list. Fix it there:
+
+- missing `Qt6*.dll` → add it to `QVIM_QT_RUNTIME_DLLS` in `CMakeLists.txt`;
+- missing QML module dir → add a copy for that module alongside the existing QtQuick / QtQml / QtTest copies.
+
+The expected set is derived from the binaries + qml source, so the test needs no update when dependencies change — only the deploy list does.
+
 ## Build/test cheatsheet
 
 ```pwsh

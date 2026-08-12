@@ -124,6 +124,10 @@ Qml2Imports = .
     # discovery stats+reads them and Windows Defender scans each on first sight.
     # VCPKG_APPLOCAL_DEPS continues to supply the non-Qt transitive deps
     # (freetype/harfbuzz/icu/pcre2/zlib/brotli/...), which windeployqt does NOT.
+    #
+    # GUARDED BY tests/check_deploy.ps1 (ctest: test_deploy_manifest). If you add a
+    # Qt module or a QML import and forget to deploy it here, that test fails with a
+    # FIX hint pointing back at this block — you never edit the test, only this list.
     set(QVIM_QT_RUNTIME_DLLS
         Qt6Core
         Qt6Gui
