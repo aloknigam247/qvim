@@ -153,3 +153,19 @@ set_tests_properties(
     test_text_node_pool
     PROPERTIES ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
 )
+
+# Deploy-integrity check — deterministic (no launch). Guards the EXPLICIT, hand-picked Qt
+# deploy list in the top-level CMakeLists.txt against two independent, derived expectations:
+#   (A) every Qt6*.dll imported by qvim.exe or a deployed plugin is itself deployed, and
+#   (B) every `import Qt...` in qml/ has its module directory + backing plugin deployed.
+# Every other test loads Qt from the full vcpkg tree on PATH and so cannot catch a deploy
+# omission; this one reads the deployed binaries + qml source directly, so it is not flaky.
+# It inspects the real product exe, so it depends on the qvim target (and its POST_BUILD
+# deploy) being built.
+add_test(NAME test_deploy_manifest
+    COMMAND pwsh -NoProfile -ExecutionPolicy Bypass
+        -File "${CMAKE_CURRENT_SOURCE_DIR}/check_deploy.ps1"
+        -DeployDir "$<TARGET_FILE_DIR:qvim>"
+        -QmlSourceDir "${CMAKE_SOURCE_DIR}/qml"
+)
+set_tests_properties(test_deploy_manifest PROPERTIES TIMEOUT 60)
