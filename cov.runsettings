@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="Code Coverage">
+        <Configuration>
+          <CodeCoverage>
+            <EnableStaticNativeInstrumentation>True</EnableStaticNativeInstrumentation>
+            <EnableDynamicNativeInstrumentation>True</EnableDynamicNativeInstrumentation>
+            <CollectFromChildProcesses>True</CollectFromChildProcesses>
+            <ModulePaths>
+              <Exclude>
+                <ModulePath>.*[Qq]t6.*</ModulePath>
+                <ModulePath>.*\\vcpkg_installed\\.*</ModulePath>
+                <ModulePath>.*msgpack.*</ModulePath>
+              </Exclude>
+            </ModulePaths>
+            <Sources>
+              <Include>
+                <Source>.*\\qvim\\src\\.*</Source>
+                <Source>.*\\qvim\\include\\.*</Source>
+              </Include>
+            </Sources>
+          </CodeCoverage>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
