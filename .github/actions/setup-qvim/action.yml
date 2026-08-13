@@ -1,8 +1,12 @@
 name: Setup qvim build
 description: >
   Provision the toolchain (CMake >= 4.2, Neovim on PATH), wire the vcpkg NuGet
-  binary cache, then configure and build qvim with the dev preset under /WX.
-  Shared by every CI job so the build is identical across test tiers + coverage.
+  binary cache, then CONFIGURE the dev preset — which runs the vcpkg manifest
+  install, i.e. builds Qt on a cold cache or restores it otherwise. Compiling
+  qvim itself is left to each job (they run cmake --build after this), so the
+  seed `build` job can stop here once Qt is cached. Shared by every CI job so
+  the toolchain + Qt ABI are identical across the build seed, test tiers, and
+  coverage.
 
 inputs:
   github-token:
@@ -68,12 +72,9 @@ runs:
       shell: pwsh
       # Keep vcpkg's heavy buildtrees / packages / downloads off the small C:
       # drive, and delete each port's intermediates right after it builds so the
-      # peak footprint is one port, not the whole Qt tree.
+      # peak footprint is one port, not the whole Qt tree. On a warm NuGet cache
+      # this restores Qt instead of building it.
       run: |
         $env:VCPKG_DOWNLOADS = "D:\vcpkg\downloads"
         cmake --preset dev -DQVIM_WERROR=ON `
           "-DVCPKG_INSTALL_OPTIONS=--x-buildtrees-root=D:/vcpkg/bt;--x-packages-root=D:/vcpkg/pkg;--clean-buildtrees-after-build;--clean-packages-after-build"
-
-    - name: Build
-      shell: pwsh
-      run: cmake --build --preset dev

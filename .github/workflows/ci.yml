@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
 
-# A newer push to the same ref cancels the in-flight run — no point burning a
+# A newer push to the same ref cancels the in-flight run - no point burning a
 # ~hours-long cold Qt build on a commit that has already been superseded.
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,8 +21,21 @@ env:
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/aloknigam247/index.json,readwrite"
 
 jobs:
+  # Seed the vcpkg binary cache. On a cold cache this cold-builds Qt (~1-3 h)
+  # and pushes it to the NuGet feed; every downstream job then RESTORES Qt in
+  # minutes instead of all of them racing to build it in parallel.
+  build:
+    name: build (seed Qt cache)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qvim
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     name: test-${{ matrix.tier }}
+    needs: build
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -33,6 +46,10 @@ jobs:
       - uses: ./.github/actions/setup-qvim
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset dev
 
       - name: Test (${{ matrix.tier }})
         shell: pwsh
@@ -59,12 +76,17 @@ jobs:
 
   coverage:
     name: coverage
+    needs: build
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-qvim
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset dev
 
       # Debug build (RelWithDebInfo reports covered=0 due to inlining). Collect
       # native coverage over the whole suite, then enforce the union floor.
