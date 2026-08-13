@@ -53,7 +53,11 @@ jobs:
 
       - name: Test (${{ matrix.tier }})
         shell: pwsh
-        run: ctest --preset dev -L ${{ matrix.tier }} --output-on-failure
+        # test_pixel_snapshot compares against a golden BMP rasterized on a
+        # developer machine; the CI runner's Courier New anti-aliases
+        # differently and blows the pixel budget. It stays a local-only visual
+        # regression aid until a redistributable font is bundled (see #44).
+        run: ctest --preset dev -L ${{ matrix.tier }} -E test_pixel_snapshot --output-on-failure
 
       # Guard that every registered test carries exactly one tier label, so the
       # three parallel tiers together cover the whole suite (nothing silently
@@ -102,7 +106,7 @@ jobs:
           }
           New-Item -ItemType Directory -Force _cov | Out-Null
           & $cc collect --output _cov\ci.cobertura --output-format cobertura `
-            --settings cov.runsettings -- ctest --preset dev --output-on-failure
+            --settings cov.runsettings -- ctest --preset dev -E test_pixel_snapshot --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw "coverage collect / ctest failed with exit code $LASTEXITCODE." }
 
       - name: Enforce coverage floor
