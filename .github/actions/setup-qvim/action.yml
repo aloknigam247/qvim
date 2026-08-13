@@ -1,0 +1,52 @@
+name: Setup qvim build
+description: >
+  Provision the toolchain (CMake >= 4.2, Neovim on PATH), wire the vcpkg NuGet
+  binary cache, then configure and build qvim with the dev preset under /WX.
+  Shared by every CI job so the build is identical across test tiers + coverage.
+
+inputs:
+  github-token:
+    description: Token with packages:write, used to read/write the vcpkg NuGet binary cache.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # windows-latest ships CMake 3.31.x; the project requires >= 4.2.
+    - name: Install CMake + Ninja
+      uses: lukka/get-cmake@latest
+
+    # Integration-tier tests spawn `nvim` and locate it via
+    # QStandardPaths::findExecutable, so it must be on PATH.
+    - name: Set up Neovim
+      id: nvim
+      uses: rhysd/action-setup-vim@v1
+      with:
+        neovim: true
+
+    - name: Export PATH + VCPKG_ROOT
+      shell: pwsh
+      run: |
+        Split-Path "${{ steps.nvim.outputs.executable_path }}" |
+          Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" |
+          Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+    # Register the GitHub Packages NuGet feed as vcpkg's binary cache source so
+    # Qt is built ONCE (per ABI) and restored on every later run.
+    - name: Configure vcpkg NuGet binary cache
+      shell: pwsh
+      run: |
+        $nuget = & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" fetch nuget | Select-Object -Last 1
+        $src = "https://nuget.pkg.github.com/aloknigam247/index.json"
+        & $nuget sources add -Source $src -Name github `
+          -Username aloknigam247 -Password "${{ inputs.github-token }}" -StorePasswordInClearText
+        & $nuget setapikey "${{ inputs.github-token }}" -Source $src
+
+    - name: Configure
+      shell: pwsh
+      run: cmake --preset dev -DQVIM_WERROR=ON
+
+    - name: Build
+      shell: pwsh
+      run: cmake --build --preset dev

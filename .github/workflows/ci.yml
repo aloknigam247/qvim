@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same ref cancels the in-flight run — no point burning a
+# ~hours-long cold Qt build on a commit that has already been superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Read/write the public GitHub Packages NuGet feed as vcpkg's binary cache.
+  # Public repo => unlimited package storage/transfer; Qt is built once per ABI.
+  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/aloknigam247/index.json,readwrite"
+
+jobs:
+  test:
+    name: test-${{ matrix.tier }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: [unit, integration, qml]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qvim
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test (${{ matrix.tier }})
+        shell: pwsh
+        run: ctest --preset dev -L ${{ matrix.tier }} --output-on-failure
+
+      # Guard that every registered test carries exactly one tier label, so the
+      # three parallel tiers together cover the whole suite (nothing silently
+      # drops out of all of them). Runs once, on the unit shard.
+      - name: Tier-label union guard
+        if: matrix.tier == 'unit'
+        shell: pwsh
+        run: |
+          function Count($extra) {
+            (ctest --preset dev -N @extra | Select-String 'Test\s+#\d+:').Count
+          }
+          $all = Count @()
+          $u   = Count @('-L','unit')
+          $i   = Count @('-L','integration')
+          $q   = Count @('-L','qml')
+          Write-Host "all=$all unit=$u integration=$i qml=$q sum=$($u+$i+$q)"
+          if (($u + $i + $q) -ne $all) {
+            throw "Tier-label union ($($u + $i + $q)) != total tests ($all). Every test must carry exactly one of unit/integration/qml (see tests/CMakeLists.txt)."
+          }
+
+  coverage:
+    name: coverage
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qvim
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Debug build (RelWithDebInfo reports covered=0 due to inlining). Collect
+      # native coverage over the whole suite, then enforce the union floor.
+      - name: Collect coverage
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          $cc = Get-ChildItem "$vs\Common7\IDE\Extensions\Microsoft\CodeCoverage.Console\Microsoft.CodeCoverage.Console.exe" `
+                  -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $cc) {
+            throw "Microsoft.CodeCoverage.Console.exe not found under '$vs'. Install the VS 'Code coverage tools' component."
+          }
+          New-Item -ItemType Directory -Force _cov | Out-Null
+          & $cc collect --output _cov\ci.cobertura --output-format cobertura `
+            --settings cov.runsettings -- ctest --preset dev --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "coverage collect / ctest failed with exit code $LASTEXITCODE." }
+
+      - name: Enforce coverage floor
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\coverage-union.ps1 -CoberturaPath _cov\ci.cobertura
