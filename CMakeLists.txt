@@ -10,6 +10,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(QVIM_ENABLE_ASAN "Build with MSVC AddressSanitizer" OFF)
+option(QVIM_WERROR "Treat qvim's own compiler warnings as errors (CI gate)" OFF)
 option(BUILD_TESTING "Build the test suites" ON)
 
 find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickTest Test)
@@ -28,6 +29,23 @@ if(MSVC)
     if(QVIM_ENABLE_ASAN)
         add_compile_options(/fsanitize=address)
     endif()
+endif()
+
+# Warnings-as-errors, scoped to qvim's OWN targets only — never Qt/vcpkg/msgpack.
+# A global /WX breaks on Qt headers' C4702 unreachable-code warnings even with
+# /external:anglebrackets /external:W0, so it can't live in the add_compile_options
+# above. Instead this interface carrier applies /WX per target and is opted in by
+# CI with -DQVIM_WERROR=ON. Link it PRIVATE into each first-party target.
+add_library(qvim_warnings INTERFACE)
+if(MSVC)
+    # /WX promotes ALL warnings to errors, including C4702 (unreachable code)
+    # emitted from Qt's <QtCore/qnumeric.h> during code generation. That warning
+    # is NOT suppressed by /external:anglebrackets /external:W0 (a known MSVC
+    # limitation: codegen-phase diagnostics ignore /external), so it would break
+    # a /WX build even though it originates entirely in Qt. Disable just C4702
+    # under WERROR; every other warning in qvim's own code is still an error.
+    target_compile_options(qvim_warnings INTERFACE
+        $<$<BOOL:${QVIM_WERROR}>:/WX;/wd4702>)
 endif()
 
 set(QVIM_LIB_SOURCES
@@ -70,6 +88,7 @@ target_link_libraries(qvim_lib
         msgpack-cxx
 )
 target_link_libraries(qvim_lib PRIVATE $<$<PLATFORM_ID:Windows>:dwmapi>)
+target_link_libraries(qvim_lib PRIVATE qvim_warnings)
 set_target_properties(qvim_lib PROPERTIES AUTOMOC ON)
 
 qt_add_qml_module(qvim_lib
@@ -90,6 +109,7 @@ else()
     qt_add_executable(qvim src/main.cpp)
 endif()
 target_link_libraries(qvim PRIVATE qvim_lib qvim_libplugin)
+target_link_libraries(qvim PRIVATE qvim_warnings)
 set_target_properties(qvim PROPERTIES WIN32_EXECUTABLE TRUE)
 
 if(WIN32)
@@ -195,6 +215,24 @@ Qml2Imports = .
         COMMENT "Deploying trimmed Qt runtime (loaded DLLs + imported QML modules) next to qvim.exe"
         VERBATIM
     )
+
+    # QtQuick.Window's qmldir declares a REQUIRED (non-optional) `plugin
+    # quickwindowplugin`, but Qt's debug build ships the DLL suffixed
+    # (quickwindowplugind.dll) while the config-agnostic qmldir keeps the base
+    # name. tests/check_deploy.ps1 resolves that declared name literally, so a
+    # debug deploy looks for quickwindowplugin.dll and fails. Deploy an unsuffixed
+    # copy of the debug plugin so the declared name resolves — it is a valid debug
+    # binary, and Qt still prefers the suffixed variant at runtime. Release already
+    # ships quickwindowplugin.dll, so this is debug-only (QVIM_QT_DLL_SUFFIX set).
+    if(QVIM_QT_DLL_SUFFIX)
+        add_custom_command(TARGET qvim POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${QVIM_QT_QML}/QtQuick/Window/quickwindowplugin${QVIM_QT_DLL_SUFFIX}.dll"
+                "${QVIM_OUT_DIR}/QtQuick/Window/quickwindowplugin.dll"
+            COMMENT "Deploying unsuffixed QtQuick.Window plugin alias for the debug deploy-manifest check"
+            VERBATIM
+        )
+    endif()
 endif()
 
 if(BUILD_TESTING)
