@@ -43,9 +43,36 @@ runs:
           -Username aloknigam247 -Password "${{ inputs.github-token }}" -StorePasswordInClearText
         & $nuget setapikey "${{ inputs.github-token }}" -Source $src
 
+    # vcpkg builds Qt from source on the first run (until the binary cache is
+    # seeded), and its buildtrees overflow the C: system drive. Reclaim space
+    # and move the build intermediates onto the roomier workspace drive.
+    - name: Free disk space
+      shell: pwsh
+      run: |
+        function Show-Free { Get-PSDrive -PSProvider FileSystem |
+          Where-Object { $_.Free } |
+          Select-Object Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}} | Format-Table | Out-String | Write-Host }
+        Write-Host "Before cleanup:"; Show-Free
+        foreach ($p in @($env:ANDROID_SDK_ROOT, $env:ANDROID_HOME,
+                         "C:\Program Files (x86)\Android",
+                         "$env:AGENT_TOOLSDIRECTORY\CodeQL",
+                         "C:\Program Files\Microsoft SDKs\Azure")) {
+          if ($p -and (Test-Path $p)) {
+            Write-Host "Removing $p"
+            Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue
+          }
+        }
+        Write-Host "After cleanup:"; Show-Free
+
     - name: Configure
       shell: pwsh
-      run: cmake --preset dev -DQVIM_WERROR=ON
+      # Keep vcpkg's heavy buildtrees / packages / downloads off the small C:
+      # drive, and delete each port's intermediates right after it builds so the
+      # peak footprint is one port, not the whole Qt tree.
+      run: |
+        $env:VCPKG_DOWNLOADS = "D:\vcpkg\downloads"
+        cmake --preset dev -DQVIM_WERROR=ON `
+          "-DVCPKG_INSTALL_OPTIONS=--x-buildtrees-root=D:/vcpkg/bt;--x-packages-root=D:/vcpkg/pkg;--clean-buildtrees-after-build;--clean-packages-after-build"
 
     - name: Build
       shell: pwsh
