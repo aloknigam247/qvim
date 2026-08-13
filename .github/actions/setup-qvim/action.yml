@@ -27,7 +27,7 @@ runs:
     - name: Export PATH + VCPKG_ROOT
       shell: pwsh
       run: |
-        Split-Path "${{ steps.nvim.outputs.executable_path }}" |
+        Split-Path "${{ steps.nvim.outputs.executable }}" |
           Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
         "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" |
           Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
