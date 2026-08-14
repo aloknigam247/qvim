@@ -13,11 +13,19 @@ function(qvim_add_test name)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES
         TIMEOUT 60
+        LABELS "${QVIM_TEST_LABEL}"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
     )
 endfunction()
 
+# ctest LABELS drive the parallel CI test tiers (see .github/workflows/ci.yml).
+# qvim_add_test stamps each test with the current ${QVIM_TEST_LABEL}; tests
+# registered by raw add_test() below (test_qml, test_deploy_manifest) are
+# labelled explicitly. Every test MUST carry exactly one tier label so the CI
+# union guard (unit + integration + qml == `ctest -N`) holds.
+
 # Tier 1 — unit / model (guiless)
+set(QVIM_TEST_LABEL unit)
 qvim_add_test(test_app_icon            unit/test_app_icon.cpp)
 qvim_add_test(test_argv_parser         unit/test_argv_parser.cpp)
 qvim_add_test(test_cell_metrics        unit/test_cell_metrics.cpp)
@@ -66,6 +74,7 @@ set_tests_properties(test_cell_metrics PROPERTIES
 )
 
 # Tier 2 — integration (offscreen QPA, real nvim --embed)
+set(QVIM_TEST_LABEL integration)
 qvim_add_test(test_attach_and_render             integration/test_attach_and_render.cpp)
 qvim_add_test(test_boot_no_resize_jump           integration/test_boot_no_resize_jump.cpp)
 qvim_add_test(test_boot_perf                     integration/test_boot_perf.cpp)
@@ -120,6 +129,18 @@ foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_cl
 endforeach()
 
 
+# Perf tests assert hard wall-clock ceilings (test_boot_perf: boot < 3000ms;
+# test_scroll_perf_micro: scroll median < 500us; test_scroll_perf: 100 j-presses
+# < 3000ms). Under `ctest --parallel` they must not share the CPU with other
+# tests or the timing goes noisy and they flake. RUN_SERIAL makes ctest schedule
+# each one alone even inside a parallel run — they still execute and still catch
+# regressions, just never concurrently. QVIM_SKIP_PERF=1 remains the escape hatch
+# for genuinely slow machines.
+set_tests_properties(test_boot_perf test_scroll_perf test_scroll_perf_micro PROPERTIES
+    RUN_SERIAL TRUE
+)
+
+
 # Pixel-snapshot test needs to find tests/golden/ relative to the source tree.
 # It is deliberately NOT in the minimal-QPA list above: it drives no nvim, and
 # the minimal platform has an empty font database and cannot grab a window, so
@@ -138,6 +159,7 @@ add_test(NAME test_qml
 set_tests_properties(test_qml PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE}"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
+    LABELS "qml"
     TIMEOUT 30
 )
 
@@ -168,4 +190,4 @@ add_test(NAME test_deploy_manifest
         -DeployDir "$<TARGET_FILE_DIR:qvim>"
         -QmlSourceDir "${CMAKE_SOURCE_DIR}/qml"
 )
-set_tests_properties(test_deploy_manifest PROPERTIES TIMEOUT 60)
+set_tests_properties(test_deploy_manifest PROPERTIES TIMEOUT 60 LABELS "unit")

@@ -75,8 +75,11 @@ Produces `D:\qvim\build\release\qvim.sln` (or `build\dev\qvim.sln` for Debug) pl
 ## 6. Build
 
 ```pwsh
-cmake --build --preset release   # or: cmake --build --preset dev
+cmake --build --preset release --parallel   # or: cmake --build --preset dev --parallel
 ```
+
+`--parallel` (no number) uses all cores (MSBuild `/m`) — the same flag CI uses. To avoid typing it,
+set `$env:CMAKE_BUILD_PARALLEL_LEVEL` in your PowerShell profile.
 
 Produces `D:\qvim\build\release\RelWithDebInfo\qvim.exe` (Debug: `D:\qvim\build\dev\Debug\qvim.exe`) and 11 test binaries. With `windeployqt` wired into post-build (see CMakeLists.txt), Qt DLLs + plugins are copied next to each `.exe` automatically — no env vars needed at launch.
 
@@ -99,6 +102,60 @@ D:\qvim\build\release\RelWithDebInfo\qvim.exe   # or: D:\qvim\build\dev\Debug\qv
 ```
 
 A window opens, attaches to nvim, and you'll see a `[No Name]` buffer with cursor in normal mode.
+
+## 9. Coverage & CI toolchain (contributors)
+
+These are only needed to run the coverage gate locally or to understand what CI does — a plain
+build/test (steps 1–8) does not require them.
+
+### Neovim on PATH (integration tier)
+
+The Tier-2 integration tests spawn a real `nvim --embed` and locate it with
+`QStandardPaths::findExecutable("nvim")`, so `nvim` must be on `PATH`:
+
+```pwsh
+winget install --id Neovim.Neovim --accept-package-agreements --accept-source-agreements
+nvim --version   # confirm it resolves on PATH (open a new shell if winget just added it)
+```
+
+### Native code coverage
+
+Coverage uses **`Microsoft.CodeCoverage.Console`**, which ships with the VS 2026 "Code coverage
+tools" component (installed by the `--includeRecommended` VCTools workload in step 1). Locate it and
+collect over a **Debug** build (RelWithDebInfo reports covered = 0 because of inlining):
+
+```pwsh
+$vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+$cc = Get-ChildItem "$vs\Common7\IDE\Extensions\Microsoft\CodeCoverage.Console\Microsoft.CodeCoverage.Console.exe" |
+        Select-Object -First 1 -ExpandProperty FullName
+
+cmake --preset dev; cmake --build --preset dev
+& $cc collect --output _cov\full.cobertura --output-format cobertura `
+    --settings cov.runsettings -- ctest --preset dev
+```
+
+Every test executable statically links `qvim_lib`, so the report's own line-rate double-counts each
+source line once per test module. `scripts/coverage-union.ps1` collapses that into a real union
+figure over `src/` + `include/` and fails if it regresses below the floor:
+
+```pwsh
+pwsh -NoProfile -File scripts\coverage-union.ps1 -CoberturaPath _cov\full.cobertura
+```
+
+Ratchet `-MinCovered` / `-MinRatio` upward as coverage improves (issue #33 tracks the gate, #40
+tracks raising coverage toward 100%).
+
+### CI vcpkg binary cache (one-time, maintainer)
+
+`.github/workflows/ci.yml` uses a **public GitHub Packages NuGet feed**
+(`nuget.pkg.github.com/aloknigam247`) as vcpkg's binary cache, so Qt is compiled once per ABI and
+restored on every later run. The first run (or any run after a vcpkg baseline / MSVC-toolset bump)
+cold-builds Qt (1–3 h) and then publishes the blob. Two one-time requirements:
+
+- The workflow's `GITHUB_TOKEN` already has `packages: write` (set in `ci.yml`); no PAT needed.
+- After the first publish, open the package under **github.com/users/aloknigam247/packages** and set
+  its visibility to **Public** — otherwise a private package hits the 500 MB free quota and later
+  runs fail to restore. Public packages on a public repo have unlimited storage and transfer.
 
 ## Troubleshooting
 

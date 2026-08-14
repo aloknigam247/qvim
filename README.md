@@ -1,5 +1,7 @@
 # qvim
 
+[![CI](https://github.com/aloknigam247/qvim/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aloknigam247/qvim/actions/workflows/ci.yml)
+
 ## Overview
 
 qvim is a Neovim GUI client for Windows, written in C++23 / Qt 6.10 / QML. It drives an embedded

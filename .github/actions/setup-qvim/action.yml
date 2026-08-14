@@ -1,0 +1,61 @@
+name: Setup qvim build
+description: >
+  Provision the toolchain (CMake >= 4.2, Neovim on PATH), wire the vcpkg NuGet
+  binary cache, then CONFIGURE the dev preset — which runs the vcpkg manifest
+  install, i.e. builds Qt on a cold cache or restores it otherwise. Compiling
+  qvim itself is left to each job (they run cmake --build after this), so the
+  seed `build` job can stop here once Qt is cached. Shared by every CI job so
+  the toolchain + Qt ABI are identical across the build seed, test tiers, and
+  coverage.
+
+inputs:
+  github-token:
+    description: Token with packages:write, used to read/write the vcpkg NuGet binary cache.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # windows-latest ships CMake 3.31.x; the project requires >= 4.2. get-cmake
+    # also bundles Ninja, but our build uses the Visual Studio generator (see
+    # CMakePresets.json) — Ninja is incidental, not something we invoke.
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+
+    # Integration-tier tests spawn `nvim` and locate it via
+    # QStandardPaths::findExecutable, so it must be on PATH.
+    - name: Set up Neovim
+      id: nvim
+      uses: rhysd/action-setup-vim@v1
+      with:
+        neovim: true
+
+    - name: Export PATH + VCPKG_ROOT
+      shell: pwsh
+      run: |
+        Split-Path "${{ steps.nvim.outputs.executable }}" |
+          Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" |
+          Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+    # Register the GitHub Packages NuGet feed as vcpkg's binary cache source so
+    # Qt is built ONCE (per ABI) and restored on every later run.
+    - name: Configure vcpkg NuGet binary cache
+      shell: pwsh
+      run: |
+        $nuget = & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" fetch nuget | Select-Object -Last 1
+        $src = "https://nuget.pkg.github.com/aloknigam247/index.json"
+        & $nuget sources add -Source $src -Name github `
+          -Username aloknigam247 -Password "${{ inputs.github-token }}" -StorePasswordInClearText
+        & $nuget setapikey "${{ inputs.github-token }}" -Source $src
+
+    - name: Configure
+      shell: pwsh
+      # Keep vcpkg's heavy buildtrees / packages / downloads off the small C:
+      # drive, and delete each port's intermediates right after it builds so the
+      # peak footprint is one port, not the whole Qt tree. On a warm NuGet cache
+      # this restores Qt instead of building it.
+      run: |
+        $env:VCPKG_DOWNLOADS = "D:\vcpkg\downloads"
+        cmake --preset dev -DQVIM_WERROR=ON `
+          "-DVCPKG_INSTALL_OPTIONS=--x-buildtrees-root=D:/vcpkg/bt;--x-packages-root=D:/vcpkg/pkg;--clean-buildtrees-after-build;--clean-packages-after-build"
