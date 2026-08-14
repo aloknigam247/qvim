@@ -22,7 +22,11 @@
     -MinRatio upward as issue #40 raises coverage.
 
 .PARAMETER CoberturaPath
-    Path to the cobertura XML emitted by the coverage collector.
+    One or more paths to cobertura XML emitted by the coverage collector. When
+    several are given (one per parallel test tier), their per-line coverage is
+    unioned: a line counts as covered if ANY report hit it. Because every test
+    carries exactly one tier label, the union of the tiers equals a single
+    whole-suite run, so the floor is identical either way.
 
 .PARAMETER MinCovered
     Minimum number of distinct covered source lines required (floor).
@@ -32,33 +36,33 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$CoberturaPath,
+    [Parameter(Mandatory)][string[]]$CoberturaPath,
     [int]$MinCovered = 1996,
     [double]$MinRatio = 0.769
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path -LiteralPath $CoberturaPath)) {
-    Write-Error "cobertura report not found: $CoberturaPath"; exit 1
-}
-
-[xml]$report = Get-Content -LiteralPath $CoberturaPath -Raw
-
-# key "<normalized-file>|<line>" -> $true once any module hit that line.
+# key "<normalized-file>|<line>" -> $true once any module in any report hit it.
 $covered = @{}
 # key "<normalized-file>|<line>" present (value ignored) -> line exists at all.
 $all = @{}
 
-foreach ($pkg in $report.coverage.packages.package) {
-    foreach ($cls in $pkg.classes.class) {
-        $file = [string]$cls.filename
-        if ($file -notmatch '\\(src|include)\\') { continue }
-        $norm = $file.ToLowerInvariant()
-        foreach ($ln in $cls.lines.line) {
-            $key = "$norm|$($ln.number)"
-            $all[$key] = $true
-            if ([int]$ln.hits -gt 0) { $covered[$key] = $true }
+foreach ($path in $CoberturaPath) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        Write-Error "cobertura report not found: $path"; exit 1
+    }
+    [xml]$report = Get-Content -LiteralPath $path -Raw
+    foreach ($pkg in $report.coverage.packages.package) {
+        foreach ($cls in $pkg.classes.class) {
+            $file = [string]$cls.filename
+            if ($file -notmatch '\\(src|include)\\') { continue }
+            $norm = $file.ToLowerInvariant()
+            foreach ($ln in $cls.lines.line) {
+                $key = "$norm|$($ln.number)"
+                $all[$key] = $true
+                if ([int]$ln.hits -gt 0) { $covered[$key] = $true }
+            }
         }
     }
 }
