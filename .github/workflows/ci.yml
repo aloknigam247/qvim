@@ -38,7 +38,9 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build --preset dev
+        # --parallel uses all runner cores (MSBuild builds the ~57 targets
+        # serially otherwise). This is the seed job's dominant cost.
+        run: cmake --build --preset dev --parallel
 
       # Share the compiled tree (test exes + qvim.exe deploy + PDBs for native
       # coverage). Downstream jobs still run setup-qvim to restore Qt onto PATH
