@@ -16,8 +16,10 @@ inputs:
 runs:
   using: composite
   steps:
-    # windows-latest ships CMake 3.31.x; the project requires >= 4.2.
-    - name: Install CMake + Ninja
+    # windows-latest ships CMake 3.31.x; the project requires >= 4.2. get-cmake
+    # also bundles Ninja, but our build uses the Visual Studio generator (see
+    # CMakePresets.json) — Ninja is incidental, not something we invoke.
+    - name: Install CMake
       uses: lukka/get-cmake@latest
 
     # Integration-tier tests spawn `nvim` and locate it via

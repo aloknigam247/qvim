@@ -21,17 +21,38 @@ env:
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/aloknigam247/index.json,readwrite"
 
 jobs:
-  # Seed the vcpkg binary cache. On a cold cache this cold-builds Qt (~1-3 h)
-  # and pushes it to the NuGet feed; every downstream job then RESTORES Qt in
-  # minutes instead of all of them racing to build it in parallel.
+  # Seed the vcpkg binary cache AND compile qvim exactly once. On a cold cache
+  # the setup-qvim configure cold-builds Qt (~1-3 h) and pushes it to the NuGet
+  # feed; every later job then RESTORES Qt in minutes. Compiling here (not in
+  # each downstream job) means a build break fails fast in one place instead of
+  # four, and the compiled test tree is shared via an artifact so the test /
+  # coverage jobs skip the ~11 min rebuild.
   build:
-    name: build (seed Qt cache)
+    name: build
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-qvim
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset dev
+
+      # Share the compiled tree (test exes + qvim.exe deploy + PDBs for native
+      # coverage). Downstream jobs still run setup-qvim to restore Qt onto PATH
+      # and regenerate the ctest config, then drop these exes back into
+      # build/dev/Debug and run ctest without recompiling. The GitHub-hosted
+      # checkout path is identical across jobs (D:\a\qvim\qvim), so the absolute
+      # paths baked into CTestTestfile.cmake resolve.
+      - name: Upload compiled test tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-dev-debug
+          path: build/dev/Debug
+          retention-days: 1
+          if-no-files-found: error
 
   test:
     name: test-${{ matrix.tier }}
@@ -47,9 +68,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
-        shell: pwsh
-        run: cmake --build --preset dev
+      - name: Download compiled test tree
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dev-debug
+          path: build/dev/Debug
 
       - name: Test (${{ matrix.tier }})
         shell: pwsh
@@ -88,9 +111,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
-        shell: pwsh
-        run: cmake --build --preset dev
+      - name: Download compiled test tree
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dev-debug
+          path: build/dev/Debug
 
       # Debug build (RelWithDebInfo reports covered=0 due to inlining). Collect
       # native coverage over the whole suite, then enforce the union floor.
