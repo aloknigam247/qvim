@@ -31,7 +31,7 @@ jobs:
     name: build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-qvim
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
       # checkout path is identical across jobs (D:\a\qvim\qvim), so the absolute
       # paths baked into CTestTestfile.cmake resolve.
       - name: Upload compiled test tree
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-dev-debug
           path: build/dev/Debug
@@ -65,13 +65,13 @@ jobs:
       matrix:
         tier: [unit, integration, qml]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-qvim
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download compiled test tree
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-dev-debug
           path: build/dev/Debug
@@ -82,6 +82,10 @@ jobs:
         # emit a per-tier cobertura. coverage-gate unions the three tiers (= whole
         # suite, since every test carries exactly one tier label) and enforces the
         # floor. Debug build (RelWithDebInfo reports covered=0 due to inlining).
+        # The unit tier is headless/CPU-bound so its tests run in parallel across
+        # the runner's cores (the one timing-sensitive unit test is RUN_SERIAL, see
+        # tests/CMakeLists.txt). The integration tier stays serial: real nvim +
+        # waitUntil timeouts on a busy CI runner flake when the CPU is contended.
         # test_pixel_snapshot compares against a golden BMP rasterized on a
         # developer machine; the CI runner's Courier New anti-aliases differently
         # and blows the pixel budget, so it stays a local-only visual aid (see #44).
@@ -93,13 +97,15 @@ jobs:
           if (-not $cc) {
             throw "Microsoft.CodeCoverage.Console.exe not found under '$vs'. Install the VS 'Code coverage tools' component."
           }
+          $ctestArgs = @('--preset','dev','-L','${{ matrix.tier }}','-E','test_pixel_snapshot','--output-on-failure')
+          if ('${{ matrix.tier }}' -eq 'unit') { $ctestArgs += @('--parallel', $env:NUMBER_OF_PROCESSORS) }
           New-Item -ItemType Directory -Force _cov | Out-Null
           & $cc collect --output _cov\${{ matrix.tier }}.cobertura --output-format cobertura `
-            --settings cov.runsettings -- ctest --preset dev -L ${{ matrix.tier }} -E test_pixel_snapshot --output-on-failure
+            --settings cov.runsettings -- ctest @ctestArgs
           if ($LASTEXITCODE -ne 0) { throw "coverage collect / ctest failed with exit code $LASTEXITCODE." }
 
       - name: Upload tier coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cov-${{ matrix.tier }}
           path: _cov/${{ matrix.tier }}.cobertura
@@ -130,10 +136,10 @@ jobs:
     needs: test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download tier coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: cov-*
           path: _cov
