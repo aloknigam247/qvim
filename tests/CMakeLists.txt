@@ -129,6 +129,18 @@ foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_cl
 endforeach()
 
 
+# Perf tests assert hard wall-clock ceilings (test_boot_perf: boot < 3000ms;
+# test_scroll_perf_micro: scroll median < 500us; test_scroll_perf: 100 j-presses
+# < 3000ms). Under `ctest --parallel` they must not share the CPU with other
+# tests or the timing goes noisy and they flake. RUN_SERIAL makes ctest schedule
+# each one alone even inside a parallel run — they still execute and still catch
+# regressions, just never concurrently. QVIM_SKIP_PERF=1 remains the escape hatch
+# for genuinely slow machines.
+set_tests_properties(test_boot_perf test_scroll_perf test_scroll_perf_micro PROPERTIES
+    RUN_SERIAL TRUE
+)
+
+
 # Pixel-snapshot test needs to find tests/golden/ relative to the source tree.
 # It is deliberately NOT in the minimal-QPA list above: it drives no nvim, and
 # the minimal platform has an empty font database and cannot grab a window, so
