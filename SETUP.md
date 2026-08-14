@@ -75,8 +75,11 @@ Produces `D:\qvim\build\release\qvim.sln` (or `build\dev\qvim.sln` for Debug) pl
 ## 6. Build
 
 ```pwsh
-cmake --build --preset release   # or: cmake --build --preset dev
+cmake --build --preset release --parallel   # or: cmake --build --preset dev --parallel
 ```
+
+`--parallel` (no number) uses all cores (MSBuild `/m`) — the same flag CI uses. To avoid typing it,
+set `$env:CMAKE_BUILD_PARALLEL_LEVEL` in your PowerShell profile.
 
 Produces `D:\qvim\build\release\RelWithDebInfo\qvim.exe` (Debug: `D:\qvim\build\dev\Debug\qvim.exe`) and 11 test binaries. With `windeployqt` wired into post-build (see CMakeLists.txt), Qt DLLs + plugins are copied next to each `.exe` automatically — no env vars needed at launch.
 

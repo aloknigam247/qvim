@@ -58,9 +58,14 @@ Directory-scoped instructions live in nested `AGENTS.md` files that auto-load wh
 
 ```pwsh
 cmake --preset release
-cmake --build --preset release
+cmake --build --preset release --parallel
 ctest --preset release
 ```
+
+`--parallel` (no number) builds with all cores — it maps to MSBuild `/m`. This is the same flag CI
+uses, so local and CI builds parallelize identically. There is no "all cores" value for a preset's
+`jobs` field (it needs a fixed integer), so the flag is the portable way; to avoid typing it, set
+`$env:CMAKE_BUILD_PARALLEL_LEVEL` in your PowerShell profile.
 
 Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --preset dev --config Release` — that produces a Release build under the dev preset's multi-config solution (`build/dev/Release/`), which is not the intended release binary.
 
@@ -68,7 +73,7 @@ Output: `build/release/RelWithDebInfo/qvim.exe`. Do NOT use `cmake --build --pre
 
 ```pwsh
 cmake --preset dev
-cmake --build --preset dev
+cmake --build --preset dev --parallel
 ctest --preset dev
 ```
 
