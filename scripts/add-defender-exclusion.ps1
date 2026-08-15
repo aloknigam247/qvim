@@ -4,28 +4,30 @@
 
 .DESCRIPTION
     On Windows, the dominant cost of a *cold* qvim launch (first run after a build or
-    update — 10-20s) is Defender's real-time "first-sight" scan of qvim.exe and every Qt
-    DLL it loads. Defender caches its verdict by file content hash, so the cost is paid
-    once per unique build and then launches are fast (~1s) — until the next rebuild
-    produces new bytes and the scan happens all over again.
+    update — 10-20s) is Defender's real-time scanning of the build tree. Two things happen
+    on a rebuild: qvim.exe and every Qt DLL it loads get a "first-sight" scan (Defender
+    caches its verdict by file content hash, so new bytes = new scan), AND the several GB
+    of freshly-written compile intermediates (.obj/.pdb/.lib under build\<preset>\) get
+    scanned too — saturating disk I/O that the first launch then has to compete with.
 
-    Excluding the install directory from real-time scanning collapses cold launches from
-    ~8s to ~1.5s and keeps rebuilds fast. This is the single most effective cold-start fix.
+    Excluding the whole build tree from real-time scanning collapses the post-build first
+    launch from ~10-13s to ~2s (measured) and keeps rebuilds fast. This is the single most
+    effective cold-start fix.
 
     SECURITY TRADEOFF: an excluded path is no longer scanned by Defender's real-time
     protection. Only exclude a directory whose contents you trust and control (your own
     build output). Do NOT exclude a broad location such as your whole user profile or a
-    downloads folder. This script defaults to the directory containing the built qvim.exe.
+    downloads folder. This script defaults to the repo's build tree (build\).
 
 .PARAMETER Path
-    Directory to exclude. Defaults to the folder containing the release qvim.exe next to
-    this script's repo (build\release\RelWithDebInfo).
+    Directory to exclude. Defaults to the repo's build\ tree (covers every preset's output
+    and its compile intermediates). Pass a worktree's build dir explicitly to cover it too.
 
 .PARAMETER Remove
     Remove the exclusion instead of adding it.
 
 .EXAMPLE
-    # Add an exclusion for the default release output (run from an elevated shell):
+    # Add an exclusion for the default build tree (run from an elevated shell):
     pwsh -NoProfile -File scripts\add-defender-exclusion.ps1
 
 .EXAMPLE
@@ -44,10 +46,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Resolve default path: build\release\RelWithDebInfo relative to the repo root (parent of scripts\).
+# Resolve default path: the repo's build\ tree (parent of scripts\). Excluding the whole tree —
+# not just build\release\RelWithDebInfo — is deliberate: the post-build first-launch cost is Defender
+# scanning the several GB of compile intermediates (.obj/.pdb/.lib) in build\<preset>\, which the
+# narrower deploy-dir exclusion leaves scanned. It also covers every preset (dev/release/ci-*) at once.
 if (-not $Path) {
     $repoRoot = Split-Path -Parent $PSScriptRoot
-    $Path = Join-Path $repoRoot "build\release\RelWithDebInfo"
+    $Path = Join-Path $repoRoot "build"
 }
 
 # Normalise to a full path. The directory need not exist yet (you may exclude before first build),

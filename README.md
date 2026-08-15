@@ -69,10 +69,11 @@ directly.
 ## Launch performance (Windows cold start)
 
 The first launch of qvim *after a build or update* can take 10-20 seconds, while every subsequent
-launch is ~1 second. This is not qvim code — it is **Microsoft Defender's real-time "first-sight"
-scan** of `qvim.exe` and the Qt DLLs it loads. Defender caches its verdict by file **content hash**,
-so the scan cost is paid once per unique build and then launches are fast — until the next rebuild
-produces new bytes and the whole scan happens again.
+launch is ~1 second. This is not qvim code — it is **Microsoft Defender's real-time scanning of the
+build tree**. On a rebuild, two scans stack: a "first-sight" scan of `qvim.exe` and the Qt DLLs it
+loads (Defender caches its verdict by file **content hash**, so new bytes mean a new scan), and a
+scan of the several GB of freshly-written compile intermediates (`.obj`/`.pdb`/`.lib`) — which
+saturates disk I/O that the first launch then competes with.
 
 Two things keep cold start down:
 
@@ -81,14 +82,15 @@ Two things keep cold start down:
   imported, instead of the whole Qt Quick tree (Controls/Dialogs/Particles/Effects, ~150 MB). Fewer
   and smaller files means less for Defender to scan on first sight.
 
-- **A Defender exclusion collapses the cold launch outright** (~8s → ~1.5s in measurement, a 5×
-  win). Run this once, from an **elevated** PowerShell, against your build output directory:
+- **A Defender exclusion for the build tree collapses the cold launch outright** (post-build first
+  launch ~10-13s → ~2s in measurement). Run this once, from an **elevated** PowerShell:
 
   ```pwsh
   pwsh -NoProfile -File scripts\add-defender-exclusion.ps1
   ```
 
-  By default it excludes `build\release\RelWithDebInfo`; pass `-Path <dir>` for a custom install
-  location, or `-Remove` to undo. An excluded directory is no longer scanned by real-time
-  protection, so only exclude build output you produce and trust — never a broad location like your
-  whole user profile or a downloads folder.
+  By default it excludes the whole `build\` tree — deliberately, because the dominant cost is
+  scanning the compile intermediates, not just the deployed `qvim.exe`. Pass `-Path <dir>` for a
+  custom location (e.g. a worktree's own `build\` dir), or `-Remove` to undo. An excluded directory
+  is no longer scanned by real-time protection, so only exclude build output you produce and trust —
+  never a broad location like your whole user profile or a downloads folder.
