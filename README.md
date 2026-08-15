@@ -37,7 +37,7 @@ NvimConnector       decodes and dispatches redraw events (grid_line, grid_scroll
                      CursorItem (QQuickPaintedItem)  paints the cursor overlay
                          │
                          ▼
-                     QML shell (qml/: Main, Shell, Tabline, PopupMenu, Cmdline)
+                     QML shell (qml/: Main, Shell, Tabline, PopupMenu, Cmdline, ChatPanel)
 ```
 
 `NvimConnector` exposes redraw notifications as `Q_SIGNAL`s that the QML shell connects to

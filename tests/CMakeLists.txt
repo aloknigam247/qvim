@@ -78,6 +78,7 @@ set(QVIM_TEST_LABEL integration)
 qvim_add_test(test_attach_and_render             integration/test_attach_and_render.cpp)
 qvim_add_test(test_boot_no_resize_jump           integration/test_boot_no_resize_jump.cpp)
 qvim_add_test(test_boot_perf                     integration/test_boot_perf.cpp)
+qvim_add_test(test_chat_panel                    integration/test_chat_panel.cpp)
 qvim_add_test(test_click_focuses_float           integration/test_click_focuses_float.cpp)
 qvim_add_test(test_click_skips_unfocusable_float integration/test_click_skips_unfocusable_float.cpp)
 qvim_add_test(test_cmdline                       integration/test_cmdline.cpp)
@@ -113,6 +114,10 @@ target_link_libraries(test_runtime_set_options PRIVATE qvim_libplugin Qt6::Quick
 qvim_add_test(test_user_smoke        integration/test_user_smoke.cpp)
 target_link_libraries(test_user_smoke PRIVATE qvim_libplugin Qt6::Quick)
 
+# Chat panel end-to-end also loads Main.qml and drives the focus chain via
+# mouse/key clicks — same QML registration link requirement.
+target_link_libraries(test_chat_panel PRIVATE qvim_libplugin Qt6::Quick)
+
 # Float-click tests also load Main.qml in a real QQuickWindow and inject mouse
 # events through Qt's hit-test, so they need the same QML registration link.
 target_link_libraries(test_click_focuses_float           PRIVATE qvim_libplugin Qt6::Quick)
@@ -121,7 +126,7 @@ target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin 
 target_link_libraries(test_boot_no_resize_jump PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_boot_perf           PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
+foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_chat_panel test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"

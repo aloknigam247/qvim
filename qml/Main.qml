@@ -147,9 +147,80 @@ Window {
         id: shell
         objectName: "shell"
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: chatPanel.visible ? chatPanel.left : parent.right
         anchors.top: tabline.bottom
         anchors.bottom: cmdline.visible ? cmdline.top : parent.bottom
+    }
+
+    // Chat panel — docked on the right, hidden by default. Toggling `visible`
+    // changes Shell's width, which fires GridItem::geometryChange ->
+    // maybeResizeUi -> requestResize (the existing tryResize path — geometry is
+    // never poked directly). Width is clamped so a narrow window never starves
+    // the grid to <=0 width (which would suppress the resize entirely).
+    ChatPanel {
+        id: chatPanel
+        anchors.top: tabline.bottom
+        anchors.bottom: cmdline.visible ? cmdline.top : parent.bottom
+        anchors.right: parent.right
+        width: visible ? Math.min(360, Math.floor(parent.width * 0.5)) : 0
+        visible: false
+        onClosed: shell.focusGrid()
+    }
+
+    // Always-visible toggle button (a small speech-bubble icon) in the app's
+    // top strip. Floating overlay so it never perturbs Shell geometry or the
+    // boot resize sequence. Not in the native OS caption (that would need a
+    // frameless-window rewrite).
+    Item {
+        id: chatToggle
+        objectName: "chatToggle"
+        width: 24
+        height: 22
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.rightMargin: 6
+        anchors.topMargin: 3
+        z: 150
+
+        Canvas {
+            id: chatIcon
+            anchors.fill: parent
+            property color tint: chatPanel.visible ? "#5a9fd4"
+                               : (toggleArea.containsMouse ? "#e0e0e0" : "#9d9d9d")
+            onTintChanged: requestPaint()
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.strokeStyle = tint
+                ctx.lineWidth = 1.5
+                var bx = 3, by = 2, bw = width - 6, bh = height - 9, r = 3
+                ctx.beginPath()
+                ctx.moveTo(bx + r, by)
+                ctx.lineTo(bx + bw - r, by)
+                ctx.arcTo(bx + bw, by, bx + bw, by + r, r)
+                ctx.lineTo(bx + bw, by + bh - r)
+                ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r)
+                ctx.lineTo(bx + 7, by + bh)
+                ctx.lineTo(bx + 4, by + bh + 4)  // tail
+                ctx.lineTo(bx + 4, by + bh)
+                ctx.lineTo(bx + r, by + bh)
+                ctx.arcTo(bx, by + bh, bx, by + bh - r, r)
+                ctx.lineTo(bx, by + r)
+                ctx.arcTo(bx, by, bx + r, by, r)
+                ctx.closePath()
+                ctx.stroke()
+            }
+        }
+
+        MouseArea {
+            id: toggleArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: {
+                if (chatPanel.visible) chatPanel.requestClose()
+                else chatPanel.open()
+            }
+        }
     }
 
     Cmdline {
@@ -189,7 +260,8 @@ Window {
                     const cw = Math.max(1, shell.cellWidth)
                     const ch = Math.max(1, shell.cellHeight)
                     const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
-                    const cols = Math.max(1, Math.floor(scr.width / cw))
+                    const dockW = chatPanel.visible ? chatPanel.width : 0
+                    const cols = Math.max(1, Math.floor((scr.width - dockW) / cw))
                     const rows = Math.max(1, Math.floor((scr.height - chromeH) / ch))
                     $connector.tryResize(cols, rows)
                 }
