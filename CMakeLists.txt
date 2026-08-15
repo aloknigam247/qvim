@@ -52,6 +52,7 @@ set(QVIM_LIB_SOURCES
     src/AppIcon.cpp             include/AppIcon.h
     src/ArgvParser.cpp          include/ArgvParser.h
     src/CellMetrics.cpp         include/CellMetrics.h
+    src/ChatModel.cpp           include/ChatModel.h
     src/ClipboardBridge.cpp     include/ClipboardBridge.h
     src/CmdlineModel.cpp        include/CmdlineModel.h
     src/Config.cpp              include/Config.h
@@ -95,6 +96,7 @@ qt_add_qml_module(qvim_lib
     URI Qvim
     VERSION 1.0
     QML_FILES
+        qml/ChatPanel.qml
         qml/Cmdline.qml
         qml/Main.qml
         qml/Messages.qml

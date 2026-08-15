@@ -82,5 +82,9 @@ Item {
         z: -1
     }
 
+    // Hands focus back to the long-lived baseGrid (the item that owns focus).
+    // Used by Main.qml when the chat panel closes.
+    function focusGrid() { baseGrid.forceActiveFocus() }
+
     Component.onCompleted: baseGrid.forceActiveFocus()
 }
