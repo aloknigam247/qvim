@@ -97,6 +97,11 @@ entirely through adb. It builds + installs the APK, starts the Python echo serve
 `adb reverse`, launches the app, drives the real UI, and asserts on the actual rendered view
 hierarchy via `uiautomator dump` (elements are located by text — never hardcoded pixel coordinates).
 
+> **Local-only gate.** This needs a physical device on USB, so it **cannot run on GitHub-hosted CI**.
+> The exit code (0 pass / 1 fail) is for local scripting, not a PR gate. CI-gating output validation
+> lives in the JVM unit tests (`ProtocolTest`, `ChatReducerTest`), which pin the protocol frames and
+> the `Echo: hi` streaming assembly. Treat this script as a manual smoke, not a proof.
+
 ```pwsh
 # full run (builds the APK first)
 pwsh -NoProfile -File android\scripts\e2e-device.ps1

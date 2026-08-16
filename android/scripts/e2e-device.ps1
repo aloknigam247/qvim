@@ -17,6 +17,11 @@
 
     Exit code 0 = all assertions passed, 1 = at least one failed (or setup error).
 
+    LOCAL-ONLY GATE: this requires a physical device on USB and therefore CANNOT run on
+    GitHub-hosted CI runners. The exit code is for local scripting (e.g. a pre-push hook),
+    not a PR gate. CI-gating output validation lives in the JVM unit tests (ProtocolTest,
+    ChatReducerTest), which pin the protocol frames and the "Echo: hi" streaming assembly.
+
 .PARAMETER SkipBuild
     Reuse the already-built app-debug.apk instead of running `gradlew assembleDebug`.
 
