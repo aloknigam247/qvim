@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only overlay. Android's network-security config is static XML and cannot
+  whitelist a host chosen at runtime, so this slice (explicitly plaintext ws://)
+  permits cleartext broadly in DEBUG builds only. The release manifest does not
+  reference this file. Channel encryption is issue #54.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>
