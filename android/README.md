@@ -28,6 +28,7 @@ android/
       MainActivity.kt
     src/test/java/com/qvim/companion/   # ProtocolTest, ChatReducerTest (pure JVM)
     src/debug/                # debug-only cleartext network-security config
+  scripts/e2e-device.ps1      # on-demand adb-driven device E2E suite
   tools/echo-server/          # Python dev stand-in for the qvim mirror (#49)
 ```
 
@@ -88,6 +89,33 @@ Drive it headlessly with adb if you like:
 & $adb shell input text "hi"
 & $adb exec-out screencap -p > shot.png
 ```
+
+## On-demand device E2E suite
+
+`scripts/e2e-device.ps1` automates the full smoke against a **physically connected device**, driven
+entirely through adb. It builds + installs the APK, starts the Python echo server behind
+`adb reverse`, launches the app, drives the real UI, and asserts on the actual rendered view
+hierarchy via `uiautomator dump` (elements are located by text — never hardcoded pixel coordinates).
+
+```pwsh
+# full run (builds the APK first)
+pwsh -NoProfile -File android\scripts\e2e-device.ps1
+
+# reuse an already-built APK
+pwsh -NoProfile -File android\scripts\e2e-device.ps1 -SkipBuild
+```
+
+It runs two cases and exits non-zero if any assertion fails:
+
+- **Positive** — Connect reaches `Status: Connected`; sending `hi` yields a `you: hi` bubble and a
+  streamed `assistant: Echo: hi` bubble.
+- **Negative** — with the echo server stopped, a fresh launch + Connect settles on
+  `Status: Disconnected` and never shows Connected or an echo.
+
+Prerequisites: an authorized device (`adb devices` shows `device`), the JDK/SDK env vars above, and
+the echo-server deps (`pip install -r tools\echo-server\requirements.txt`). The script freezes screen
+rotation for the duration and restores it on exit. Pass `-DeviceSerial` when more than one device is
+attached, or `-Port` / `-PythonExe` to override defaults.
 
 ## Cleartext note
 
