@@ -45,17 +45,24 @@ void ChatModel::submit(const QString& text) {
     const QString trimmed = text.trimmed();
     if (trimmed.isEmpty()) return;
 
+    ++m_turn;
+    const QString userId      = QStringLiteral("u") + QString::number(m_turn);
+    const QString assistantId = QStringLiteral("a") + QString::number(m_turn);
+
     appendMessage(Author::User, trimmed);
+    emit userMessageAdded(userId, trimmed);
 
     // Begin an empty assistant block, then queue the echo split into chunks
     // targeting that specific row.
     appendMessage(Author::Assistant, QString());
     const int assistantRow = static_cast<int>(m_msgs.size()) - 1;
+    emit assistantMessageBegan(assistantId);
 
     const QString reply = QStringLiteral("Echo: ") + trimmed;
     const QVector<QString> parts = chunkify(reply, kEchoChunks);
-    for (const QString& part : parts) {
-        m_pending.enqueue(Chunk{assistantRow, part});
+    for (int i = 0; i < parts.size(); ++i) {
+        const bool last = (i == parts.size() - 1);
+        m_pending.enqueue(Chunk{assistantRow, assistantId, parts[i], last});
     }
     if (!m_pending.isEmpty() && !m_streamTimer->isActive()) {
         m_streamTimer->start();
@@ -72,6 +79,10 @@ void ChatModel::streamTick() {
         m_msgs[chunk.row].text += chunk.text;
         const QModelIndex idx = index(chunk.row, 0);
         emit dataChanged(idx, idx, {TextRole});
+    }
+    emit assistantMessageDelta(chunk.id, chunk.text);
+    if (chunk.last) {
+        emit assistantMessageEnded(chunk.id);
     }
     if (m_pending.isEmpty()) {
         m_streamTimer->stop();

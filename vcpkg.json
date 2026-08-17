@@ -11,6 +11,7 @@
     },
     "qtdeclarative",
     "qtquickcontrols2",
+    "qtwebsockets",
     "msgpack"
   ]
 }

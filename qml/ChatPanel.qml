@@ -33,6 +33,14 @@ Rectangle {
 
     ChatModel { id: chatModel }
 
+    // Mirrors this panel's session to LAN subscribers over ws://, but only
+    // while the panel is open — `active` binds the server's listen lifecycle to
+    // visibility, so no port is held when chat isn't in use.
+    SessionMirrorServer {
+        source: chatModel
+        active: panel.visible
+    }
+
     // Left divider between the grid and the panel.
     Rectangle {
         id: divider

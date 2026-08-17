@@ -13,7 +13,7 @@ option(QVIM_ENABLE_ASAN "Build with MSVC AddressSanitizer" OFF)
 option(QVIM_WERROR "Treat qvim's own compiler warnings as errors (CI gate)" OFF)
 option(BUILD_TESTING "Build the test suites" ON)
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickTest Test)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickTest Test WebSockets)
 find_package(msgpack-cxx CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.10)
@@ -73,6 +73,8 @@ set(QVIM_LIB_SOURCES
     src/RectNodePool.cpp        include/RectNodePool.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
+    src/SessionEventLog.cpp     include/SessionEventLog.h
+    src/SessionMirrorServer.cpp include/SessionMirrorServer.h
     src/TablineModel.cpp        include/TablineModel.h
     src/TextNodePool.cpp        include/TextNodePool.h
     src/WindowChrome.cpp        include/WindowChrome.h
@@ -86,6 +88,7 @@ target_link_libraries(qvim_lib
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
+        Qt6::WebSockets
         msgpack-cxx
 )
 target_link_libraries(qvim_lib PRIVATE $<$<PLATFORM_ID:Windows>:dwmapi>)
@@ -159,6 +162,7 @@ Qml2Imports = .
         Qt6QmlModels
         Qt6QmlWorkerScript
         Qt6Quick
+        Qt6WebSockets
     )
     set(QVIM_QT_DLL_PATHS "")
     foreach(_qtdll ${QVIM_QT_RUNTIME_DLLS})
