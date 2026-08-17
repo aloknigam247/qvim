@@ -31,9 +31,6 @@
 .PARAMETER Port
     TCP port for the echo server + adb reverse tunnel. Default 8765.
 
-.PARAMETER PythonExe
-    Python launcher to use for the echo server. Default "python".
-
 .EXAMPLE
     pwsh -NoProfile -File android\scripts\e2e-device.ps1
     pwsh -NoProfile -File android\scripts\e2e-device.ps1 -SkipBuild
@@ -42,8 +39,7 @@
 param(
     [switch] $SkipBuild,
     [string] $DeviceSerial,
-    [int]    $Port = 8765,
-    [string] $PythonExe = "python"
+    [int]    $Port = 8765
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,7 +56,7 @@ $Package     = "com.qvim.companion"
 $Activity    = "$Package/.MainActivity"
 
 $RunId       = [guid]::NewGuid().ToString("N").Substring(0, 8)
-$DeviceUiXml = "/sdcard/qvim-ui-$RunId.xml"
+$DeviceUiXml = "/sdcard/qvim-ui.xml"
 
 if (-not (Test-Path $Adb)) { throw "adb not found at $Adb. Set ANDROID_HOME." }
 
@@ -208,8 +204,8 @@ try {
     Invoke-Adb install -r $Apk | Out-Host
 
     # 3. Echo-server preflight + reverse tunnel.
-    & $PythonExe -c "import websockets" 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "Python 'websockets' not installed. Run: $PythonExe -m pip install -r `"$EchoDir\requirements.txt`"" }
+    & python -c "import websockets" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Python 'websockets' not installed. Run: python -m pip install -r `"$EchoDir\requirements.txt`"" }
     Invoke-Adb reverse "tcp:$Port" "tcp:$Port" | Out-Null
     $reverseAdded = $true
 
@@ -224,7 +220,7 @@ try {
     # ---------------------------------------------------------------------------
     Write-Host "Starting echo server..." -ForegroundColor Cyan
     $echoLog = Join-Path $env:TEMP "qvim-echo-$RunId.log"
-    $echoProc = Start-Process -FilePath $PythonExe -ArgumentList "echo_ws.py" `
+    $echoProc = Start-Process -FilePath "python" -ArgumentList "echo_ws.py" `
         -WorkingDirectory $EchoDir -PassThru -NoNewWindow `
         -RedirectStandardOutput $echoLog -RedirectStandardError "$echoLog.err"
     $up = $false

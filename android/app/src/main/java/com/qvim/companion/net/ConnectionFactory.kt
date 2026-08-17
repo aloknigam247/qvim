@@ -3,7 +3,7 @@ package com.qvim.companion.net
 import okhttp3.Request
 
 /**
- * Builds the OkHttp [Request] that opens the session-mirror socket, mapping the ws(s)
+ * Builds the OkHttp [Request] that opens the session socket, mapping the ws(s)
  * endpoint to the http(s) URL OkHttp's HttpUrl requires. Kept as a seam so request
  * construction (auth headers, wss upgrade) can change without touching call sites.
  */

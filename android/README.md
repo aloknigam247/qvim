@@ -1,8 +1,8 @@
 # qvim companion (Android)
 
 A minimal Android client that mirrors a qvim chat session over a plaintext WebSocket. This is the
-skeleton slice (issue #48) of the #29 epic: connect, see the transcript, send input, watch the echo
-reply stream back. No discovery, auth, encryption, or resume yet — those are later slices (#50–#54).
+skeleton slice: connect, see the transcript, send input, watch the echo reply stream back. No
+discovery, auth, encryption, or resume yet — those are later slices.
 
 ## What it does
 
@@ -10,7 +10,7 @@ reply stream back. No discovery, auth, encryption, or resume yet — those are l
 - Renders the chat transcript: atomic `user` messages and streamed `assistant` replies.
 - Sends what you type as an `input` frame; the server echoes `Echo: <text>` back in chunks.
 
-The wire contract lives in [`docs/protocol/session-mirror.md`](../docs/protocol/session-mirror.md).
+The wire contract lives in [`docs/protocol/session-protocol.md`](../docs/protocol/session-protocol.md).
 
 ## Layout
 
@@ -29,7 +29,7 @@ android/
     src/test/java/com/qvim/companion/   # ProtocolTest, ChatReducerTest (pure JVM)
     src/debug/                # debug-only cleartext network-security config
   scripts/e2e-device.ps1      # on-demand adb-driven device E2E suite
-  tools/echo-server/          # Python dev stand-in for the qvim mirror (#49)
+  tools/echo-server/          # Python dev stand-in for the qvim session mirror
 ```
 
 ## Prerequisites (headless — no Android Studio)
@@ -63,7 +63,7 @@ From `android/`:
 
 ## Run against the dev echo server
 
-The real session mirror is issue #49; until then, use the Python stand-in. On the PC:
+The real session mirror lives on the qvim desktop side; until then, use the Python stand-in. On the PC:
 
 ```pwsh
 cd android\tools\echo-server
@@ -126,4 +126,4 @@ attached, or `-Port` / `-PythonExe` to override defaults.
 
 The app talks plaintext `ws://` on purpose for this slice. Cleartext is enabled **only** in the debug
 manifest (`src/debug`) via a network-security config; the release manifest has no such allowance.
-Encryption (`wss://`) is issue #54.
+Encryption (`wss://`) is a later slice.

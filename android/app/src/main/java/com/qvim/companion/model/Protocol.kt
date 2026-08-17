@@ -11,7 +11,7 @@ import kotlinx.serialization.json.longOrNull
 
 /**
  * Wire protocol for the qvim session mirror. The canonical contract lives in
- * docs/protocol/session-mirror.md; this file is the Kotlin client half.
+ * docs/protocol/session-protocol.md; this file is the Kotlin client half.
  *
  * Frames are decoded by hand off the "type" discriminator rather than via
  * polymorphic serialization so an unknown or newer "type" degrades to

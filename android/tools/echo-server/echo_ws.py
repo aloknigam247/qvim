@@ -3,7 +3,7 @@
 
 A stand-in for the real qvim session mirror, used to exercise the Android client
 end-to-end before the C++ server exists. It speaks the wire protocol in
-docs/protocol/session-mirror.md and mimics qvim's ChatModel: on each `input` it
+docs/protocol/session-protocol.md and mimics qvim's ChatModel: on each `input` it
 appends an atomic `user` message, then streams an `assistant` "Echo: <text>" reply
 via message.begin/delta*/end with a monotonically increasing seq.
 
