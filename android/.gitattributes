@@ -1,0 +1,7 @@
+# Keep the Gradle wrapper scripts with correct, stable line endings regardless of
+# the checkout platform's autocrlf setting. gradlew is a POSIX shell script and
+# must stay LF; the .bat launcher must stay CRLF.
+gradlew        text eol=lf
+*.sh           text eol=lf
+*.bat          text eol=crlf
+gradle-wrapper.jar binary

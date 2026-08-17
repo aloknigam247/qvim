@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose supplies the real UI theme via MaterialTheme; the platform theme
+         only needs to drop the action bar and system window decorations. Using the
+         platform Material theme avoids pulling in the AppCompat/Material XML deps. -->
+    <style name="Theme.QvimCompanion" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

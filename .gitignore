@@ -19,3 +19,13 @@ qml/.qmlls.ini
 qtquickcontrols2.conf
 tmp/
 .worktree/
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/local.properties
+android/app/build/
+*.apk
+*.aab
+*.keystore
+__pycache__/

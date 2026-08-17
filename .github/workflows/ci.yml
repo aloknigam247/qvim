@@ -1,9 +1,15 @@
 name: CI
 
 on:
+  # paths-ignore skips a run only when every changed file matches, so a mixed PR
+  # still runs this pipeline. android/ has no C++/Qt/QML surface and builds separately.
   pull_request:
+    paths-ignore:
+      - "android/**"
   push:
     branches: [main]
+    paths-ignore:
+      - "android/**"
 
 # A newer push to the same ref cancels the in-flight run - no point burning a
 # ~hours-long cold Qt build on a commit that has already been superseded.
