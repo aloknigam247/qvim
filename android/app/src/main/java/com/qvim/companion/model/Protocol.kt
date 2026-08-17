@@ -14,9 +14,8 @@ import kotlinx.serialization.json.longOrNull
  * docs/protocol/session-mirror.md; this file is the Kotlin client half.
  *
  * Frames are decoded by hand off the "type" discriminator rather than via
- * polymorphic serialization so an unknown/newer "type" degrades to [ServerFrame.Unknown]
- * instead of throwing — that is what keeps this client forward-compatible with the
- * resume (#51/#52), discovery (#50), auth (#53) and encryption (#54) slices.
+ * polymorphic serialization so an unknown or newer "type" degrades to
+ * [ServerFrame.Unknown] instead of throwing, keeping the client forward-compatible.
  */
 
 /** Client -> server: the user typed a message into the session. */
@@ -24,9 +23,9 @@ import kotlinx.serialization.json.longOrNull
 data class Input(val type: String = "input", val text: String)
 
 /**
- * Client -> server: resume handshake, sent after the server's hello. In this slice
- * lastSeq is always 0 and the server does not replay; the field is fixed now so #51
- * can add server-side replay without a wire change.
+ * Client -> server: resume handshake, sent after the server's hello. lastSeq is
+ * always 0 here and the server does not replay; the field exists so server-side
+ * replay can be added later without a wire change.
  */
 @Serializable
 data class Resume(val type: String = "resume", val lastSeq: Long, val sessionId: String? = null)

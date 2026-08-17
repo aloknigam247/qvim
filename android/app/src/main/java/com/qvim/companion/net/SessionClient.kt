@@ -19,9 +19,8 @@ enum class ConnectionState { Disconnected, Connecting, Connected }
 /**
  * Thin OkHttp WebSocket wrapper. [frames] opens a connection and emits decoded
  * [ServerFrame]s; collecting it drives the socket's lifetime (cancel the collector to
- * close). There is deliberately NO automatic reconnect in this slice — auto-reconnect
- * with resume/dedup is issue #52. Each connection is tagged with a generation so that
- * callbacks from a socket superseded by a newer connect are ignored.
+ * close). There is deliberately NO automatic reconnect. Each connection is tagged with
+ * a generation so callbacks from a socket superseded by a newer connect are ignored.
  */
 class SessionClient(
     private val factory: ConnectionFactory = PlainConnectionFactory(),

@@ -1,11 +1,8 @@
 name: CI
 
 on:
-  # This workflow is the C++/Qt qvim build (a cold Qt compile is ~1-3 h). The
-  # Android companion app under android/ has no C++/Qt/QML surface, so a change
-  # confined to it must not trigger this pipeline. android/ gets its own
-  # workflow (see #55). paths-ignore only skips a run when EVERY changed file
-  # matches, so a mixed PR still runs qvim CI.
+  # paths-ignore skips a run only when every changed file matches, so a mixed PR
+  # still runs this pipeline. android/ has no C++/Qt/QML surface and builds separately.
   pull_request:
     paths-ignore:
       - "android/**"

@@ -38,8 +38,7 @@ class ChatViewModel(
 
     /**
      * (Re)connect. Cancels any prior connection and clears transient transcript state
-     * first, so an explicit reconnect can never duplicate history (auto-reconnect with
-     * replay-based dedup is #52).
+     * first, so an explicit reconnect can never duplicate history.
      */
     fun connect() {
         collectJob?.cancel()

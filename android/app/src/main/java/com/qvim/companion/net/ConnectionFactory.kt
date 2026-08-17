@@ -3,10 +3,9 @@ package com.qvim.companion.net
 import okhttp3.Request
 
 /**
- * Builds the OkHttp [Request] used to open the session-mirror socket. This is the
- * seam later slices extend without touching call sites: #53 adds an Authorization
- * header here, #54 switches ws:// -> wss://. Today it just maps the ws(s) endpoint to
- * the http(s) URL OkHttp's HttpUrl requires.
+ * Builds the OkHttp [Request] that opens the session-mirror socket, mapping the ws(s)
+ * endpoint to the http(s) URL OkHttp's HttpUrl requires. Kept as a seam so request
+ * construction (auth headers, wss upgrade) can change without touching call sites.
  */
 fun interface ConnectionFactory {
     fun requestFor(endpoint: String): Request
