@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use when the user wants to triage a task/bug/idea into a well-formed GitHub issue for a future agent to implement. Discusses the task, investigates what needs doing and where, classifies it, and creates a GitHub issue only after the user accepts. Trigger phrases include "triage", "triage this", "create an issue", "file an issue", "turn this into a task", "raise a ticket".
+description: Use when the user wants to triage a task/bug/idea into a well-formed GitHub issue for a future agent to implement. Discusses the task, investigates what needs doing and where, checks existing issues for duplicates (and warns) and related issues (and links them), classifies it — labelling investigation-only work `spike` — and creates a GitHub issue only after the user accepts. Trigger phrases include "triage", "triage this", "create an issue", "file an issue", "turn this into a task", "raise a ticket".
 ---
 
 # Triage
@@ -10,6 +10,7 @@ Turn a rough task, bug, or idea into a **well-formed GitHub issue** that a *diff
 ## Principles
 
 - **Discuss first, create last.** Never run `gh issue create` until the user has reviewed the drafted issue and explicitly accepted it.
+- **Check for duplicates and related issues first.** Before drafting, search the repo's existing issues (open *and* closed). If the task duplicates an existing issue, say so and steer the user away from filing a redundant one. If related-but-distinct issues exist, link them via GitHub's native issue relationships.
 - **Always rubber-duck the draft.** Every triage runs the rubber-duck agent over the drafted issue to catch flawed root causes, invariant violations, and weak tests *before* the user sees it.
 - **The issue is for another agent, at another time.** Write it as a self-contained task: enough context, file references, and acceptance criteria that an agent with zero conversation history can pick it up and implement it.
 - **Ask for missing details.** Do not guess when scope, expected behavior, or acceptance criteria are ambiguous.
@@ -64,7 +65,27 @@ The subagent must **return a structured report** containing:
 
 If the subagent returns `openQuestions`, resolve them with the user (via `ask_user`) before drafting the issue.
 
-### 3. Classify the task
+### 3. Check for duplicate and related issues
+
+Before classifying and drafting, search the repo's existing issues so the new issue isn't redundant and gets linked to anything relevant. Search **both open and closed** issues.
+
+1. Build a few search queries from the task's key terms — the affected component (e.g. `GridItem`, `InputHandler`, `CursorItem`), the symptom, and any distinctive keywords. Run them with `gh`:
+
+   ```pwsh
+   gh issue list --state all --search "<keywords>" --limit 20 --json number,title,state,url
+   # broader full-text search across the repo:
+   gh search issues --repo <owner>/<repo> "<keywords>" --state all --limit 20 --json number,title,state,url
+   ```
+
+2. Read the candidate issues (`gh issue view <n>`) closely enough to judge each one. Classify every genuine match as either:
+   - **Duplicate** — same root cause / same requested change. The new issue would be redundant.
+   - **Related** — distinct task, but overlapping area, dependency, blocker, or follow-up. Worth linking, not merging.
+
+3. **Handle duplicates.** If one or more open duplicates exist, **stop and inform the user** (via `ask_user`) with the issue number(s), title(s), and URL(s), and recommend *not* filing a new one — instead point them at the existing issue (add a comment/upvote there if they want). Only continue to draft a new issue if the user explicitly confirms it is meaningfully different. A closed issue covering the same thing is worth surfacing too (it may need reopening rather than a fresh issue).
+
+4. **Record related issues** for linking. Keep a list of `{number, title, url, relationship}` where `relationship` is a short reason (e.g. "blocked by", "follow-up to", "same subsystem"). These get linked from the drafted issue in step 5 using GitHub's native cross-reference relationships (`Related to #N`, `Blocked by #N`, `Part of #N`, `Follow-up to #N`), which surface in both issues' timelines.
+
+### 4. Classify the task
 
 Assign **one or more categories** from the fixed set below (these map 1:1 to GitHub labels):
 
@@ -78,19 +99,23 @@ Assign **one or more categories** from the fixed set below (these map 1:1 to Git
 | `chore`       | Maintenance, dependencies, cleanup              |
 | `performance` | Speed/memory/efficiency improvements            |
 | `tech-debt`   | Paying down accumulated shortcuts               |
+| `spike`       | Investigation/exploration only — no code or docs changes (research, feasibility, root-cause analysis) |
 
 Pick the categories that genuinely apply (usually one primary, occasionally a secondary such as `bug` + `tech-debt`).
 
-### 4. Draft the issue and present it for acceptance
+**Spike issues.** Apply the `spike` label when the task is purely investigation, exploration, or research whose deliverable is *findings* (a decision, a root-cause analysis, a feasibility answer, a proposed design) and that **does not itself change any source code or documentation**. A spike is `spike` *alone* — if the task is expected to also land a code/doc change, it is not a spike, use the matching category instead. Because a spike ships no code, the **Testing requirements** section of its issue is replaced by **Investigation deliverables** (the concrete questions to answer and the artifact/output the spike must produce, e.g. a written findings summary or a follow-up issue), and the **Acceptance criteria** are about the findings being produced, not about tests passing.
 
-1. Compose the issue **title** in Conventional Commit style: `<type>(scope): <short description>` (e.g., `fix(GridItem): cursor blink phase resets on nvim window event`). Use the component as the scope where it helps.
+### 5. Draft the issue and present it for acceptance
+
+1. Compose the issue **title** in Conventional Commit style: `<type>(scope): <short description>` (e.g., `fix(GridItem): cursor blink phase resets on nvim window event`). Use the component as the scope where it helps. For a spike, use `spike(scope): <question to answer>`.
 2. Compose the issue **body** with these sections (omit a section only if truly not applicable):
    - **Summary** — one or two sentences.
    - **Context / Background** — why this matters; the reported symptom or motivation; the affected layer(s). **Embed the relevant current code** as a fenced snippet (from the subagent's `codeSnippets`) with a `file:line` caption whenever feasible, so the future agent sees exactly what code the task refers to.
+   - **Related issues** — if step 3 found related-but-distinct issues, list each one using a GitHub cross-reference keyword so the relationship is recorded natively in both issues' timelines: `Related to #N`, `Blocked by #N`, `Part of #N`, or `Follow-up to #N` (one per line, with the short reason). Omit this section if there are none. Do **not** list duplicates here — duplicates are resolved with the user in step 3, not linked from a new redundant issue.
    - **Affected files & components** — bulleted list from the subagent's `affected` + `components`, with `file` -> `symbol` -> reason. Reference the "Layout" / "Where to extend" guidance in `AGENTS.md` where relevant.
    - **Proposed approach** — the subagent's `approach`, plus root cause for bugs. Call out any invariant that must **not** break (paint-path purity, per-frame cost, no `msgpack::object` copies, render-thread affinity, well-bracketed nvim keycodes).
-   - **Acceptance criteria** — a checklist of concrete, verifiable outcomes.
-   - **Testing requirements** — **always required.** Spell out the concrete test changes needed to add and/or validate the fix, so a future agent (or the user) can verify the change is done. Triaged issues are expected to include their tests as part of the fix — do **not** add a "tests only when explicitly requested" caveat here:
+   - **Acceptance criteria** — a checklist of concrete, verifiable outcomes. For a spike, these are about the findings being produced (questions answered, decision recorded, follow-up filed), not tests passing.
+   - **Testing requirements** — **required for any issue that changes code or docs.** Spell out the concrete test changes needed to add and/or validate the fix, so a future agent (or the user) can verify the change is done. Triaged issues are expected to include their tests as part of the fix — do **not** add a "tests only when explicitly requested" caveat here. **For a `spike` issue, replace this section with an _Investigation deliverables_ section** — a spike changes no code or docs, so it has no tests; instead list the concrete questions to answer and the artifact the spike must produce (a written findings summary, a decision, a follow-up implementation issue). For non-spike issues:
      - The exact test tier/target that maps to the changed source (Tier 1 `tests/unit/`, Tier 2 `tests/integration/`, or Tier 3 `tests/qml/`), and the test binary name where known (e.g., `test_input_handler`, `test_qml`).
      - **Existing tests that will break** and must be updated (name them, and say how).
      - **New test cases** that add/validate the fix — proposed test function/method names and the specific behavior/assertion each covers. Include a concrete **regression test code snippet** (fenced) that the future agent can drop in. Use `QSignalSpy` for redraw assertions and `dumpAscii()` for grid snapshots per repo convention.
@@ -107,14 +132,14 @@ Pick the categories that genuinely apply (usually one primary, occasionally a se
    - The instruction to report only substantive issues (bugs, logic/design flaws, missing coverage) — not style/wording nits.
 
    Act on the rubber-duck's findings: revise `tmp/triage-issue.md` (and re-run the investigation subagent if it surfaced a factual gap) until the substantive findings are resolved. Only then proceed to present the draft.
-5. Show a summary in chat including the proposed **title** and **categories/labels**, and note that the rubber-duck review passed.
+5. Show a summary in chat including the proposed **title**, **categories/labels**, and any **related issues** being linked, and note that the rubber-duck review passed.
 6. **Ask the user to accept, edit, or reject** using the `ask_user` tool (accept / edit / reject). If they choose "edit", let them edit `tmp/triage-issue.md` (and/or adjust categories) and wait for confirmation, then re-read the file.
 
-### 5. Create the GitHub issue — only if accepted
+### 6. Create the GitHub issue — only if accepted
 
-**Only run this step if the user accepted in step 4.** If rejected, delete `tmp/triage-issue.md` and stop.
+**Only run this step if the user accepted in step 5.** If rejected, delete `tmp/triage-issue.md` and stop.
 
-Use the bundled helper script — it derives the repo root, ensures each label exists (creating any that are missing), extracts the title from the first `# ` heading, writes the body to a git-ignored temp file, creates the issue assigned to `@me`, and prints the title and URL:
+Use the bundled helper script — it derives the repo root, ensures each label exists (creating any that are missing), extracts the title from the first `# ` heading, writes the body to a git-ignored temp file, creates the issue assigned to `@me`, and prints the title and URL. GitHub auto-links any `Related to #N` / `Blocked by #N` cross-references in the body at creation time, so no extra linking call is needed:
 
 ```ps1
 pwsh -NoProfile -ExecutionPolicy Bypass `
@@ -122,9 +147,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass `
   -Draft tmp/triage-issue.md -Label <cat1> -Label <cat2>
 ```
 
-Pass one `-Label` per chosen category. Then report the created issue URL to the user.
+Pass one `-Label` per chosen category (including `spike` when applicable). Then report the created issue URL to the user, and confirm the related-issue cross-references resolved.
 
-### 6. Cleanup
+### 7. Cleanup
 
 1. Delete `tmp/triage-issue.md` and any temp body file.
-2. Show a short summary: issue URL, title, and assigned categories/labels.
+2. Show a short summary: issue URL, title, assigned categories/labels, and any linked related issues.
