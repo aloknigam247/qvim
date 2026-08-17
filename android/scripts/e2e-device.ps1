@@ -55,7 +55,6 @@ $EchoDir     = Join-Path $AndroidRoot "tools\echo-server"
 $Package     = "com.qvim.companion"
 $Activity    = "$Package/.MainActivity"
 
-$RunId       = [guid]::NewGuid().ToString("N").Substring(0, 8)
 $DeviceUiXml = "/sdcard/qvim-ui.xml"
 
 if (-not (Test-Path $Adb)) { throw "adb not found at $Adb. Set ANDROID_HOME." }
@@ -146,9 +145,9 @@ function Hide-ImeIfShown {
 function Seed-Endpoint {
     param([string] $Url)
     $xml = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>`n<map>`n    <string name=`"endpoint`">$Url</string>`n</map>`n"
-    $tmp = Join-Path $env:TEMP "qvim-prefs-$RunId.xml"
+    $tmp = Join-Path $env:TEMP "qvim-prefs.xml"
     [IO.File]::WriteAllText($tmp, $xml)
-    $devTmp = "/data/local/tmp/qvim-prefs-$RunId.xml"
+    $devTmp = "/data/local/tmp/qvim-prefs.xml"
     Invoke-Adb push $tmp $devTmp | Out-Null
     Invoke-Adb shell "run-as $Package mkdir -p /data/data/$Package/shared_prefs" | Out-Null
     Invoke-Adb shell "run-as $Package cp $devTmp /data/data/$Package/shared_prefs/qvim.xml" | Out-Null
@@ -219,7 +218,7 @@ try {
     Write-Host "`n=== Case 1: positive (server up) ===" -ForegroundColor Yellow
     # ---------------------------------------------------------------------------
     Write-Host "Starting echo server..." -ForegroundColor Cyan
-    $echoLog = Join-Path $env:TEMP "qvim-echo-$RunId.log"
+    $echoLog = Join-Path $env:TEMP "qvim-echo.log"
     $echoProc = Start-Process -FilePath "python" -ArgumentList "echo_ws.py" `
         -WorkingDirectory $EchoDir -PassThru -NoNewWindow `
         -RedirectStandardOutput $echoLog -RedirectStandardError "$echoLog.err"
@@ -278,7 +277,7 @@ finally {
             Invoke-Adb shell settings put system accelerometer_rotation $origAutoRotate 2>$null | Out-Null
         }
     }
-    Get-ChildItem (Join-Path $env:TEMP "qvim-echo-$RunId.log*") -ErrorAction SilentlyContinue | Remove-Item -ErrorAction SilentlyContinue
+    Get-ChildItem (Join-Path $env:TEMP "qvim-echo.log*") -ErrorAction SilentlyContinue | Remove-Item -ErrorAction SilentlyContinue
 }
 
 # --- Verdict ---
