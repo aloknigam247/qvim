@@ -133,7 +133,13 @@ Pick the categories that genuinely apply (usually one primary, occasionally a se
 
    Act on the rubber-duck's findings: revise `tmp/triage-issue.md` (and re-run the investigation subagent if it surfaced a factual gap) until the substantive findings are resolved. Only then proceed to present the draft.
 5. Show a summary in chat including the proposed **title**, **categories/labels**, and any **related issues** being linked, and note that the rubber-duck review passed.
-6. **Ask the user to accept, edit, or reject** using the `ask_user` tool (accept / edit / reject). If they choose "edit", let them edit `tmp/triage-issue.md` (and/or adjust categories) and wait for confirmation, then re-read the file.
+6. **Always open the rendered draft with mdview before asking the user to accept.** Launch the viewer on the draft so the user reviews the formatted markdown, not the raw file:
+
+   ```pwsh
+   D:\mdview\target\release\mdview.exe tmp/triage-issue.md
+   ```
+
+7. **Ask the user to accept, edit, or reject** using the `ask_user` tool (accept / edit / reject). If they choose "edit", let them edit `tmp/triage-issue.md` (and/or adjust categories) and wait for confirmation, then re-read the file **and reopen it with mdview** (same command as above) so the user reviews the modified draft before being asked again. Repeat the reopen-on-modification loop until the user accepts or rejects.
 
 ### 6. Create the GitHub issue — only if accepted
 
