@@ -9,7 +9,7 @@
 #include <qqmlregistration.h>
 
 #include "ChatModel.h"
-#include "SessionEventLog.h"
+#include "SessionEventBuffer.h"
 
 class QWebSocket;
 class QWebSocketServer;
@@ -17,7 +17,7 @@ class QWebSocketServer;
 namespace qvim {
 
 // In-process plaintext WebSocket endpoint that mirrors qvim's chat session to
-// LAN subscribers, backed by SessionEventLog. Implements the v1 wire protocol in
+// LAN subscribers, backed by SessionEventBuffer. Implements the v1 wire protocol in
 // docs/protocol/session-protocol.md: on connect the server sends `hello` first;
 // the client replies `resume`; the server then streams live events.
 //
@@ -87,11 +87,11 @@ private:
 
     void sendHello(QWebSocket* client);
     void handleInput(const QString& text);
-    void logAndBroadcast(QJsonObject frame);
+    void bufferAndBroadcast(QJsonObject frame);
     void broadcast(const QByteArray& payload);
 
     QWebSocketServer*   m_server = nullptr;
-    SessionEventLog     m_log;
+    SessionEventBuffer  m_buffer;
     QString             m_sessionId;
     QPointer<ChatModel> m_source;
     QSet<QWebSocket*>   m_clients; // all accepted sockets

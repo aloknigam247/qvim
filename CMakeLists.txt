@@ -73,7 +73,7 @@ set(QVIM_LIB_SOURCES
     src/RectNodePool.cpp        include/RectNodePool.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
-    src/SessionEventLog.cpp     include/SessionEventLog.h
+    src/SessionEventBuffer.cpp  include/SessionEventBuffer.h
     src/SessionMirrorServer.cpp include/SessionMirrorServer.h
     src/TablineModel.cpp        include/TablineModel.h
     src/TextNodePool.cpp        include/TextNodePool.h

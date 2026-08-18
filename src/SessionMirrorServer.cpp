@@ -10,7 +10,7 @@ namespace qvim {
 
 namespace {
 constexpr int kProtocolVersion = 1;
-// Cap on a single client input so one frame can't make a logged event
+// Cap on a single client input so one frame can't make a buffered event
 // arbitrarily large from untrusted LAN input.
 constexpr int kMaxInputChars = 4096;
 
@@ -150,7 +150,7 @@ void SessionMirrorServer::onSocketDisconnected() {
 
 void SessionMirrorServer::onUserMessage(const QString& id, const QString& text) {
     if (!m_active) return;
-    logAndBroadcast(QJsonObject{
+    bufferAndBroadcast(QJsonObject{
         {QStringLiteral("type"), QStringLiteral("message")},
         {QStringLiteral("id"), id},
         {QStringLiteral("role"), QStringLiteral("user")},
@@ -160,7 +160,7 @@ void SessionMirrorServer::onUserMessage(const QString& id, const QString& text) 
 
 void SessionMirrorServer::onAssistantBegin(const QString& id) {
     if (!m_active) return;
-    logAndBroadcast(QJsonObject{
+    bufferAndBroadcast(QJsonObject{
         {QStringLiteral("type"), QStringLiteral("message.begin")},
         {QStringLiteral("id"), id},
         {QStringLiteral("role"), QStringLiteral("assistant")},
@@ -169,7 +169,7 @@ void SessionMirrorServer::onAssistantBegin(const QString& id) {
 
 void SessionMirrorServer::onAssistantDelta(const QString& id, const QString& text) {
     if (!m_active) return;
-    logAndBroadcast(QJsonObject{
+    bufferAndBroadcast(QJsonObject{
         {QStringLiteral("type"), QStringLiteral("message.delta")},
         {QStringLiteral("id"), id},
         {QStringLiteral("text"), text},
@@ -178,14 +178,14 @@ void SessionMirrorServer::onAssistantDelta(const QString& id, const QString& tex
 
 void SessionMirrorServer::onAssistantEnd(const QString& id) {
     if (!m_active) return;
-    logAndBroadcast(QJsonObject{
+    bufferAndBroadcast(QJsonObject{
         {QStringLiteral("type"), QStringLiteral("message.end")},
         {QStringLiteral("id"), id},
     });
 }
 
 void SessionMirrorServer::sendHello(QWebSocket* client) {
-    // `hello` carries no `seq` and is not logged.
+    // `hello` carries no `seq` and is not buffered.
     const QJsonObject hello{
         {QStringLiteral("type"), QStringLiteral("hello")},
         {QStringLiteral("protocol"), kProtocolVersion},
@@ -204,8 +204,8 @@ void SessionMirrorServer::handleInput(const QString& text) {
     m_source->submit(trimmed);
 }
 
-void SessionMirrorServer::logAndBroadcast(QJsonObject frame) {
-    const LoggedEvent event = m_log.append(std::move(frame));
+void SessionMirrorServer::bufferAndBroadcast(QJsonObject frame) {
+    const BufferedEvent event = m_buffer.append(std::move(frame));
     broadcast(event.json);
 }
 

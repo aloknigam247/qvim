@@ -50,7 +50,7 @@ qvim_add_test(test_resize_coalescer    unit/test_resize_coalescer.cpp)
 qvim_add_test(test_rounded_highlight   unit/test_rounded_highlight.cpp)
 qvim_add_test(test_scroll_perf_micro   unit/test_scroll_perf_micro.cpp)
 qvim_add_test(test_session_cache       unit/test_session_cache.cpp)
-qvim_add_test(test_session_event_log   unit/test_session_event_log.cpp)
+qvim_add_test(test_session_event_buffer unit/test_session_event_buffer.cpp)
 qvim_add_test(test_text_node_pool      unit/test_text_node_pool.cpp)
 
 # test_app_icon constructs QGuiApplication and needs the qico imageformat
