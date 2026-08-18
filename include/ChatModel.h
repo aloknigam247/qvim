@@ -51,6 +51,16 @@ public:
 signals:
     void countChanged();
 
+    // Session-mirror taps. These describe the same turn the model rows do, but
+    // as an ordered event stream a subscriber (SessionMirrorServer) can forward
+    // verbatim: the user block is atomic (userMessageAdded), the assistant reply
+    // is a begin / delta* / end sequence. Ids are stable per turn (`u<n>` /
+    // `a<n>`) so a client can attribute streamed deltas to the right block.
+    void userMessageAdded(const QString& id, const QString& text);
+    void assistantMessageBegan(const QString& id);
+    void assistantMessageDelta(const QString& id, const QString& text);
+    void assistantMessageEnded(const QString& id);
+
 private:
     enum class Author { User, Assistant };
 
@@ -61,9 +71,13 @@ private:
 
     // A queued streaming fragment carries its target row so a second submit()
     // arriving mid-stream can never append chunks to the wrong assistant block.
+    // `id` is the assistant block's session id and `last` marks the final chunk
+    // of a turn, so streamTick() can emit the matching delta / end taps.
     struct Chunk {
         int     row;
+        QString id;
         QString text;
+        bool    last;
     };
 
     void appendMessage(Author author, const QString& text);
@@ -75,6 +89,7 @@ private:
     QVector<Message> m_msgs;
     QQueue<Chunk>    m_pending;
     QTimer*          m_streamTimer = nullptr;
+    quint64          m_turn        = 0; // per-turn id counter for session taps
 };
 
 } // namespace qvim
