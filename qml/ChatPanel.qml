@@ -37,8 +37,17 @@ Rectangle {
     // while the panel is open — `active` binds the server's listen lifecycle to
     // visibility, so no port is held when chat isn't in use.
     SessionMirrorServer {
+        id: mirror
         source: chatModel
         active: panel.visible
+    }
+
+    // Advertises the mirror endpoint over mDNS/DNS-SD so the companion app finds
+    // it without a hard-coded host:port. Bound to the actually-listening port and
+    // gated on the same visibility, so the announcement tracks the listen socket.
+    MdnsAdvertiser {
+        port: mirror.boundPort
+        active: panel.visible && mirror.boundPort !== 0
     }
 
     // Left divider between the grid and the panel.

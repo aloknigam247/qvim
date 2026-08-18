@@ -80,6 +80,7 @@ void SessionMirrorServer::startListening() {
         qWarning("qvim: session mirror failed to listen on ws://%s:%d", qPrintable(m_address),
                  m_port);
     }
+    emit boundPortChanged();
 }
 
 void SessionMirrorServer::stopListening() {
@@ -96,6 +97,7 @@ void SessionMirrorServer::stopListening() {
     }
     m_clients.clear();
     m_ready.clear();
+    emit boundPortChanged();
 }
 
 void SessionMirrorServer::onNewConnection() {

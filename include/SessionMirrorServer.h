@@ -43,6 +43,7 @@ class SessionMirrorServer : public QObject {
     Q_PROPERTY(bool active READ isActive WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(int port READ port WRITE setPort NOTIFY portChanged)
     Q_PROPERTY(QString address READ address WRITE setAddress NOTIFY addressChanged)
+    Q_PROPERTY(quint16 boundPort READ serverPort NOTIFY boundPortChanged)
 
 public:
     explicit SessionMirrorServer(QObject *parent = nullptr);
@@ -71,6 +72,7 @@ signals:
     void activeChanged();
     void portChanged();
     void addressChanged();
+    void boundPortChanged();
 
 private:
     void onNewConnection();

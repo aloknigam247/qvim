@@ -58,3 +58,38 @@ streamed chunks to the right author. The streamed `begin`/`delta`*/`end` shape m
 {"type":"resume","lastSeq":0,"sessionId":null}
 {"type":"input","text":"hi"}
 ```
+
+## Discovery
+
+The client finds qvim on the local network via **mDNS / DNS-SD** — no IP address is typed by hand on
+the common path. qvim advertises the running session-mirror WebSocket, the client browses for it and
+auto-connects to the first responder.
+
+| field         | value                                                        |
+| ------------- | ----------------------------------------------------------- |
+| service type  | `_qvim-mirror._tcp` (DNS-SD service type, `.local` domain)  |
+| port          | the TCP port the mirror WebSocket is bound to (e.g. `8765`) |
+| transport     | plaintext `ws://<host>:<port>` (same as above)              |
+
+- **qvim (server)** advertises `_qvim-mirror._tcp` on Windows via the native `DnsServiceRegister`
+  API while the chat panel is visible and the mirror is listening on a non-zero port. The
+  advertisement is withdrawn when the panel closes, the port changes (it re-advertises), or qvim
+  exits.
+- **Android (client)** browses `_qvim-mirror._tcp` with `NsdManager`, resolves the first result to
+  `host:port`, and forms `ws://host:port`. IPv6 hosts are bracketed (`ws://[fe80::1]:8765`).
+
+Discovery is **LAN-only** by design: mDNS uses link-local multicast (`224.0.0.251:5353`, not routed
+across subnets). Off-LAN reach (e.g. over Tailscale) is out of scope for this slice — for that,
+enter the endpoint manually, which always wins over discovery.
+
+### Firewall
+
+Both hosts must allow:
+
+- **UDP 5353** (mDNS multicast) inbound/outbound on the local network — for the discovery exchange.
+- **TCP `<port>`** (the mirror WebSocket, e.g. `8765`) inbound on qvim's host — for the connection
+  itself.
+
+On Windows, allow qvim through the firewall for **Private** networks when first prompted; a blocked
+UDP 5353 means the phone never sees the advertisement even though the WebSocket port is open.
+
