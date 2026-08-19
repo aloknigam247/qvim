@@ -1,5 +1,5 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
@@ -16,7 +16,7 @@ private slots:
 
         const int initial = conn.tabline()->rowCount();
         conn.command(QStringLiteral("tabnew"));
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
 
         // ext_tabline is disabled in NvimConnector::attachUi (diagnostic
         // mode); without it nvim renders the tabline on the grid and never

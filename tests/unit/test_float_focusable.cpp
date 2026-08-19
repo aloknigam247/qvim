@@ -20,7 +20,7 @@ private slots:
         g.resize(2, 10, 5);
         g.setPos(2, 0, 0, 10, 5);
         QVERIFY(g.gridIsFocusable(2));
-        const auto* proxy = g.surfaceFor(2);
+        const auto *proxy = g.surfaceFor(2);
         QVERIFY(proxy);
         QVERIFY(proxy->isFocusable());
         QVERIFY(!proxy->isFloat());
@@ -33,7 +33,7 @@ private slots:
                       /*focusable*/ true, /*zindex*/ 50);
         QVERIFY(g.gridIsFloat(3));
         QVERIFY(g.gridIsFocusable(3));
-        const auto* proxy = g.surfaceFor(3);
+        const auto *proxy = g.surfaceFor(3);
         QVERIFY(proxy);
         QVERIFY(proxy->isFloat());
         QVERIFY(proxy->isFocusable());
@@ -45,7 +45,7 @@ private slots:
         g.setFloatPos(4, 1, 2, 3, /*focusable*/ false, /*zindex*/ 50);
         QVERIFY(g.gridIsFloat(4));
         QVERIFY(!g.gridIsFocusable(4));
-        const auto* proxy = g.surfaceFor(4);
+        const auto *proxy = g.surfaceFor(4);
         QVERIFY(proxy);
         QVERIFY(proxy->isFloat());
         QVERIFY(!proxy->isFocusable());
@@ -57,7 +57,7 @@ private slots:
         GridModel g;
         g.resize(5, 10, 5);
         g.setFloatPos(5, 1, 2, 3, /*focusable*/ true, 50);
-        auto* proxy = g.surfaceFor(5);
+        auto *proxy = g.surfaceFor(5);
         QVERIFY(proxy);
         QSignalSpy spy(proxy, &GridSurfaceProxy::focusableChanged);
         g.setFloatPos(5, 1, 2, 3, /*focusable*/ false, 50);

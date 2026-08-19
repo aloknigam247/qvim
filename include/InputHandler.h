@@ -11,16 +11,16 @@ class InputHandler {
 public:
     // Translate a Qt key event to a Neovim keycode string. Empty result means
     // "no input to send" (e.g., bare modifier press).
-    static QString keyToNvim(QKeyEvent* ev);
+    static QString keyToNvim(QKeyEvent *ev);
 
     // Translate a mouse event into nvim_input_mouse arguments.
     struct MouseInput {
         QString button;
         QString action;
         QString modifier;
-        bool    valid = false;
+        bool valid = false;
     };
-    static MouseInput mouseFor(QMouseEvent* ev, QEvent::Type type);
+    static MouseInput mouseFor(QMouseEvent *ev, QEvent::Type type);
 
     // Translate a wheel event's angleDelta into nvim_input_mouse arguments.
     // The dominant axis wins; ties resolve to vertical. Returns an invalid

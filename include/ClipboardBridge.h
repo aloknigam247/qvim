@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QObject>
-#include <QString>
-#include <qqmlregistration.h>
-#include <msgpack.hpp>
 #include "MsgpackRpc.h"
+#include <msgpack.hpp>
+#include <QObject>
+#include <qqmlregistration.h>
+#include <QString>
 
 namespace qvim {
 
@@ -15,20 +15,20 @@ class ClipboardBridge : public QObject {
     QML_ELEMENT
 
 public:
-    explicit ClipboardBridge(QObject* parent = nullptr);
+    explicit ClipboardBridge(QObject *parent = nullptr);
 
-    void attachTo(NvimConnector* conn);
+    void attachTo(NvimConnector *conn);
 
 public slots:
     void pasteFromClipboard();
 
 private slots:
-    void onCustomNotification(const qvim::Notification& note);
+    void onCustomNotification(const qvim::Notification &note);
 
 private:
     void installYankAutocmd();
 
-    NvimConnector* m_conn = nullptr;
+    NvimConnector *m_conn = nullptr;
 };
 
 } // namespace qvim

@@ -19,6 +19,6 @@ struct QvimArgs {
 // and the reserved `--qvim-*` namespace. Everything else (including vim-style
 // options like `-O`, `+10`, `-c "set number"`, and bare file paths) is
 // forwarded verbatim to the embedded `nvim --embed` after `--embed`.
-QvimArgs parseArgv(int argc, char** argv);
+QvimArgs parseArgv(int argc, char **argv);
 
 } // namespace qvim

@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QSignalSpy>
+#include <QtTest>
 
 #include "Config.h"
 
@@ -66,7 +66,7 @@ private slots:
         cfg.registerOption(QStringLiteral("alpha"), ConfigType::Int, 0);
         cfg.registerOption(QStringLiteral("mu"), ConfigType::String, QString());
         const QStringList n = cfg.registeredNames();
-        QCOMPARE(n, (QStringList{ "alpha", "mu", "zeta" }));
+        QCOMPARE(n, QStringList{ "alpha", "mu", "zeta" });
     }
 };
 

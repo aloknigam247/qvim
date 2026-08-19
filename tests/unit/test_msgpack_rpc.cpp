@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <msgpack.hpp>
+#include <QtTest>
 
 #include "MsgpackRpc.h"
 
@@ -14,14 +14,14 @@ private slots:
         msgpack::sbuffer buf;
         msgpack::packer<msgpack::sbuffer> pk(&buf);
         pk.pack_array(3);
-        pk.pack(2);                            // notification
+        pk.pack(2); // notification
         pk.pack(std::string("nvim_input"));
         pk.pack_array(1);
         pk.pack(std::string("iabc<Esc>"));
 
         msgpack::object_handle h;
         msgpack::unpack(h, buf.data(), buf.size());
-        const auto& a = h.get().via.array;
+        const auto &a = h.get().via.array;
         QCOMPARE(static_cast<int>(a.size), 3);
         QCOMPARE(a.ptr[0].as<int>(), 2);
         QCOMPARE(QString::fromStdString(a.ptr[1].as<std::string>()), QStringLiteral("nvim_input"));
@@ -33,17 +33,15 @@ private slots:
     void rpcNotRunningRejectsRequest() {
         MsgpackRpc rpc;
         bool called = false;
-        std::expected<msgpack::object_handle, RpcError> received{std::in_place};
-        rpc.request(QStringLiteral("nvim_eval"),
-            [](msgpack::packer<msgpack::sbuffer>& pk) {
-                pk.pack_array(1);
-                pk.pack(std::string("1"));
-            },
-            [&](RpcResult r) {
-                called = true;
-                QVERIFY(!r);
-                QVERIFY(r.error().message.contains(QStringLiteral("not running")));
-            });
+        std::expected<msgpack::object_handle, RpcError> received{ std::in_place };
+        rpc.request(QStringLiteral("nvim_eval"), [](msgpack::packer<msgpack::sbuffer> &pk) {
+            pk.pack_array(1);
+            pk.pack(std::string("1"));
+        }, [&](RpcResult r) {
+            called = true;
+            QVERIFY(!r);
+            QVERIFY(r.error().message.contains(QStringLiteral("not running")));
+        });
         QVERIFY(called);
     }
 
@@ -54,10 +52,10 @@ private slots:
         msgpack::sbuffer buf;
         msgpack::packer<msgpack::sbuffer> pk(&buf);
         pk.pack_array(4);
-        pk.pack(1);          // response
+        pk.pack(1);            // response
         pk.pack(uint32_t(42)); // msgid
-        pk.pack_nil();       // no error
-        pk.pack_array(0);    // empty result
+        pk.pack_nil();         // no error
+        pk.pack_array(0);      // empty result
 
         msgpack::object_handle h;
         msgpack::unpack(h, buf.data(), buf.size());

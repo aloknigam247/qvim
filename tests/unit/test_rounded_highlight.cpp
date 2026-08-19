@@ -19,12 +19,12 @@
 // the pill colour) before asserting what colour the cutout is. Without that
 // guard a mis-aimed probe would pass silently.
 
-#include <QtTest>
+#include <msgpack.hpp>
 #include <QColor>
 #include <QGuiApplication>
 #include <QImage>
 #include <QScreen>
-#include <msgpack.hpp>
+#include <QtTest>
 
 #include "support/QuickRasterizer.h"
 
@@ -37,24 +37,33 @@ using namespace qvim;
 
 namespace {
 
-constexpr int kDefaultBgRgb = 0xE0E2EA;  // editor Normal background
-constexpr int kAmbientBgRgb = 0x3060C0;  // e.g. CursorLine — the colour corners must show
-constexpr int kPillBgRgb    = 0xFFD000;  // e.g. Search — the rounded highlight itself
+constexpr int kDefaultBgRgb = 0xE0E2EA; // editor Normal background
+constexpr int kAmbientBgRgb = 0x3060C0; // e.g. CursorLine — the colour corners must show
+constexpr int kPillBgRgb = 0xFFD000;    // e.g. Search — the rounded highlight itself
 
 constexpr int kAmbientHl = 1;
-constexpr int kPillHl    = 2;
+constexpr int kPillHl = 2;
 
 // Mirrors the helper in test_grid_model.cpp / test_hidpi_rendering.cpp.
-msgpack::object_handle packGridLineCells(
-    const std::vector<std::tuple<std::string, int, int>>& cells)
-{
+msgpack::object_handle
+    packGridLineCells(const std::vector<std::tuple<std::string, int, int>> &cells) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(cells.size()));
-    for (const auto& [text, hl, repeat] : cells) {
-        if (repeat > 0 && hl >= 0) { pk.pack_array(3); pk.pack(text); pk.pack(hl); pk.pack(repeat); }
-        else if (hl >= 0)          { pk.pack_array(2); pk.pack(text); pk.pack(hl); }
-        else                       { pk.pack_array(1); pk.pack(text); }
+    for(const auto &[text, hl, repeat]: cells) {
+        if(repeat > 0 && hl >= 0) {
+            pk.pack_array(3);
+            pk.pack(text);
+            pk.pack(hl);
+            pk.pack(repeat);
+        } else if(hl >= 0) {
+            pk.pack_array(2);
+            pk.pack(text);
+            pk.pack(hl);
+        } else {
+            pk.pack_array(1);
+            pk.pack(text);
+        }
     }
     msgpack::object_handle h;
     msgpack::unpack(h, buf.data(), buf.size());
@@ -62,8 +71,7 @@ msgpack::object_handle packGridLineCells(
 }
 
 // Packs { "background": <rgb> } — the rgb_attr map shape of hl_attr_define.
-msgpack::object_handle packBgAttr(int bgRgb)
-{
+msgpack::object_handle packBgAttr(int bgRgb) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_map(1);
@@ -77,12 +85,11 @@ msgpack::object_handle packBgAttr(int bgRgb)
 // Packs the ext_hlstate `info` array: [ { "hi_name": <name> } ]. Going through
 // this path rather than poking isRounded directly means the test also covers
 // the 4-element hl_attr_define shape that ext_hlstate produces.
-msgpack::object_handle packInfoNames(const std::vector<std::string>& names)
-{
+msgpack::object_handle packInfoNames(const std::vector<std::string> &names) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(names.size()));
-    for (const auto& n : names) {
+    for(const auto &n: names) {
         pk.pack_map(1);
         pk.pack(std::string("hi_name"));
         pk.pack(n);
@@ -92,8 +99,7 @@ msgpack::object_handle packInfoNames(const std::vector<std::string>& names)
     return h;
 }
 
-QString describe(QRgb c)
-{
+QString describe(QRgb c) {
     return QStringLiteral("#%1").arg(QColor::fromRgb(c).rgb() & 0xFFFFFF, 6, 16, QLatin1Char('0'));
 }
 
@@ -106,7 +112,7 @@ private slots:
     void initTestCase() {
         // Must precede any QQuickWindow: the scene graph backend is chosen once.
         QuickRasterizer::useSoftwareBackend();
-        if (QGuiApplication::primaryScreen() == nullptr) {
+        if(QGuiApplication::primaryScreen() == nullptr) {
             QSKIP("No primary screen available (headless without minimal QPA).");
         }
     }
@@ -119,13 +125,15 @@ private slots:
         const QImage img = f.render();
 
         const QPoint probe = f.cornerProbe();
-        const QRgb   px    = img.pixel(probe);
+        const QRgb px = img.pixel(probe);
 
         QVERIFY2(px != qRgb(0xFF, 0xD0, 0x00),
                  qPrintable(QStringLiteral(
-                     "Probe (%1,%2) landed on the pill itself, not the corner cutout — "
-                     "the test would pass vacuously. Got %3.")
-                     .arg(probe.x()).arg(probe.y()).arg(describe(px))));
+                                "Probe (%1,%2) landed on the pill itself, not the corner cutout — "
+                                "the test would pass vacuously. Got %3.")
+                                .arg(probe.x())
+                                .arg(probe.y())
+                                .arg(describe(px))));
 
         QCOMPARE(px, qRgb(0x30, 0x60, 0xC0));
     }
@@ -158,11 +166,12 @@ private slots:
         const QImage img = f.render();
 
         const QPoint probe = f.cornerProbe();
-        const QRgb   px    = img.pixel(probe);
+        const QRgb px = img.pixel(probe);
 
         QVERIFY2(px != qRgb(0xFF, 0xD0, 0x00),
                  qPrintable(QStringLiteral("Probe (%1,%2) landed on the pill, not the cutout.")
-                     .arg(probe.x()).arg(probe.y())));
+                                .arg(probe.x())
+                                .arg(probe.y())));
 
         QCOMPARE(px, qRgb(0xE0, 0xE2, 0xEA));
     }
@@ -182,10 +191,10 @@ private slots:
 
         int defaultBgHits = 0;
         QPoint firstHit;
-        for (int y = box.top(); y <= box.bottom(); ++y) {
-            for (int x = box.left(); x <= box.right(); ++x) {
-                if (img.pixel(x, y) == qRgb(0xE0, 0xE2, 0xEA)) {
-                    if (defaultBgHits == 0) firstHit = QPoint(x, y);
+        for(int y = box.top(); y <= box.bottom(); ++y) {
+            for(int x = box.left(); x <= box.right(); ++x) {
+                if(img.pixel(x, y) == qRgb(0xE0, 0xE2, 0xEA)) {
+                    if(defaultBgHits == 0) firstHit = QPoint(x, y);
                     ++defaultBgHits;
                 }
             }
@@ -193,18 +202,20 @@ private slots:
 
         QVERIFY2(defaultBgHits == 0,
                  qPrintable(QStringLiteral(
-                     "%1 pixel(s) around the concave step vertex show defaultBg #E0E2EA "
-                     "(first at %2,%3); expected ambient #3060C0 or pill #FFD000.")
-                     .arg(defaultBgHits).arg(firstHit.x()).arg(firstHit.y())));
+                                "%1 pixel(s) around the concave step vertex show defaultBg #E0E2EA "
+                                "(first at %2,%3); expected ambient #3060C0 or pill #FFD000.")
+                                .arg(defaultBgHits)
+                                .arg(firstHit.x())
+                                .arg(firstHit.y())));
     }
 
 private:
     // Owns the connector + item so each test starts from a clean grid.
     struct Fixture {
         NvimConnector conn;
-        GridItem      item;
-        int           cols = 0;
-        int           rows = 0;
+        GridItem item;
+        int cols = 0;
+        int rows = 0;
         // Column extents of the rounded span(s), row-indexed.
         int row0C0 = 0, row0C1 = 0;
         int row1C0 = 0, row1C1 = 0;
@@ -216,24 +227,24 @@ private:
             item.setFontSize(12.0);
         }
 
-        HighlightTable* hl() { return conn.highlights(); }
-        GridModel*      gm() { return conn.grid(); }
+        HighlightTable *hl() { return conn.highlights(); }
+        GridModel *gm() { return conn.grid(); }
 
-        qreal cw() const { return item.cellWidth();  }
+        qreal cw() const { return item.cellWidth(); }
         qreal ch() const { return item.cellHeight(); }
 
         // setRoundedHighlights MUST run before defineAttr: defineAttr computes
         // isRounded at define time from the current rounded-name set.
         void seedHighlights(int ambientRgb) {
             hl()->setDefaultColors(/*fg*/ 0x101010, /*bg*/ kDefaultBgRgb, /*sp*/ 0xFF0000);
-            hl()->setRoundedHighlights({QStringLiteral("Search")});
+            hl()->setRoundedHighlights({ QStringLiteral("Search") });
 
             auto ambientAttr = packBgAttr(ambientRgb);
-            auto ambientInfo = packInfoNames({"CursorLine"});
+            auto ambientInfo = packInfoNames({ "CursorLine" });
             hl()->defineAttr(kAmbientHl, ambientAttr.get(), &ambientInfo.get());
 
             auto pillAttr = packBgAttr(kPillBgRgb);
-            auto pillInfo = packInfoNames({"Search"});
+            auto pillInfo = packInfoNames({ "Search" });
             hl()->defineAttr(kPillHl, pillAttr.get(), &pillInfo.get());
 
             QVERIFY(hl()->isRounded(kPillHl));
@@ -242,51 +253,56 @@ private:
 
         // Row 0: ambient | pill [4,9) | ambient
         void buildSingleRowPill(int ambientRgb) {
-            cols = 20; rows = 3;
-            row0C0 = 4; row0C1 = 9;
+            cols = 20;
+            rows = 3;
+            row0C0 = 4;
+            row0C1 = 9;
             twoRow = false;
 
             seedHighlights(ambientRgb);
             gm()->resize(cols, rows);
-            writeRow(0, {{0, row0C0, kAmbientHl},
-                         {row0C0, row0C1, kPillHl},
-                         {row0C1, cols, kAmbientHl}});
-            for (int r = 1; r < rows; ++r) writeRow(r, {{0, cols, kAmbientHl}});
+            writeRow(0, { { 0, row0C0, kAmbientHl },
+                          { row0C0, row0C1, kPillHl },
+                          { row0C1, cols, kAmbientHl } });
+            for(int r = 1; r < rows; ++r) writeRow(r, { { 0, cols, kAmbientHl } });
             sizeItem();
         }
 
         // Row 0: pill [2,9); Row 1: pill [4,9)  -> reflex vertex at (4*cw, 1*ch)
         void buildTwoRowSteppedPill(int ambientRgb) {
-            cols = 20; rows = 4;
-            row0C0 = 2; row0C1 = 9;
-            row1C0 = 4; row1C1 = 9;
+            cols = 20;
+            rows = 4;
+            row0C0 = 2;
+            row0C1 = 9;
+            row1C0 = 4;
+            row1C1 = 9;
             twoRow = true;
 
             seedHighlights(ambientRgb);
             gm()->resize(cols, rows);
-            writeRow(0, {{0, row0C0, kAmbientHl},
-                         {row0C0, row0C1, kPillHl},
-                         {row0C1, cols, kAmbientHl}});
-            writeRow(1, {{0, row1C0, kAmbientHl},
-                         {row1C0, row1C1, kPillHl},
-                         {row1C1, cols, kAmbientHl}});
-            for (int r = 2; r < rows; ++r) writeRow(r, {{0, cols, kAmbientHl}});
+            writeRow(0, { { 0, row0C0, kAmbientHl },
+                          { row0C0, row0C1, kPillHl },
+                          { row0C1, cols, kAmbientHl } });
+            writeRow(1, { { 0, row1C0, kAmbientHl },
+                          { row1C0, row1C1, kPillHl },
+                          { row1C1, cols, kAmbientHl } });
+            for(int r = 2; r < rows; ++r) writeRow(r, { { 0, cols, kAmbientHl } });
             sizeItem();
         }
 
         // Writes a row from [start, end) runs of a given hl id, using blanks so
         // no glyph ink can contaminate a background probe.
-        void writeRow(int row, const std::vector<std::tuple<int, int, int>>& runs) {
+        void writeRow(int row, const std::vector<std::tuple<int, int, int>> &runs) {
             std::vector<std::tuple<std::string, int, int>> cells;
-            for (const auto& [c0, c1, id] : runs) {
-                if (c1 > c0) cells.push_back({" ", id, c1 - c0});
+            for(const auto &[c0, c1, id]: runs) {
+                if(c1 > c0) cells.push_back({ " ", id, c1 - c0 });
             }
             auto packed = packGridLineCells(cells);
             gm()->applyLine(row, 0, packed.get());
         }
 
         void sizeItem() {
-            item.setWidth (std::ceil(cw() * cols));
+            item.setWidth(std::ceil(cw() * cols));
             item.setHeight(std::ceil(ch() * rows));
         }
 
@@ -295,7 +311,7 @@ private:
         // these assertions stayed green.
         QImage render() {
             const QImage img = raster.render(&item);
-            if (!raster.isUnscaled())
+            if(!raster.isUnscaled())
                 qFatal("render surface is scaled; probes assume 1 logical px == 1 device px");
             return img.convertToFormat(QImage::Format_RGB32);
         }
@@ -306,8 +322,7 @@ private:
         // corner off, so this pixel is inside the rounded cell but outside the
         // pill — exactly the area the bug leaves showing defaultBg.
         QPoint cornerProbe() const {
-            return QPoint(static_cast<int>(row0C0 * cw()),
-                          static_cast<int>(0 * ch()));
+            return QPoint(static_cast<int>(row0C0 * cw()), static_cast<int>(0 * ch()));
         }
 
         QPoint pillCentreProbe() const {
@@ -316,15 +331,14 @@ private:
         }
 
         QPoint ambientProbe() const {
-            return QPoint(static_cast<int>(1 * cw()),
-                          static_cast<int>(0.5 * ch()));
+            return QPoint(static_cast<int>(1 * cw()), static_cast<int>(0.5 * ch()));
         }
 
         // A small box centred on the reflex vertex at (row1C0*cw, 1*ch).
-        QRect concaveStepProbeBox(const QRect& bounds) const {
+        QRect concaveStepProbeBox(const QRect &bounds) const {
             const int vx = static_cast<int>(row1C0 * cw());
             const int vy = static_cast<int>(1 * ch());
-            constexpr int kPad = 6;   // >= the pass's 5.0 corner radius
+            constexpr int kPad = 6; // >= the pass's 5.0 corner radius
             return QRect(vx - kPad, vy - kPad, 2 * kPad, 2 * kPad).intersected(bounds);
         }
     };

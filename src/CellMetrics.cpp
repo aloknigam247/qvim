@@ -5,7 +5,7 @@
 
 namespace qvim {
 
-CellMetrics computeCellMetrics(const QFontMetricsF& fm, int linespace, qreal dpr) {
+CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr) {
     // Snap cell dimensions to a unit that is integer in BOTH logical and
     // device pixel space. For an integer DPR (1.0, 2.0) any integer logical
     // value already lands on an integer device pixel, so the unit is 1. For
@@ -17,10 +17,10 @@ CellMetrics computeCellMetrics(const QFontMetricsF& fm, int linespace, qreal dpr
     // of this function snapped to whole device pixels, which made cellWidth
     // fractional in logical pixels and broke window sizing).
     const qreal safeDpr = (dpr > 0.0) ? dpr : 1.0;
-    const qreal extra   = static_cast<qreal>(std::max(0, linespace));
+    const qreal extra = static_cast<qreal>(std::max(0, linespace));
     int unit = 1;
-    for (int q = 1; q <= 16; ++q) {
-        if (std::abs(safeDpr * q - std::round(safeDpr * q)) < 1e-3) {
+    for(int q = 1; q <= 16; ++q) {
+        if(std::abs(safeDpr * q - std::round(safeDpr * q)) < 1e-3) {
             unit = q;
             break;
         }
@@ -29,12 +29,12 @@ CellMetrics computeCellMetrics(const QFontMetricsF& fm, int linespace, qreal dpr
         const qreal u = static_cast<qreal>(unit);
         return std::max(u, std::round(v / u) * u);
     };
-    const qreal width  = snapUnit(fm.horizontalAdvance(QLatin1Char('M')));
+    const qreal width = snapUnit(fm.horizontalAdvance(QLatin1Char('M')));
     const qreal height = snapUnit(fm.height() + extra);
-    qreal baseline     = std::round(fm.ascent() + extra / 2.0);
-    if (baseline < 0.0)      baseline = 0.0;
-    if (baseline > height)   baseline = height;
-    return CellMetrics{width, height, baseline};
+    qreal baseline = std::round(fm.ascent() + extra / 2.0);
+    if(baseline < 0.0) baseline = 0.0;
+    if(baseline > height) baseline = height;
+    return CellMetrics{ width, height, baseline };
 }
 
 } // namespace qvim

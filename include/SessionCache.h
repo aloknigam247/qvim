@@ -24,7 +24,7 @@ struct SessionCache {
 
     // Save to disk. Creates the directory if needed. Errors are silently
     // ignored (cache is best-effort).
-    static void save(const SessionCache& cache);
+    static void save(const SessionCache &cache);
 };
 
 } // namespace qvim

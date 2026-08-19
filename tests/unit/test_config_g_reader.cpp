@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QSignalSpy>
+#include <QtTest>
 
 #include "Config.h"
 #include "ConfigGGlobalReader.h"
@@ -15,8 +15,8 @@ private slots:
         cfg.registerOption(QStringLiteral("padding"), ConfigType::Int, 0);
 
         QHash<QString, QVariant> vars;
-        vars.insert(QStringLiteral("qvim_opacity"),     0.7);
-        vars.insert(QStringLiteral("qvim_padding"),     8);
+        vars.insert(QStringLiteral("qvim_opacity"), 0.7);
+        vars.insert(QStringLiteral("qvim_padding"), 8);
         vars.insert(QStringLiteral("qvim_unknown_var"), 42);
 
         ConfigGGlobalReader::readFromMap(vars, cfg);
@@ -30,11 +30,10 @@ private slots:
         Config cfg;
         cfg.registerOption(QStringLiteral("fallback"), ConfigType::StringList, QStringList{});
         QHash<QString, QVariant> vars;
-        vars.insert(QStringLiteral("qvim_fallback"),
-                    QVariant(QStringList{ "a", "b", "c" }));
+        vars.insert(QStringLiteral("qvim_fallback"), QVariant(QStringList{ "a", "b", "c" }));
         ConfigGGlobalReader::readFromMap(vars, cfg);
         QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(),
-                 (QStringList{ "a", "b", "c" }));
+                 QStringList{ "a", "b", "c" });
     }
 
     void missingVarsAreSilent() {

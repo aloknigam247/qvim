@@ -1,14 +1,14 @@
 #pragma once
 
-#include <QObject>
-#include <QHash>
-#include <QString>
-#include <QStringList>
-#include <QByteArray>
-#include <QProcess>
 #include <expected>
 #include <functional>
 #include <memory>
+#include <QByteArray>
+#include <QHash>
+#include <QObject>
+#include <QProcess>
+#include <QString>
+#include <QStringList>
 
 #include <msgpack.hpp>
 
@@ -20,9 +20,9 @@ struct RpcError {
 };
 
 using ObjectHandlePtr = std::shared_ptr<msgpack::object_handle>;
-using RpcResult       = std::expected<ObjectHandlePtr, RpcError>;
-using RpcCallback     = std::function<void(RpcResult)>;
-using PackFn          = std::function<void(msgpack::packer<msgpack::sbuffer>&)>;
+using RpcResult = std::expected<ObjectHandlePtr, RpcError>;
+using RpcCallback = std::function<void(RpcResult)>;
+using PackFn = std::function<void(msgpack::packer<msgpack::sbuffer> &)>;
 
 // Notification carries an RPC notification across signal/slot boundaries.
 // `handle` keeps the msgpack arena alive; `params()` returns the already-
@@ -30,14 +30,14 @@ using PackFn          = std::function<void(msgpack::packer<msgpack::sbuffer>&)>;
 // Returns a nil object if the handle is missing/malformed — receivers should
 // still validate the shape they expect.
 struct Notification {
-    QString          method;
-    ObjectHandlePtr  handle;
+    QString method;
+    ObjectHandlePtr handle;
 
-    const msgpack::object& params() const noexcept {
+    const msgpack::object &params() const noexcept {
         static const msgpack::object kNil{};
-        if (!handle) return kNil;
-        const msgpack::object& root = handle->get();
-        if (root.type != msgpack::type::ARRAY || root.via.array.size < 3) return kNil;
+        if(!handle) return kNil;
+        const msgpack::object &root = handle->get();
+        if(root.type != msgpack::type::ARRAY || root.via.array.size < 3) return kNil;
         return root.via.array.ptr[2];
     }
 };
@@ -45,20 +45,20 @@ struct Notification {
 class MsgpackRpc : public QObject {
     Q_OBJECT
 public:
-    explicit MsgpackRpc(QObject* parent = nullptr);
+    explicit MsgpackRpc(QObject *parent = nullptr);
     ~MsgpackRpc() override;
 
-    bool startEmbeddedNvim(const QString& nvimExe, const QStringList& extraArgs = {});
+    bool startEmbeddedNvim(const QString &nvimExe, const QStringList &extraArgs = {});
 
-    void request(const QString& method, PackFn packArgs, RpcCallback cb);
-    void notify(const QString& method, PackFn packArgs);
+    void request(const QString &method, PackFn packArgs, RpcCallback cb);
+    void notify(const QString &method, PackFn packArgs);
 
     bool isRunning() const;
 
 signals:
-    void notification(const qvim::Notification& note);
+    void notification(const qvim::Notification &note);
     void disconnected();
-    void error(const QString& message);
+    void error(const QString &message);
 
 private slots:
     void onReadyRead();
@@ -67,7 +67,7 @@ private slots:
 
 private:
     void dispatchUnpacked(ObjectHandlePtr handle);
-    void writeMessage(const msgpack::sbuffer& buf);
+    void writeMessage(const msgpack::sbuffer &buf);
 
     std::unique_ptr<QProcess> m_process;
     msgpack::unpacker m_unpacker;
@@ -75,7 +75,7 @@ private:
     uint32_t m_nextMsgId = 1;
 };
 
-inline std::string toStd(const QString& s) { return s.toStdString(); }
+inline std::string toStd(const QString &s) { return s.toStdString(); }
 
 } // namespace qvim
 

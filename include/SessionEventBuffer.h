@@ -1,15 +1,15 @@
 #pragma once
 
+#include <deque>
 #include <QByteArray>
 #include <QJsonObject>
-#include <deque>
 
 namespace qvim {
 
 // One buffered server→client frame: its assigned sequence number plus the exact
 // compact-JSON bytes broadcast on the wire.
 struct BufferedEvent {
-    quint64    seq;
+    quint64 seq;
     QByteArray json;
 };
 
@@ -37,11 +37,11 @@ public:
 
     int size() const { return static_cast<int>(m_events.size()); }
 
-    const std::deque<BufferedEvent>& entries() const { return m_events; }
+    const std::deque<BufferedEvent> &entries() const { return m_events; }
 
 private:
-    quint64                   m_nextSeq = 1;
-    int                       m_maxEntries;
+    quint64 m_nextSeq = 1;
+    int m_maxEntries;
     std::deque<BufferedEvent> m_events;
 };
 

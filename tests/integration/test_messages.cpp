@@ -1,6 +1,6 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
 #include "MessagesModel.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
@@ -15,18 +15,17 @@ private slots:
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
 
-        MessagesModel* msgs = conn.messages();
+        MessagesModel *msgs = conn.messages();
         QVERIFY(msgs != nullptr);
 
         conn.command(QStringLiteral("echom \"hello\""));
 
         bool found = false;
-        for (int i = 0; i < 5 && !found; ++i) {
+        for(int i = 0; i < 5 && !found; ++i) {
             waitForFlush(&conn, 500);
-            for (int r = 0; r < msgs->rowCount(); ++r) {
-                const QString text =
-                    msgs->data(msgs->index(r), MessagesModel::TextRole).toString();
-                if (text.contains(QStringLiteral("hello"))) {
+            for(int r = 0; r < msgs->rowCount(); ++r) {
+                const QString text = msgs->data(msgs->index(r), MessagesModel::TextRole).toString();
+                if(text.contains(QStringLiteral("hello"))) {
                     found = true;
                     break;
                 }

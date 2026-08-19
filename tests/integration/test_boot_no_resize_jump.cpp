@@ -22,8 +22,8 @@
 #include <QSignalSpy>
 #include <QtTest>
 
-#include "IntegrationHelpers.h"
 #include "GridModel.h"
+#include "IntegrationHelpers.h"
 #include "NvimConnector.h"
 
 using namespace qvim;
@@ -32,11 +32,11 @@ using namespace qvim::test;
 namespace {
 
 template <typename F>
-bool waitUntil(F&& predicate, int timeoutMs) {
+bool waitUntil(F &&predicate, int timeoutMs) {
     QElapsedTimer t;
     t.start();
-    while (!predicate()) {
-        if (t.elapsed() >= timeoutMs) return false;
+    while(!predicate()) {
+        if(t.elapsed() >= timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return true;
@@ -66,16 +66,15 @@ private slots:
         engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &conn);
         engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
         QVERIFY(!engine.rootObjects().isEmpty());
-        QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
 
         // Step 1: window must NOT be visible immediately after load. This is
         // the load-bearing assertion — if Main.qml ever flips back to
         // visible: true at construction time, the resize jump returns.
-        QVERIFY2(!window->isVisible(),
-                 "Window was visible immediately after loadFromModule — "
-                 "Main.qml must start with visible: false to avoid the "
-                 "80x24 -> real-size jump.");
+        QVERIFY2(!window->isVisible(), "Window was visible immediately after loadFromModule — "
+                                       "Main.qml must start with visible: false to avoid the "
+                                       "80x24 -> real-size jump.");
 
         // Drive the event loop until the connector has fully attached and the
         // post-attach tryResize has propagated to grid 1.
@@ -93,15 +92,16 @@ private slots:
         // way, but we can assert grid 1 has grown past 80x24 by the time
         // visible is true. Any reasonable 1200x780 window with a typical
         // monospace cell exceeds 80 columns.
-        GridModel* grid = conn.grid();
+        GridModel *grid = conn.grid();
         QVERIFY(grid);
         const int cols = grid->gridCols(1);
         const int rows = grid->gridRows(1);
-        QVERIFY2(cols > 80 || rows > 24,
-                 qPrintable(QStringLiteral(
-                     "Grid 1 was still at 80x24 when window became visible "
-                     "(cols=%1, rows=%2) — resize didn't complete before show.")
-                     .arg(cols).arg(rows)));
+        QVERIFY2(
+            cols > 80 || rows > 24,
+            qPrintable(QStringLiteral("Grid 1 was still at 80x24 when window became visible "
+                                      "(cols=%1, rows=%2) — resize didn't complete before show.")
+                           .arg(cols)
+                           .arg(rows)));
     }
 };
 

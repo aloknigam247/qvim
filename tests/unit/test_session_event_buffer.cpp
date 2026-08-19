@@ -8,15 +8,15 @@
 using namespace qvim;
 
 namespace {
-QJsonObject frame(const QString& text) {
+QJsonObject frame(const QString &text) {
     return QJsonObject{
-        {QStringLiteral("type"), QStringLiteral("message")},
-        {QStringLiteral("role"), QStringLiteral("user")},
-        {QStringLiteral("text"), text},
+        { QStringLiteral("type"), QStringLiteral("message") },
+        { QStringLiteral("role"), QStringLiteral("user") },
+        { QStringLiteral("text"), text },
     };
 }
 
-quint64 seqOf(const BufferedEvent& e) {
+quint64 seqOf(const BufferedEvent &e) {
     return static_cast<quint64>(
         QJsonDocument::fromJson(e.json).object().value(QStringLiteral("seq")).toInteger());
 }
@@ -58,9 +58,7 @@ void TestSessionEventBuffer::stampsSeqIntoSerialisedFrame() {
 
 void TestSessionEventBuffer::boundedEvictionNeverReusesSeq() {
     SessionEventBuffer buf(4);
-    for (int i = 0; i < 10; ++i) {
-        buf.append(frame(QString::number(i)));
-    }
+    for(int i = 0; i < 10; ++i) { buf.append(frame(QString::number(i))); }
 
     // Bound holds; the oldest six were evicted, leaving seq 7..10.
     QCOMPARE(buf.size(), 4);

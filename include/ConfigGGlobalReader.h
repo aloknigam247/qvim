@@ -20,8 +20,8 @@ class NvimConnector;
 // instead of a live nvim connection.
 class ConfigGGlobalReader {
 public:
-    static void read(NvimConnector& connector, Config& cfg);
-    static void readFromMap(const QHash<QString, QVariant>& vars, Config& cfg);
+    static void read(NvimConnector &connector, Config &cfg);
+    static void readFromMap(const QHash<QString, QVariant> &vars, Config &cfg);
 };
 
 } // namespace qvim

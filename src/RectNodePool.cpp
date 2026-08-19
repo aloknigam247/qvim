@@ -8,21 +8,21 @@ namespace qvim {
 
 RectNodePool::~RectNodePool() = default;
 
-void RectNodePool::beginFrame(QSGNode* parent, QQuickWindow* window) {
+void RectNodePool::beginFrame(QSGNode *parent, QQuickWindow *window) {
     m_parent = parent;
     m_window = window;
     m_used = 0;
 }
 
-void RectNodePool::add(const QRectF& rect, const QColor& color) {
-    if (!m_parent || !m_window || rect.isEmpty() || !color.isValid()) return;
+void RectNodePool::add(const QRectF &rect, const QColor &color) {
+    if(!m_parent || !m_window || rect.isEmpty() || !color.isValid()) return;
 
-    QSGRectangleNode* node = nullptr;
-    if (m_used < m_nodes.size()) {
+    QSGRectangleNode *node = nullptr;
+    if(m_used < m_nodes.size()) {
         node = m_nodes[m_used];
     } else {
         node = m_window->createRectangleNode();
-        if (!node) return;
+        if(!node) return;
         m_nodes.append(node);
         m_parent->appendChildNode(node);
     }
@@ -32,8 +32,8 @@ void RectNodePool::add(const QRectF& rect, const QColor& color) {
 }
 
 void RectNodePool::endFrame() {
-    for (int i = m_used; i < m_nodes.size(); ++i) {
-        if (m_parent) m_parent->removeChildNode(m_nodes[i]);
+    for(int i = m_used; i < m_nodes.size(); ++i) {
+        if(m_parent) m_parent->removeChildNode(m_nodes[i]);
         delete m_nodes[i];
     }
     m_nodes.resize(m_used);

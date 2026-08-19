@@ -2,6 +2,7 @@
 // multiples of the cell size (zero padding). This is the post-snap assertion —
 // Main.qml snaps window.width/height before flipping visible=true.
 
+#include <cmath>
 #include <QFontDatabase>
 #include <QFontMetricsF>
 #include <QQmlApplicationEngine>
@@ -10,7 +11,6 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QtTest>
-#include <cmath>
 
 #include "CellMetrics.h"
 #include "GridModel.h"
@@ -23,11 +23,11 @@ using namespace qvim::test;
 namespace {
 
 template <typename F>
-bool waitUntil(F&& predicate, int timeoutMs) {
+bool waitUntil(F &&predicate, int timeoutMs) {
     QElapsedTimer t;
     t.start();
-    while (!predicate()) {
-        if (t.elapsed() >= timeoutMs) return false;
+    while(!predicate()) {
+        if(t.elapsed() >= timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return true;
@@ -53,7 +53,7 @@ private slots:
         engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &conn);
         engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
         QVERIFY(!engine.rootObjects().isEmpty());
-        QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
 
         // Wait for the full startup sequence to complete.
@@ -71,7 +71,7 @@ private slots:
         QVERIFY(cm.cellWidth > 0);
         QVERIFY(cm.cellHeight > 0);
 
-        GridModel* grid = conn.grid();
+        GridModel *grid = conn.grid();
         QVERIFY(grid);
         const int cols = grid->gridCols(1);
         const int rows = grid->gridRows(1);
@@ -82,10 +82,8 @@ private slots:
         // Shell is anchored between tabline and cmdline, so its height is the
         // grid area. Chrome = window.height - shell.height.
         qreal chromeH = 0;
-        QQuickItem* shell = window->contentItem()->findChild<QQuickItem*>(
-            QStringLiteral("shell"));
-        if (shell)
-            chromeH = window->height() - shell->height();
+        QQuickItem *shell = window->contentItem()->findChild<QQuickItem *>(QStringLiteral("shell"));
+        if(shell) chromeH = window->height() - shell->height();
 
         const qreal expectedW = cols * cm.cellWidth;
         const qreal expectedH = rows * cm.cellHeight + chromeH;
@@ -98,20 +96,28 @@ private slots:
         qDebug() << "Cell:" << cm.cellWidth << "x" << cm.cellHeight;
         qDebug() << "Chrome height:" << chromeH;
         qDebug() << "Expected:" << expectedW << "x" << expectedH;
-        qDebug() << "Delta W:" << (winW - expectedW)
-                 << " Delta H:" << (winH - expectedH);
+        qDebug() << "Delta W:" << (winW - expectedW) << " Delta H:" << (winH - expectedH);
 
         QVERIFY2(std::abs(winW - expectedW) < 1.0,
                  qPrintable(QStringLiteral(
-                     "Width mismatch: window=%1, expected cols(%2)*cw(%3)=%4, delta=%5")
-                     .arg(winW).arg(cols).arg(cm.cellWidth).arg(expectedW)
-                     .arg(winW - expectedW)));
+                                "Width mismatch: window=%1, expected cols(%2)*cw(%3)=%4, delta=%5")
+                                .arg(winW)
+                                .arg(cols)
+                                .arg(cm.cellWidth)
+                                .arg(expectedW)
+                                .arg(winW - expectedW)));
 
-        QVERIFY2(std::abs(winH - expectedH) < 1.0,
-                 qPrintable(QStringLiteral(
-                     "Height mismatch: window=%1, expected rows(%2)*ch(%3)+chrome(%4)=%5, delta=%6")
-                     .arg(winH).arg(rows).arg(cm.cellHeight).arg(chromeH)
-                     .arg(expectedH).arg(winH - expectedH)));
+        QVERIFY2(
+            std::abs(winH - expectedH) < 1.0,
+            qPrintable(
+                QStringLiteral(
+                    "Height mismatch: window=%1, expected rows(%2)*ch(%3)+chrome(%4)=%5, delta=%6")
+                    .arg(winH)
+                    .arg(rows)
+                    .arg(cm.cellHeight)
+                    .arg(chromeH)
+                    .arg(expectedH)
+                    .arg(winH - expectedH)));
     }
 };
 

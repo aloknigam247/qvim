@@ -1,5 +1,5 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
@@ -15,7 +15,7 @@ private slots:
         QVERIFY(waitForFlush(&conn));
 
         conn.input(QStringLiteral(":echo \"hi\""));
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
 
         // ext_cmdline is disabled in NvimConnector::attachUi (diagnostic mode);
         // until it's re-enabled the CmdlineModel never receives cmdline_show

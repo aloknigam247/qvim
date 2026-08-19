@@ -14,9 +14,9 @@
 //   - pill spans sample the ambient background from a neighbour, which is what
 //     stops rounded corners punching through to the default colour.
 
+#include <msgpack.hpp>
 #include <QGuiApplication>
 #include <QtTest>
-#include <msgpack.hpp>
 
 #include "GridModel.h"
 #include "GridRuns.h"
@@ -27,24 +27,32 @@ using namespace qvim;
 namespace {
 
 // Mirrors the helper in test_grid_model.cpp / test_rounded_highlight.cpp.
-msgpack::object_handle packGridLineCells(
-    const std::vector<std::tuple<std::string, int, int>>& cells)
-{
+msgpack::object_handle
+    packGridLineCells(const std::vector<std::tuple<std::string, int, int>> &cells) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(cells.size()));
-    for (const auto& [text, hl, repeat] : cells) {
-        if (repeat > 0 && hl >= 0) { pk.pack_array(3); pk.pack(text); pk.pack(hl); pk.pack(repeat); }
-        else if (hl >= 0)          { pk.pack_array(2); pk.pack(text); pk.pack(hl); }
-        else                       { pk.pack_array(1); pk.pack(text); }
+    for(const auto &[text, hl, repeat]: cells) {
+        if(repeat > 0 && hl >= 0) {
+            pk.pack_array(3);
+            pk.pack(text);
+            pk.pack(hl);
+            pk.pack(repeat);
+        } else if(hl >= 0) {
+            pk.pack_array(2);
+            pk.pack(text);
+            pk.pack(hl);
+        } else {
+            pk.pack_array(1);
+            pk.pack(text);
+        }
     }
     msgpack::object_handle h;
     msgpack::unpack(h, buf.data(), buf.size());
     return h;
 }
 
-msgpack::object_handle packBgAttr(int bgRgb)
-{
+msgpack::object_handle packBgAttr(int bgRgb) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_map(1);
@@ -56,12 +64,11 @@ msgpack::object_handle packBgAttr(int bgRgb)
 }
 
 // Packs the ext_hlstate `info` array: [ { "hi_name": <name> } ].
-msgpack::object_handle packInfoNames(const std::vector<std::string>& names)
-{
+msgpack::object_handle packInfoNames(const std::vector<std::string> &names) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(names.size()));
-    for (const auto& n : names) {
+    for(const auto &n: names) {
         pk.pack_map(1);
         pk.pack(std::string("hi_name"));
         pk.pack(n);
@@ -71,16 +78,14 @@ msgpack::object_handle packInfoNames(const std::vector<std::string>& names)
     return h;
 }
 
-void defineBg(HighlightTable& hl, int id, int bgRgb)
-{
+void defineBg(HighlightTable &hl, int id, int bgRgb) {
     const auto attr = packBgAttr(bgRgb);
     hl.defineAttr(id, attr.get());
 }
 
-void defineBgNamed(HighlightTable& hl, int id, int bgRgb, const std::string& name)
-{
+void defineBgNamed(HighlightTable &hl, int id, int bgRgb, const std::string &name) {
     const auto attr = packBgAttr(bgRgb);
-    const auto info = packInfoNames({name});
+    const auto info = packInfoNames({ name });
     hl.defineAttr(id, attr.get(), &info.get());
 }
 
@@ -97,7 +102,7 @@ private slots:
         GridModel g;
         HighlightTable hl;
         g.resize(6, 1);
-        auto cells = packGridLineCells({{"a", 1, 6}});
+        auto cells = packGridLineCells({ { "a", 1, 6 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -113,8 +118,8 @@ private slots:
         GridModel g;
         HighlightTable hl;
         g.resize(4, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 1, -1},
-                                        {"c", 2, -1}, {"d", 2, -1}});
+        auto cells =
+            packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 2, -1 }, { "d", 2, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -135,15 +140,15 @@ private slots:
         GridModel g;
         HighlightTable hl;
         g.resize(2, 3);
-        for (int r = 0; r < 3; ++r) {
-            auto cells = packGridLineCells({{"x", r + 1, -1}, {"y", r + 1, -1}});
+        for(int r = 0; r < 3; ++r) {
+            auto cells = packGridLineCells({ { "x", r + 1, -1 }, { "y", r + 1, -1 } });
             g.applyLine(r, 0, cells.get());
         }
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
 
         QCOMPARE(runs.runs.size(), 3);
-        for (int i = 0; i < 3; ++i) QCOMPARE(runs.runs[i].row, i);
+        for(int i = 0; i < 3; ++i) QCOMPARE(runs.runs[i].row, i);
     }
 
     // The right half of a double-width glyph is a marker cell: the left cell's
@@ -154,7 +159,8 @@ private slots:
         HighlightTable hl;
         g.resize(3, 1);
         // A wide CJK glyph followed by its empty right-half marker.
-        auto cells = packGridLineCells({{"\xe6\xbc\xa2", 1, -1}, {"", 1, -1}, {"z", 1, -1}});
+        auto cells =
+            packGridLineCells({ { "\xe6\xbc\xa2", 1, -1 }, { "", 1, -1 }, { "z", 1, -1 } });
         g.applyLine(0, 0, cells.get());
 
         QVERIFY2(g.cell(0, 1).doubleWidth,
@@ -180,15 +186,15 @@ private slots:
     }
 
     void detectsPrivateUseAreaCodepoints() {
-        QVERIFY(isPuaChar(QChar(0xE000)));   // first BMP PUA
-        QVERIFY(isPuaChar(QChar(0xE0B0)));   // powerline separator
-        QVERIFY(isPuaChar(QChar(0xF8FF)));   // last BMP PUA
-        QVERIFY(isPuaChar(QChar(0xDB80)));   // high surrogate, supplementary PUA-A
-        QVERIFY(isPuaChar(QChar(0xDBFF)));   // high surrogate, supplementary PUA-B
+        QVERIFY(isPuaChar(QChar(0xE000))); // first BMP PUA
+        QVERIFY(isPuaChar(QChar(0xE0B0))); // powerline separator
+        QVERIFY(isPuaChar(QChar(0xF8FF))); // last BMP PUA
+        QVERIFY(isPuaChar(QChar(0xDB80))); // high surrogate, supplementary PUA-A
+        QVERIFY(isPuaChar(QChar(0xDBFF))); // high surrogate, supplementary PUA-B
 
         QVERIFY(!isPuaChar(QChar('a')));
-        QVERIFY(!isPuaChar(QChar(0xDFFF)));  // above BMP PUA, below PUA-A
-        QVERIFY(!isPuaChar(QChar(0x6F22)));  // CJK, not PUA
+        QVERIFY(!isPuaChar(QChar(0xDFFF))); // above BMP PUA, below PUA-A
+        QVERIFY(!isPuaChar(QChar(0x6F22))); // CJK, not PUA
         // U+1F600 is a surrogate pair whose high half is U+D83D — below the
         // U+DB80 PUA-A floor, so emoji must NOT be diverted to the PUA pass.
         // Diverting it would bypass Qt's font fallback and render tofu.
@@ -202,8 +208,10 @@ private slots:
         HighlightTable hl;
         g.resize(4, 1);
         // U+E0B0 U+E0B6, then plain text.
-        auto cells = packGridLineCells({{"\xee\x82\xb0", 1, -1}, {"\xee\x82\xb6", 1, -1},
-                                        {"a", 1, -1}, {"b", 1, -1}});
+        auto cells = packGridLineCells({ { "\xee\x82\xb0", 1, -1 },
+                                         { "\xee\x82\xb6", 1, -1 },
+                                         { "a", 1, -1 },
+                                         { "b", 1, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -225,8 +233,10 @@ private slots:
         HighlightTable hl;
         g.resize(4, 1);
         // U+E0B0, 'a', U+E0B6, 'b' — all one hl_id, so all one run.
-        auto cells = packGridLineCells({{"\xee\x82\xb0", 1, -1}, {"a", 1, -1},
-                                        {"\xee\x82\xb6", 1, -1}, {"b", 1, -1}});
+        auto cells = packGridLineCells({ { "\xee\x82\xb0", 1, -1 },
+                                         { "a", 1, -1 },
+                                         { "\xee\x82\xb6", 1, -1 },
+                                         { "b", 1, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -243,7 +253,7 @@ private slots:
         GridModel g;
         HighlightTable hl;
         g.resize(2, 1);
-        auto cells = packGridLineCells({{"\xee\x82\xb0", 1, -1}, {"\xee\x82\xb6", 2, -1}});
+        auto cells = packGridLineCells({ { "\xee\x82\xb0", 1, -1 }, { "\xee\x82\xb6", 2, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -257,7 +267,7 @@ private slots:
         GridModel g;
         HighlightTable hl;
         g.resize(4, 1);
-        auto cells = packGridLineCells({{"t", 1, 4}});
+        auto cells = packGridLineCells({ { "t", 1, 4 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -272,11 +282,11 @@ private slots:
         GridModel g;
         HighlightTable hl;
         hl.setDefaultColors(0xFFFFFF, 0x101010, 0xFF0000);
-        defineBg(hl, 1, 0x101010);   // same as default
-        defineBg(hl, 2, 0x3060C0);   // differs
+        defineBg(hl, 1, 0x101010); // same as default
+        defineBg(hl, 2, 0x3060C0); // differs
 
         g.resize(2, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 2, -1}});
+        auto cells = packGridLineCells({ { "a", 1, -1 }, { "b", 2, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);
@@ -296,13 +306,13 @@ private slots:
         hl.setDefaultColors(0xFFFFFF, 0xE0E2EA, 0xFF0000);
         // setRoundedHighlights must precede defineAttr: isRounded is computed
         // at define time from the current rounded-name set.
-        hl.setRoundedHighlights({QStringLiteral("Search")});
-        defineBgNamed(hl, 1, 0x3060C0, "CursorLine");   // ambient
-        defineBgNamed(hl, 2, 0xFFD000, "Search");       // the pill
+        hl.setRoundedHighlights({ QStringLiteral("Search") });
+        defineBgNamed(hl, 1, 0x3060C0, "CursorLine"); // ambient
+        defineBgNamed(hl, 2, 0xFFD000, "Search");     // the pill
 
         g.resize(4, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 2, -1},
-                                        {"c", 2, -1}, {"d", 1, -1}});
+        auto cells =
+            packGridLineCells({ { "a", 1, -1 }, { "b", 2, -1 }, { "c", 2, -1 }, { "d", 1, -1 } });
         g.applyLine(0, 0, cells.get());
 
         QVERIFY2(hl.isRounded(2), "fixture invalid: hl 2 did not resolve as rounded");
@@ -322,7 +332,7 @@ private slots:
         HighlightTable hl;
         defineBg(hl, 1, 0x3060C0);
         g.resize(2, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 1, -1}});
+        auto cells = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 } });
         g.applyLine(0, 0, cells.get());
 
         const GridRuns runs = buildGridRuns(g, hl, 1);

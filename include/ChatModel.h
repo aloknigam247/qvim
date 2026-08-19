@@ -1,10 +1,10 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <qqmlregistration.h>
 #include <QQueue>
 #include <QString>
 #include <QVector>
-#include <qqmlregistration.h>
 
 class QTimer;
 
@@ -29,20 +29,20 @@ class ChatModel : public QAbstractListModel {
 public:
     enum Roles {
         AuthorRole = Qt::UserRole + 1,
-        TextRole,
+        TextRole
     };
 
-    explicit ChatModel(QObject* parent = nullptr);
+    explicit ChatModel(QObject *parent = nullptr);
 
-    int      rowCount(const QModelIndex& parent = {}) const override;
-    QVariant data(const QModelIndex& index, int role) const override;
+    int rowCount(const QModelIndex &parent = {}) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
     int count() const { return static_cast<int>(m_msgs.size()); }
 
     // Appends the user block for `text`, then queues "Echo: <text>" as a new
     // assistant block streamed in a few chunks. No-op on empty/whitespace.
-    Q_INVOKABLE void submit(const QString& text);
+    Q_INVOKABLE void submit(const QString &text);
 
     // Read helpers for bindings and tests. Return empty on out-of-range.
     Q_INVOKABLE QString textAt(int row) const;
@@ -56,16 +56,19 @@ signals:
     // verbatim: the user block is atomic (userMessageAdded), the assistant reply
     // is a begin / delta* / end sequence. Ids are stable per turn (`u<n>` /
     // `a<n>`) so a client can attribute streamed deltas to the right block.
-    void userMessageAdded(const QString& id, const QString& text);
-    void assistantMessageBegan(const QString& id);
-    void assistantMessageDelta(const QString& id, const QString& text);
-    void assistantMessageEnded(const QString& id);
+    void userMessageAdded(const QString &id, const QString &text);
+    void assistantMessageBegan(const QString &id);
+    void assistantMessageDelta(const QString &id, const QString &text);
+    void assistantMessageEnded(const QString &id);
 
 private:
-    enum class Author { User, Assistant };
+    enum class Author {
+        User,
+        Assistant
+    };
 
     struct Message {
-        Author  author;
+        Author author;
         QString text;
     };
 
@@ -74,22 +77,22 @@ private:
     // `id` is the assistant block's session id and `last` marks the final chunk
     // of a turn, so streamTick() can emit the matching delta / end taps.
     struct Chunk {
-        int     row;
+        int row;
         QString id;
         QString text;
-        bool    last;
+        bool last;
     };
 
-    void appendMessage(Author author, const QString& text);
+    void appendMessage(Author author, const QString &text);
     void streamTick();
 
-    static QString              authorName(Author a);
-    static QVector<QString>     chunkify(const QString& s, int parts);
+    static QString authorName(Author a);
+    static QVector<QString> chunkify(const QString &s, int parts);
 
     QVector<Message> m_msgs;
-    QQueue<Chunk>    m_pending;
-    QTimer*          m_streamTimer = nullptr;
-    quint64          m_turn        = 0; // per-turn id counter for session taps
+    QQueue<Chunk> m_pending;
+    QTimer *m_streamTimer = nullptr;
+    quint64 m_turn = 0; // per-turn id counter for session taps
 };
 
 } // namespace qvim

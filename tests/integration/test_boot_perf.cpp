@@ -34,9 +34,7 @@ private slots:
     }
 
     void timeToFirstFlush() {
-        if (qEnvironmentVariableIntValue("QVIM_SKIP_PERF") != 0) {
-            QSKIP("QVIM_SKIP_PERF set");
-        }
+        if(qEnvironmentVariableIntValue("QVIM_SKIP_PERF") != 0) { QSKIP("QVIM_SKIP_PERF set"); }
 
         QElapsedTimer t;
         t.start();
@@ -48,7 +46,7 @@ private slots:
         engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &conn);
         engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
         QVERIFY(!engine.rootObjects().isEmpty());
-        QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));

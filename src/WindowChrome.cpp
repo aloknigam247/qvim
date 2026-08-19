@@ -3,31 +3,31 @@
 #include <QQuickWindow>
 
 #ifdef Q_OS_WIN
-#  include <windows.h>
-#  include <dwmapi.h>
+#include <windows.h>
+#include <dwmapi.h>
 // Older SDKs may not define these DWMWA attribute IDs; pin the values from the
 // Microsoft docs so the build doesn't depend on a recent Windows SDK header.
-#  ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-#    define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-#  endif
-#  ifndef DWMWA_CAPTION_COLOR
-#    define DWMWA_CAPTION_COLOR 35
-#  endif
-#  ifndef DWMWA_TEXT_COLOR
-#    define DWMWA_TEXT_COLOR 36
-#  endif
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+#ifndef DWMWA_TEXT_COLOR
+#define DWMWA_TEXT_COLOR 36
+#endif
 #endif
 
 namespace qvim {
 
-WindowChrome::WindowChrome(QObject* parent) : QObject(parent) {}
+WindowChrome::WindowChrome(QObject *parent) : QObject(parent) {}
 
-void WindowChrome::applyToWindow([[maybe_unused]] QQuickWindow* window,
+void WindowChrome::applyToWindow([[maybe_unused]] QQuickWindow *window,
                                  [[maybe_unused]] QColor background) {
 #ifdef Q_OS_WIN
-    if (!window || !background.isValid()) return;
+    if(!window || !background.isValid()) return;
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
-    if (!hwnd) return;
+    if(!hwnd) return;
 
     const COLORREF caption = RGB(background.red(), background.green(), background.blue());
     DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption, sizeof(caption));
