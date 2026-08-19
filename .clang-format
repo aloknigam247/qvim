@@ -1,0 +1,175 @@
+# qvim clang-format standard (issue #41).
+# Authoritative tool version: clang-format 22.1.8. Output can differ across releases; format with
+# this version. Applies to C++ under src/, include/, tests/ only (qml/ uses qmlformat; android/
+# builds separately).
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+UseTab: Never
+TabWidth: 4
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+AccessModifierOffset: -4
+NamespaceIndentation: None
+IndentCaseLabels: true
+IndentPPDirectives: None
+IndentWrappedFunctionNames: true
+LambdaBodyIndentation: OuterScope
+
+# Column & lines
+ColumnLimit: 100
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+SeparateDefinitionBlocks: Leave
+LineEnding: DeriveLF
+InsertNewlineAtEOF: false
+
+# Pointers & qualifiers
+PointerAlignment: Right
+ReferenceAlignment: Right
+QualifierAlignment: Left
+
+# Braces & wrapping — Custom BraceWrapping reproduces the user's compact-attach sample
+# (all braces attached; no break before else/catch)
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+Cpp11BracedListStyle: false
+InsertBraces: false
+BreakConstructorInitializers: AfterColon
+PackConstructorInitializers: BinPack
+BreakInheritanceList: AfterColon
+
+# Short constructs
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+AllowShortEnumsOnASingleLine: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+AlignOperands: Align
+AlignEscapedNewlines: Right
+
+# Bin-packing
+BinPackArguments: true
+BinPackParameters: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllArgumentsOnNextLine: true
+
+# Breaking
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakTemplateDeclarations: Yes
+BreakStringLiterals: false
+BreakBeforeConceptDeclarations: Always
+
+# Spacing
+SpaceBeforeParens: Never
+SpacesInParens: Never
+SpacesInAngles: Never
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpacesBeforeTrailingComments: 1
+SpaceBeforeRangeBasedForLoopColon: false
+SpaceBeforeCpp11BracedList: false
+
+# Includes
+SortIncludes: CaseInsensitive
+IncludeBlocks: Preserve
+
+# Comments & namespaces
+ReflowComments: true
+FixNamespaceComments: true
+CompactNamespaces: false
+SortUsingDeclarations: LexicographicNumeric
+
+# Empty lines & access
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineAfterAccessModifier: Never
+
+# Language
+Standard: Latest
+PPIndentWidth: -1
+DerivePointerAlignment: false
+RemoveParentheses: MultipleParentheses
+RemoveBracesLLVM: false
+RemoveSemicolon: true
+RemoveEmptyLinesInUnwrappedLines: false
+IntegerLiteralSeparator:
+  Binary: 0
+  BinaryMinDigitsInsert: 0
+  BinaryMaxDigitsRemove: 0
+  Decimal: 0
+  DecimalMinDigitsInsert: 0
+  DecimalMaxDigitsRemove: 0
+  Hex: 0
+  HexMinDigitsInsert: 0
+  HexMaxDigitsRemove: 0
+EnumTrailingComma: Remove
+InsertTrailingCommas: None
+IndentAccessModifiers: false
+IndentCaseBlocks: false
+IndentExternBlock: AfterExternBlock
+IndentGotoLabels: true
+IndentRequiresClause: true
+BreakAfterReturnType: Automatic
+BreakFunctionDefinitionParameters: false
+BreakAfterAttributes: Always
+BreakBeforeTemplateCloser: false
+BreakBinaryOperations: Never
+BreakAdjacentStringLiterals: true
+BracedInitializerIndentWidth: -1
+BinPackLongBracedList: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCtorInitializerColon: true
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBraces: Never
+SpacesInSquareBrackets: false
+SpaceAfterLogicalNot: false
+SpaceAfterOperatorKeyword: false
+ShortNamespaceLines: 1
+WrapNamespaceBodyWithEmptyLines: Leave
+AllowShortNamespacesOnASingleLine: false
+RequiresClausePosition: OwnLine
+RequiresExpressionIndentation: OuterScope
+AllowShortCompoundRequirementOnASingleLine: true
+IncludeCategories:
+  - Regex:    '^<windows\.h>'
+    Priority: -1
+  - Regex:    '^"'
+    Priority: 1
+  - Regex:    '^<Q'
+    Priority: 3
+  - Regex:    '.*'
+    Priority: 2
