@@ -25,7 +25,7 @@ class Config;
 // if they were not intended for qvim.
 class ConfigCliReader {
 public:
-    static QStringList extract(QStringList& args, Config& cfg);
+    static QStringList extract(QStringList &args, Config &cfg);
 };
 
 } // namespace qvim

@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QSignalSpy>
+#include <QtTest>
 
 #include "Config.h"
 #include "ConfigGGlobalReader.h"

@@ -1,5 +1,5 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
@@ -16,7 +16,7 @@ private slots:
 
         conn.input(QStringLiteral("iabc<Esc>"));
         // Allow several redraw flushes; the last flush should carry the final state.
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 1000);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 1000);
 
         const QString dump = conn.grid()->dumpAscii();
         QVERIFY2(dump.startsWith(QStringLiteral("abc")),

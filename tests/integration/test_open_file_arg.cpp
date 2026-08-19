@@ -42,25 +42,23 @@ private slots:
         // NvimConnector::start() is the production wiring; this test
         // verifies the underlying forward path it depends on.
         MsgpackRpc rpc;
-        QVERIFY(rpc.startEmbeddedNvim(locateNvim(), QStringList{path}));
+        QVERIFY(rpc.startEmbeddedNvim(locateNvim(), QStringList{ path }));
 
         // Attach UI so nvim's startup completes and the file argument is
         // actually loaded into a buffer.
         bool attachDone = false;
-        rpc.request(QStringLiteral("nvim_ui_attach"),
-            [](msgpack::packer<msgpack::sbuffer>& pk) {
-                pk.pack_array(3);
-                pk.pack(static_cast<int64_t>(80));
-                pk.pack(static_cast<int64_t>(24));
-                pk.pack_map(1);
-                pk.pack(std::string("ext_linegrid"));
-                pk.pack(true);
-            },
-            [&](RpcResult) { attachDone = true; });
+        rpc.request(QStringLiteral("nvim_ui_attach"), [](msgpack::packer<msgpack::sbuffer> &pk) {
+            pk.pack_array(3);
+            pk.pack(static_cast<int64_t>(80));
+            pk.pack(static_cast<int64_t>(24));
+            pk.pack_map(1);
+            pk.pack(std::string("ext_linegrid"));
+            pk.pack(true);
+        }, [&](RpcResult) { attachDone = true; });
 
         QElapsedTimer t;
         t.start();
-        while (!attachDone && t.elapsed() < 5000) {
+        while(!attachDone && t.elapsed() < 5000) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
         }
         QVERIFY2(attachDone, "nvim_ui_attach did not complete");
@@ -70,26 +68,24 @@ private slots:
         // `[1, msgid, err, result]`, so we index into arr.ptr[3].
         QString bufName;
         bool nameDone = false;
-        rpc.request(QStringLiteral("nvim_buf_get_name"),
-            [](msgpack::packer<msgpack::sbuffer>& pk) {
-                pk.pack_array(1);
-                pk.pack(static_cast<int64_t>(0));
-            },
-            [&](RpcResult r) {
-                nameDone = true;
-                if (!r) return;
-                const msgpack::object& root = r.value()->get();
-                if (root.type != msgpack::type::ARRAY) return;
-                const auto& arr = root.via.array;
-                if (arr.size < 4) return;
-                const msgpack::object& result = arr.ptr[3];
-                if (result.type == msgpack::type::STR) {
-                    bufName = QString::fromUtf8(result.via.str.ptr, result.via.str.size);
-                }
-            });
+        rpc.request(QStringLiteral("nvim_buf_get_name"), [](msgpack::packer<msgpack::sbuffer> &pk) {
+            pk.pack_array(1);
+            pk.pack(static_cast<int64_t>(0));
+        }, [&](RpcResult r) {
+            nameDone = true;
+            if(!r) return;
+            const msgpack::object &root = r.value()->get();
+            if(root.type != msgpack::type::ARRAY) return;
+            const auto &arr = root.via.array;
+            if(arr.size < 4) return;
+            const msgpack::object &result = arr.ptr[3];
+            if(result.type == msgpack::type::STR) {
+                bufName = QString::fromUtf8(result.via.str.ptr, result.via.str.size);
+            }
+        });
 
         t.restart();
-        while (!nameDone && t.elapsed() < 5000) {
+        while(!nameDone && t.elapsed() < 5000) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
         }
         QVERIFY2(nameDone, "nvim_buf_get_name did not return");

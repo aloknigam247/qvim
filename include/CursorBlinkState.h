@@ -32,14 +32,12 @@ public:
     qint64 nextChangeMs(qint64 nowMs) const;
 
 private:
-    bool blinkingEnabled() const {
-        return m_blinkWait > 0 && m_blinkOn > 0 && m_blinkOff > 0;
-    }
+    bool blinkingEnabled() const { return m_blinkWait > 0 && m_blinkOn > 0 && m_blinkOff > 0; }
 
-    int     m_blinkWait  = 0;
-    int     m_blinkOn    = 0;
-    int     m_blinkOff   = 0;
-    qint64  m_activityAt = 0;
+    int m_blinkWait = 0;
+    int m_blinkOn = 0;
+    int m_blinkOff = 0;
+    qint64 m_activityAt = 0;
 };
 
 } // namespace qvim

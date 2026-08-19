@@ -32,49 +32,48 @@ using namespace qvim::test;
 
 namespace {
 
-QQuickWindow* loadMainQml(QQmlApplicationEngine& engine, NvimConnector* conn) {
+QQuickWindow *loadMainQml(QQmlApplicationEngine &engine, NvimConnector *conn) {
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), conn);
     engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
-    if (engine.rootObjects().isEmpty()) return nullptr;
-    return qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+    if(engine.rootObjects().isEmpty()) return nullptr;
+    return qobject_cast<QQuickWindow *>(engine.rootObjects().first());
 }
 
 template <typename F>
-bool waitUntil(F&& predicate, int timeoutMs) {
+bool waitUntil(F &&predicate, int timeoutMs) {
     QElapsedTimer t;
     t.start();
-    while (!predicate()) {
-        if (t.elapsed() >= timeoutMs) return false;
+    while(!predicate()) {
+        if(t.elapsed() >= timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return true;
 }
 
-QImage grabItem(QQuickItem* item, int timeoutMs = 2000) {
+QImage grabItem(QQuickItem *item, int timeoutMs = 2000) {
     QSharedPointer<QQuickItemGrabResult> result = item->grabToImage();
-    if (!result) return {};
+    if(!result) return {};
     QElapsedTimer t;
     t.start();
-    while (result->image().isNull() && t.elapsed() < timeoutMs) {
+    while(result->image().isNull() && t.elapsed() < timeoutMs) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return result->image();
 }
 
-int distinctColours(const QImage& img) {
+int distinctColours(const QImage &img) {
     QHash<QRgb, int> seen;
-    for (int y = 0; y < img.height(); ++y) {
-        for (int x = 0; x < img.width(); ++x) {
+    for(int y = 0; y < img.height(); ++y) {
+        for(int x = 0; x < img.width(); ++x) {
             seen.insert(img.pixel(x, y), 1);
-            if (seen.size() > 1) return seen.size();
+            if(seen.size() > 1) return seen.size();
         }
     }
     return seen.size();
 }
 
-void clickItem(QQuickWindow* window, QQuickItem* item) {
-    const QPointF c =
-        item->mapToScene(QPointF(item->width() / 2.0, item->height() / 2.0));
+void clickItem(QQuickWindow *window, QQuickItem *item) {
+    const QPointF c = item->mapToScene(QPointF(item->width() / 2.0, item->height() / 2.0));
     QTest::mouseClick(window, Qt::LeftButton, {}, c.toPoint());
 }
 
@@ -95,21 +94,21 @@ private slots:
         QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
-        QQuickWindow* window = loadMainQml(engine, &conn);
+        QQuickWindow *window = loadMainQml(engine, &conn);
         QVERIFY2(window, "Main.qml failed to load");
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
 
-        auto* toggle = window->findChild<QQuickItem*>(QStringLiteral("chatToggle"));
-        auto* panel  = window->findChild<QQuickItem*>(QStringLiteral("chatPanel"));
-        auto* model  = window->findChild<ChatModel*>();
+        auto *toggle = window->findChild<QQuickItem *>(QStringLiteral("chatToggle"));
+        auto *panel = window->findChild<QQuickItem *>(QStringLiteral("chatPanel"));
+        auto *model = window->findChild<ChatModel *>();
         QVERIFY2(toggle, "chatToggle button not found in scene");
-        QVERIFY2(panel,  "chatPanel not found in scene");
-        QVERIFY2(model,  "ChatModel not found in scene");
+        QVERIFY2(panel, "chatPanel not found in scene");
+        QVERIFY2(model, "ChatModel not found in scene");
 
         // Focus starts on the grid; record it so we can prove it is restored.
-        QQuickItem* gridFocus = window->activeFocusItem();
+        QQuickItem *gridFocus = window->activeFocusItem();
         QVERIFY2(gridFocus != nullptr, "No active focus item after attach");
         QVERIFY(!panel->isVisible());
         const int baseCols = conn.grid()->gridCols(1);
@@ -121,10 +120,9 @@ private slots:
                  "Panel did not become visible after clicking the toggle");
         QVERIFY2(waitUntil(
                      [&] {
-                         QQuickItem* f = window->activeFocusItem();
-                         return f && f->objectName() == QStringLiteral("chatInput");
-                     },
-                     3000),
+            QQuickItem *f = window->activeFocusItem();
+            return f && f->objectName() == QStringLiteral("chatInput");
+        }, 3000),
                  "Chat input did not take focus on open");
 
         // (3) Opening the panel shrinks the nvim grid via the resize path.
@@ -163,8 +161,9 @@ private slots:
         QTest::keyClick(window, Qt::Key_I);
         QTest::keyClick(window, Qt::Key_X);
         QTest::keyClick(window, Qt::Key_Escape);
-        QVERIFY2(waitUntil([&] { return conn.grid()->dumpAscii().contains(QLatin1Char('x')); }, 3000),
-                 "nvim did not receive keystrokes after the panel closed");
+        QVERIFY2(
+            waitUntil([&] { return conn.grid()->dumpAscii().contains(QLatin1Char('x')); }, 3000),
+            "nvim did not receive keystrokes after the panel closed");
     }
 };
 

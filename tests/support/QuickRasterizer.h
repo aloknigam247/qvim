@@ -35,7 +35,7 @@ public:
     // Renders one frame and returns its pixels. Returns a null QImage if the
     // scene graph produced nothing; callers must treat that as a hard failure,
     // since a silent null would make every pixel assertion below it vacuous.
-    QImage render(QQuickItem* item) {
+    QImage render(QQuickItem *item) {
         const int w = static_cast<int>(item->width());
         const int h = static_cast<int>(item->height());
         item->setParentItem(m_window.contentItem());
@@ -56,7 +56,7 @@ public:
         return qFuzzyCompare(m_window.effectiveDevicePixelRatio(), qreal(1));
     }
 
-    QQuickWindow* window() { return &m_window; }
+    QQuickWindow *window() { return &m_window; }
 
 private:
     QQuickWindow m_window;

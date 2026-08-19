@@ -12,14 +12,12 @@ namespace qvim {
 // `.\foo.txt -O .\bar.txt` arrives as ONE arg `".\foo.txt" "-O" ".\bar.txt"`.
 // MSVC CRT and CommandLineToArgvW both parse this faithfully — both end up
 // returning the merged single arg. The fix lives entirely on our side.
-static void appendNormalized(const QString& raw, QStringList& out) {
-    if (raw.size() >= 2 && raw.startsWith(QLatin1Char('"')) && raw.endsWith(QLatin1Char('"'))) {
+static void appendNormalized(const QString &raw, QStringList &out) {
+    if(raw.size() >= 2 && raw.startsWith(QLatin1Char('"')) && raw.endsWith(QLatin1Char('"'))) {
         const QString inner = raw.mid(1, raw.size() - 2);
-        if (inner.contains(QStringLiteral("\" \""))) {
+        if(inner.contains(QStringLiteral("\" \""))) {
             // pwsh crushed multiple args into one quoted token.
-            for (const QString& piece : inner.split(QStringLiteral("\" \""))) {
-                out << piece;
-            }
+            for(const QString &piece: inner.split(QStringLiteral("\" \""))) { out << piece; }
             return;
         }
         out << inner;
@@ -28,28 +26,26 @@ static void appendNormalized(const QString& raw, QStringList& out) {
     out << raw;
 }
 
-QvimArgs parseArgv(int argc, char** argv) {
+QvimArgs parseArgv(int argc, char **argv) {
     QvimArgs out;
     QStringList logical;
-    for (int i = 1; i < argc; ++i) {
-        appendNormalized(QString::fromLocal8Bit(argv[i]), logical);
-    }
-    for (const QString& arg : logical) {
-        if (arg == QStringLiteral("--help") || arg == QStringLiteral("-h")) {
+    for(int i = 1; i < argc; ++i) { appendNormalized(QString::fromLocal8Bit(argv[i]), logical); }
+    for(const QString &arg: logical) {
+        if(arg == QStringLiteral("--help") || arg == QStringLiteral("-h")) {
             out.helpRequested = true;
             continue;
         }
-        if (arg == QStringLiteral("--version") || arg == QStringLiteral("-v")) {
+        if(arg == QStringLiteral("--version") || arg == QStringLiteral("-v")) {
             out.versionRequested = true;
             continue;
         }
-        if (arg.startsWith(QStringLiteral("--qvim-"))) {
+        if(arg.startsWith(QStringLiteral("--qvim-"))) {
             // Reserved namespace for future qvim-only options. Swallowed here
             // so it never leaks into nvim's argv, where it would be rejected.
             qDebug() << "qvim: ignoring reserved option" << arg;
             continue;
         }
-        if (arg == QStringLiteral("-")) {
+        if(arg == QStringLiteral("-")) {
             // Consumed by qvim — forwarding to nvim --embed would conflict
             // with the RPC channel that already owns nvim's stdin.
             out.stdinAsBuffer = true;

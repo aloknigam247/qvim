@@ -1,20 +1,20 @@
+#include <cstdio>
+#include <future>
 #include <QByteArray>
 #include <QDebug>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QStandardPaths>
-#include <QFileInfo>
-#include <QDir>
-#include <cstdio>
-#include <future>
 #ifdef _WIN32
-#  include <fcntl.h>
-#  include <io.h>
-#  include <windows.h>
+#include <windows.h>
+#include <fcntl.h>
+#include <io.h>
 #endif
 
 #include "AppIcon.h"
@@ -33,31 +33,31 @@ namespace {
 
 QString locateNvim() {
     const QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
-    if (!fromPath.isEmpty()) return fromPath;
+    if(!fromPath.isEmpty()) return fromPath;
     return QStringLiteral("nvim");
 }
 
 struct BootProfile {
-    const bool    enabled;
+    const bool enabled;
     const QString outFile;
     QElapsedTimer timer;
-    BootProfile()
-        : enabled(qEnvironmentVariableIntValue("QVIM_BOOT_PROFILE") != 0)
-        , outFile(qEnvironmentVariable("QVIM_BOOT_PROFILE_FILE")) {
-        if (enabled) timer.start();
+    BootProfile() :
+        enabled(qEnvironmentVariableIntValue("QVIM_BOOT_PROFILE") != 0),
+        outFile(qEnvironmentVariable("QVIM_BOOT_PROFILE_FILE")) {
+        if(enabled) timer.start();
     }
-    void mark(const char* phase) {
-        if (!enabled) return;
+    void mark(const char *phase) {
+        if(!enabled) return;
         const qint64 ms = timer.elapsed();
         qDebug().noquote() << "[boot]" << phase << ms << "ms";
-        if (!outFile.isEmpty()) {
-            std::FILE* fp = nullptr;
+        if(!outFile.isEmpty()) {
+            std::FILE *fp = nullptr;
 #ifdef _WIN32
             (void)::fopen_s(&fp, outFile.toLocal8Bit().constData(), "a");
 #else
             fp = std::fopen(outFile.toLocal8Bit().constData(), "a");
 #endif
-            if (fp) {
+            if(fp) {
                 std::fprintf(fp, "[boot] %s %lld ms\n", phase, static_cast<long long>(ms));
                 std::fclose(fp);
             }
@@ -67,33 +67,32 @@ struct BootProfile {
 
 } // namespace
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     BootProfile boot;
     const qvim::QvimArgs cli = qvim::parseArgv(argc, argv);
     boot.mark("argv parsed");
-    if (cli.helpRequested) {
-        std::printf(
-            "Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
-            "\n"
-            "qvim is a Neovim GUI client. All arguments not in qvim's own\n"
-            "namespace are forwarded to the embedded `nvim --embed` process.\n"
-            "\n"
-            "qvim options:\n"
-            "  -h, --help       Show this help and exit.\n"
-            "  -v, --version    Show qvim version and exit.\n"
-            "\n"
-            "Everything else (e.g. `foo.txt`, `-O a.txt b.txt`, `+10 foo.txt`,\n"
-            "`-c \"set number\" foo.txt`) is forwarded to nvim.\n"
-            "\n"
-            "Reading stdin (`qvim -`):\n"
-            "  PowerShell intercepts the literal `-` token for its own pipeline\n"
-            "  handling, which delays spawning qvim by several seconds. Use cmd\n"
-            "  or Start-Process to avoid the delay:\n"
-            "    cmd /c \"echo hello | qvim -\"\n"
-            "    Start-Process qvim '-' -RedirectStandardInput in.txt\n");
+    if(cli.helpRequested) {
+        std::printf("Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
+                    "\n"
+                    "qvim is a Neovim GUI client. All arguments not in qvim's own\n"
+                    "namespace are forwarded to the embedded `nvim --embed` process.\n"
+                    "\n"
+                    "qvim options:\n"
+                    "  -h, --help       Show this help and exit.\n"
+                    "  -v, --version    Show qvim version and exit.\n"
+                    "\n"
+                    "Everything else (e.g. `foo.txt`, `-O a.txt b.txt`, `+10 foo.txt`,\n"
+                    "`-c \"set number\" foo.txt`) is forwarded to nvim.\n"
+                    "\n"
+                    "Reading stdin (`qvim -`):\n"
+                    "  PowerShell intercepts the literal `-` token for its own pipeline\n"
+                    "  handling, which delays spawning qvim by several seconds. Use cmd\n"
+                    "  or Start-Process to avoid the delay:\n"
+                    "    cmd /c \"echo hello | qvim -\"\n"
+                    "    Start-Process qvim '-' -RedirectStandardInput in.txt\n");
         return 0;
     }
-    if (cli.versionRequested) {
+    if(cli.versionRequested) {
         std::printf("qvim 0.1.0\n");
         return 0;
     }
@@ -116,20 +115,20 @@ int main(int argc, char* argv[]) {
     // that never come. The background thread would leak.
     std::future<QByteArray> stdinFuture;
     bool stdinIsRedirected = false;
-    if (cli.stdinAsBuffer) {
+    if(cli.stdinAsBuffer) {
 #ifdef _WIN32
         const DWORD t = GetFileType(GetStdHandle(STD_INPUT_HANDLE));
         stdinIsRedirected = (t == FILE_TYPE_PIPE || t == FILE_TYPE_DISK);
-        if (stdinIsRedirected) _setmode(_fileno(stdin), _O_BINARY);
+        if(stdinIsRedirected) _setmode(_fileno(stdin), _O_BINARY);
 #else
         stdinIsRedirected = !isatty(fileno(stdin));
 #endif
     }
-    if (cli.stdinAsBuffer && stdinIsRedirected) {
+    if(cli.stdinAsBuffer && stdinIsRedirected) {
         stdinFuture = std::async(std::launch::async, []() {
             QByteArray buf;
             char chunk[4096];
-            while (std::size_t n = std::fread(chunk, 1, sizeof(chunk), stdin)) {
+            while(std::size_t n = std::fread(chunk, 1, sizeof(chunk), stdin)) {
                 buf.append(chunk, static_cast<qsizetype>(n));
             }
             return buf;
@@ -155,8 +154,7 @@ int main(int argc, char* argv[]) {
     boot.mark("QGuiApplication ctor done");
 
     qvim::Config cfg;
-    cfg.registerOption(QStringLiteral("rounded_highlights"),
-                       qvim::ConfigType::StringList,
+    cfg.registerOption(QStringLiteral("rounded_highlights"), qvim::ConfigType::StringList,
                        QStringList{});
 
     QStringList forwardArgs = cli.nvimForwardArgs;
@@ -168,7 +166,7 @@ int main(int argc, char* argv[]) {
     qvim::WindowChrome windowChrome;
     boot.mark("NvimConnector ctor done");
 
-    if (!connector.start(locateNvim(), forwardArgs)) {
+    if(!connector.start(locateNvim(), forwardArgs)) {
         qFatal("Failed to start nvim. Ensure it is on PATH.");
         return 1;
     }
@@ -200,56 +198,53 @@ int main(int argc, char* argv[]) {
     // will fire Config::changed once the user's g:qvim_rounded_highlights
     // resolves.
     auto applyRounded = [&]() {
-        if (auto* h = connector.highlights()) {
-            h->setRoundedHighlights(
-                cfg.value(QStringLiteral("rounded_highlights")).toStringList());
+        if(auto *h = connector.highlights()) {
+            h->setRoundedHighlights(cfg.value(QStringLiteral("rounded_highlights")).toStringList());
         }
     };
     applyRounded();
-    QObject::connect(&cfg, &qvim::Config::changed, &connector,
-                     [applyRounded](const QString& name) {
-                         if (name == QStringLiteral("rounded_highlights")) applyRounded();
-                     });
+    QObject::connect(&cfg, &qvim::Config::changed, &connector, [applyRounded](const QString &name) {
+        if(name == QStringLiteral("rounded_highlights")) applyRounded();
+    });
 
-    QObject::connect(&connector, &qvim::NvimConnector::disconnected,
-                     &app, &QCoreApplication::quit);
-    QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
-                     &cfg, [&connector, &cfg, &boot]() {
-                         boot.mark("attachComplete signal");
-                         qvim::ConfigGGlobalReader::read(connector, cfg);
-                     });
-    QObject::connect(&connector, &qvim::NvimConnector::flush,
-                     &connector, [&boot]() {
-                         static bool firstFlushSeen = false;
-                         if (firstFlushSeen) return;
-                         firstFlushSeen = true;
-                         boot.mark("first redraw flush received");
-                     });
+    QObject::connect(&connector, &qvim::NvimConnector::disconnected, &app, &QCoreApplication::quit);
+    QObject::connect(&connector, &qvim::NvimConnector::attachComplete, &cfg,
+                     [&connector, &cfg, &boot]() {
+        boot.mark("attachComplete signal");
+        qvim::ConfigGGlobalReader::read(connector, cfg);
+    });
+    QObject::connect(&connector, &qvim::NvimConnector::flush, &connector, [&boot]() {
+        static bool firstFlushSeen = false;
+        if(firstFlushSeen) return;
+        firstFlushSeen = true;
+        boot.mark("first redraw flush received");
+    });
 
-    if (cli.stdinAsBuffer && stdinIsRedirected) {
-        QObject::connect(&connector, &qvim::NvimConnector::attachComplete,
-                         &connector, [&connector, fut = std::make_shared<std::future<QByteArray>>(std::move(stdinFuture))]() {
-                             connector.loadStdinIntoBuffer(fut->get());
-                         });
+    if(cli.stdinAsBuffer && stdinIsRedirected) {
+        QObject::connect(&connector, &qvim::NvimConnector::attachComplete, &connector,
+                         [&connector, fut = std::make_shared<std::future<QByteArray>>(
+                                          std::move(stdinFuture))]() {
+            connector.loadStdinIntoBuffer(fut->get());
+        });
     }
 
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty(QStringLiteral("$config"),    &cfg);
+    engine.rootContext()->setContextProperty(QStringLiteral("$config"), &cfg);
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &connector);
     engine.rootContext()->setContextProperty(QStringLiteral("$clipboard"), &clipboard);
     engine.rootContext()->setContextProperty(QStringLiteral("$windowChrome"), &windowChrome);
 
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
-                     &app, []{ QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+                     [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
     engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
     boot.mark("engine.loadFromModule done");
 
-    if (!engine.rootObjects().isEmpty()) {
-        if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
+    if(!engine.rootObjects().isEmpty()) {
+        if(auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
             QObject::connect(w, &QQuickWindow::frameSwapped, &app, [&boot]() {
                 static bool firstFrameSeen = false;
-                if (firstFrameSeen) return;
+                if(firstFrameSeen) return;
                 firstFrameSeen = true;
                 boot.mark("first frame swapped");
             }, Qt::SingleShotConnection);
@@ -259,18 +254,18 @@ int main(int argc, char* argv[]) {
             // phase so we can tell time-to-first-frame from time-to-visible.
             QObject::connect(w, &QQuickWindow::visibleChanged, &app, [w, &boot, &connector]() {
                 static bool firstShowSeen = false;
-                if (firstShowSeen) return;
-                if (!w->isVisible()) return;
+                if(firstShowSeen) return;
+                if(!w->isVisible()) return;
                 firstShowSeen = true;
                 boot.mark("window shown at real size");
                 // Persist the final grid dimensions so the next launch can
                 // skip the placeholder→resize round-trip.
-                if (auto* g = connector.grid()) {
+                if(auto *g = connector.grid()) {
                     qvim::SessionCache cache;
                     cache.guifont = connector.guifont();
                     cache.cols = g->gridCols(1);
                     cache.rows = g->gridRows(1);
-                    if (cache.isValid()) qvim::SessionCache::save(cache);
+                    if(cache.isValid()) qvim::SessionCache::save(cache);
                 }
             });
         }

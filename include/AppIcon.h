@@ -4,6 +4,6 @@ class QGuiApplication;
 
 namespace qvim {
 
-void setupApplicationIcon(QGuiApplication& app);
+void setupApplicationIcon(QGuiApplication &app);
 
 } // namespace qvim

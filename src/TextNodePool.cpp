@@ -11,29 +11,29 @@ namespace qvim {
 
 TextNodePool::~TextNodePool() = default;
 
-void TextNodePool::beginFrame(QSGNode* parent, QQuickWindow* window) {
+void TextNodePool::beginFrame(QSGNode *parent, QQuickWindow *window) {
     m_parent = parent;
     m_window = window;
     m_keyToIndex.clear();
     m_used = 0;
 }
 
-void TextNodePool::addText(int key, const QString& text, const QFont& font,
-                           const QColor& color, QPointF baselinePos) {
-    if (!m_parent || !m_window || text.isEmpty()) return;
+void TextNodePool::addText(int key, const QString &text, const QFont &font, const QColor &color,
+                           QPointF baselinePos) {
+    if(!m_parent || !m_window || text.isEmpty()) return;
 
-    QSGTextNode* node = nullptr;
+    QSGTextNode *node = nullptr;
     auto it = m_keyToIndex.constFind(key);
-    if (it != m_keyToIndex.constEnd()) {
+    if(it != m_keyToIndex.constEnd()) {
         node = m_nodes[it.value()];
     } else {
         const int slot = m_used++;
-        if (slot < m_nodes.size()) {
+        if(slot < m_nodes.size()) {
             node = m_nodes[slot];
             node->clear();
         } else {
             node = m_window->createTextNode();
-            if (!node) return;
+            if(!node) return;
             m_nodes.append(node);
             m_parent->appendChildNode(node);
         }
@@ -60,20 +60,22 @@ void TextNodePool::addText(int key, const QString& text, const QFont& font,
     layout.setTextOption(opt);
     layout.beginLayout();
     QTextLine line = layout.createLine();
-    if (!line.isValid()) { layout.endLayout(); return; }
+    if(!line.isValid()) {
+        layout.endLayout();
+        return;
+    }
     line.setLineWidth(qreal(1 << 20));
     line.setPosition(QPointF(0, 0));
     layout.endLayout();
 
     // addTextLayout anchors on the layout's top-left, but callers think in
     // baselines because that is what cell metrics are expressed in.
-    node->addTextLayout(QPointF(baselinePos.x(), baselinePos.y() - line.ascent()),
-                        &layout);
+    node->addTextLayout(QPointF(baselinePos.x(), baselinePos.y() - line.ascent()), &layout);
 }
 
 void TextNodePool::endFrame() {
-    for (int i = m_used; i < m_nodes.size(); ++i) {
-        if (m_parent) m_parent->removeChildNode(m_nodes[i]);
+    for(int i = m_used; i < m_nodes.size(); ++i) {
+        if(m_parent) m_parent->removeChildNode(m_nodes[i]);
         delete m_nodes[i];
     }
     m_nodes.resize(m_used);

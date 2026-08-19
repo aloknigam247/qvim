@@ -32,14 +32,14 @@ public:
     ~TextNodePool();
 
     // parent and window must outlive the frame. Call once per updatePaintNode.
-    void beginFrame(QSGNode* parent, QQuickWindow* window);
+    void beginFrame(QSGNode *parent, QQuickWindow *window);
 
     // Draws text with its baseline-left corner at baselinePos.
     //
     // key buckets runs into nodes and must determine colour — two runs sharing
     // a key but not a colour would silently take the first one's colour.
-    void addText(int key, const QString& text, const QFont& font,
-                 const QColor& color, QPointF baselinePos);
+    void addText(int key, const QString &text, const QFont &font, const QColor &color,
+                 QPointF baselinePos);
 
     void endFrame();
 
@@ -50,15 +50,15 @@ public:
     // Node inspection for tests. NativeRendering is the entire point of the
     // scene-graph port (issue #15), and no pixel test can catch a silent flip
     // back to QtRendering because the suite runs on the software backend.
-    int          nodeCount() const { return int(m_nodes.size()); }
-    QSGTextNode* nodeAt(int i) const { return m_nodes.value(i); }
+    int nodeCount() const { return int(m_nodes.size()); }
+    QSGTextNode *nodeAt(int i) const { return m_nodes.value(i); }
 
 private:
-    QSGNode*              m_parent = nullptr;
-    QQuickWindow*         m_window = nullptr;
-    QVector<QSGTextNode*> m_nodes;
-    QHash<int, int>       m_keyToIndex;
-    int                   m_used = 0;
+    QSGNode *m_parent = nullptr;
+    QQuickWindow *m_window = nullptr;
+    QVector<QSGTextNode *> m_nodes;
+    QHash<int, int> m_keyToIndex;
+    int m_used = 0;
 };
 
 } // namespace qvim

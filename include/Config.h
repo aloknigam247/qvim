@@ -1,11 +1,11 @@
 #pragma once
 
-#include <QObject>
+#include <optional>
 #include <QHash>
+#include <QObject>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
-#include <optional>
 
 namespace qvim {
 
@@ -14,7 +14,7 @@ enum class ConfigType {
     Int,
     Float,
     String,
-    StringList,
+    StringList
 };
 
 // Central registry for qvim configuration options.
@@ -34,33 +34,33 @@ enum class ConfigType {
 class Config : public QObject {
     Q_OBJECT
 public:
-    explicit Config(QObject* parent = nullptr);
+    explicit Config(QObject *parent = nullptr);
 
-    void registerOption(const QString& name, ConfigType type, QVariant defaultValue);
+    void registerOption(const QString &name, ConfigType type, QVariant defaultValue);
 
-    Q_INVOKABLE bool has(const QString& name) const;
-    Q_INVOKABLE QVariant value(const QString& name) const;
+    Q_INVOKABLE bool has(const QString &name) const;
+    Q_INVOKABLE QVariant value(const QString &name) const;
     Q_INVOKABLE QStringList registeredNames() const;
 
-    ConfigType type(const QString& name) const;
+    ConfigType type(const QString &name) const;
 
-    void setFromDefault(const QString& name, QVariant value);
-    void setFromGGlobal(const QString& name, QVariant value);
-    void setFromCli(const QString& name, QVariant value);
+    void setFromDefault(const QString &name, QVariant value);
+    void setFromGGlobal(const QString &name, QVariant value);
+    void setFromCli(const QString &name, QVariant value);
 
 signals:
     void changed(QString name);
 
 private:
     struct Entry {
-        ConfigType            type;
-        QVariant              defaultValue;
+        ConfigType type;
+        QVariant defaultValue;
         std::optional<QVariant> gGlobal;
         std::optional<QVariant> cli;
     };
 
-    QVariant resolve(const Entry& e) const;
-    void applyAndNotify(const QString& name, Entry& e, QVariant before);
+    QVariant resolve(const Entry &e) const;
+    void applyAndNotify(const QString &name, Entry &e, QVariant before);
 
     QHash<QString, Entry> m_entries;
 };

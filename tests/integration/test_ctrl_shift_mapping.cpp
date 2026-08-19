@@ -1,14 +1,14 @@
-#include <QtTest>
 #include <QKeyEvent>
+#include <QtTest>
 
-#include "IntegrationHelpers.h"
 #include "InputHandler.h"
+#include "IntegrationHelpers.h"
 
 using namespace qvim;
 using namespace qvim::test;
 
 namespace {
-QString encode(int key, Qt::KeyboardModifiers mods, const QString& text) {
+QString encode(int key, Qt::KeyboardModifiers mods, const QString &text) {
     QKeyEvent ev(QEvent::KeyPress, key, mods, text);
     return InputHandler::keyToNvim(&ev);
 }
@@ -20,9 +20,9 @@ QString encode(int key, Qt::KeyboardModifiers mods, const QString& text) {
 class TestCtrlShiftMapping : public QObject {
     Q_OBJECT
 private:
-    static bool waitForRow0(NvimConnector& conn, const QString& prefix, int flushes = 8) {
-        for (int i = 0; i < flushes; ++i) {
-            if (conn.grid()->dumpAscii().startsWith(prefix)) return true;
+    static bool waitForRow0(NvimConnector &conn, const QString &prefix, int flushes = 8) {
+        for(int i = 0; i < flushes; ++i) {
+            if(conn.grid()->dumpAscii().startsWith(prefix)) return true;
             waitForFlush(&conn, 1000);
         }
         return conn.grid()->dumpAscii().startsWith(prefix);
@@ -39,8 +39,8 @@ private slots:
         conn.command(QStringLiteral("nnoremap <C-S-i> ihit<Esc>"));
         waitForFlush(&conn, 1000);
 
-        const QString keys = encode(Qt::Key_I, Qt::ControlModifier | Qt::ShiftModifier,
-                                    QStringLiteral("\x09"));
+        const QString keys =
+            encode(Qt::Key_I, Qt::ControlModifier | Qt::ShiftModifier, QStringLiteral("\x09"));
         QCOMPARE(keys, QStringLiteral("<S-C-i>"));
 
         conn.input(keys);
@@ -63,12 +63,13 @@ private slots:
         QCOMPARE(keys, QStringLiteral("<C-i>"));
 
         conn.input(keys);
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
 
         const QString dump = conn.grid()->dumpAscii();
         QVERIFY2(!dump.startsWith(QStringLiteral("hit")),
                  qPrintable(QStringLiteral("plain <C-i> wrongly fired the <C-S-i> mapping; "
-                                           "row 0 = '%1'").arg(dump.left(40))));
+                                           "row 0 = '%1'")
+                                .arg(dump.left(40))));
     }
 };
 

@@ -39,10 +39,10 @@ public:
     ~RectNodePool();
 
     // parent and window must outlive the frame. Call once per updatePaintNode.
-    void beginFrame(QSGNode* parent, QQuickWindow* window);
+    void beginFrame(QSGNode *parent, QQuickWindow *window);
 
     // Rects are drawn in submission order; later calls paint over earlier ones.
-    void add(const QRectF& rect, const QColor& color);
+    void add(const QRectF &rect, const QColor &color);
 
     void endFrame();
 
@@ -51,10 +51,10 @@ public:
     void forget();
 
 private:
-    QSGNode*                   m_parent = nullptr;
-    QQuickWindow*              m_window = nullptr;
-    QVector<QSGRectangleNode*> m_nodes;
-    int                        m_used = 0;
+    QSGNode *m_parent = nullptr;
+    QQuickWindow *m_window = nullptr;
+    QVector<QSGRectangleNode *> m_nodes;
+    int m_used = 0;
 };
 
 } // namespace qvim

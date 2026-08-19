@@ -1,5 +1,5 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;

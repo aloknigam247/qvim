@@ -29,7 +29,7 @@ private slots:
         // Simulate 30 rapid drag-edge requests across an interpolated path.
         const int finalCols = 110;
         const int finalRows = 32;
-        for (int i = 1; i <= 30; ++i) {
+        for(int i = 1; i <= 30; ++i) {
             const int c = 80 + ((finalCols - 80) * i) / 30;
             const int r = 24 + ((finalRows - 24) * i) / 30;
             conn.requestResize(c, r);
@@ -37,8 +37,8 @@ private slots:
         }
 
         // Wait for debounce + nvim round-trip + a few extra flushes.
-        for (int i = 0; i < 10; ++i) {
-            if (conn.grid()->cols() == finalCols && conn.grid()->rows() == finalRows) break;
+        for(int i = 0; i < 10; ++i) {
+            if(conn.grid()->cols() == finalCols && conn.grid()->rows() == finalRows) break;
             waitForFlush(&conn, 500);
         }
 
@@ -49,9 +49,10 @@ private slots:
         // must NOT have one fire per request. 5 is a comfortable bound:
         // a few are expected during attach/flush plus the single coalesced
         // resize round-trip.
-        QVERIFY2(sizeSpy.count() <= 5,
-                 qPrintable(QStringLiteral("expected <= 5 sizeChanged fires, got %1")
-                                .arg(sizeSpy.count())));
+        QVERIFY2(
+            sizeSpy.count() <= 5,
+            qPrintable(
+                QStringLiteral("expected <= 5 sizeChanged fires, got %1").arg(sizeSpy.count())));
     }
 };
 

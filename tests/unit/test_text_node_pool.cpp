@@ -1,10 +1,10 @@
-#include <QtTest>
 #include <QColor>
 #include <QFont>
 #include <QGuiApplication>
 #include <QQuickItem>
 #include <QSGNode>
 #include <QSGTextNode>
+#include <QtTest>
 
 #include "support/QuickRasterizer.h"
 
@@ -23,8 +23,7 @@ class TestTextNodePool : public QObject {
 private slots:
     void initTestCase() {
         QuickRasterizer::useSoftwareBackend();
-        if (QGuiApplication::primaryScreen() == nullptr)
-            QSKIP("No primary screen available.");
+        if(QGuiApplication::primaryScreen() == nullptr) QSKIP("No primary screen available.");
     }
 
     void usesNativeRenderingForSubpixelAntialiasing() {
@@ -36,7 +35,7 @@ private slots:
         // a live renderer behind the window.
         QVERIFY(!raster.render(&item).isNull());
 
-        QSGNode      parent;
+        QSGNode parent;
         TextNodePool pool;
         pool.beginFrame(&parent, raster.window());
         pool.addText(1, QStringLiteral("abc"), QFont(), QColor(Qt::white), QPointF(0, 10));
@@ -54,7 +53,7 @@ private slots:
         item.setHeight(32);
         QVERIFY(!raster.render(&item).isNull());
 
-        QSGNode      parent;
+        QSGNode parent;
         TextNodePool pool;
         const QFont font;
 
@@ -63,7 +62,7 @@ private slots:
         pool.addText(2, QStringLiteral("def"), font, QColor(Qt::red), QPointF(0, 20));
         pool.endFrame();
         QCOMPARE(pool.nodeCount(), 2);
-        QSGTextNode* first = pool.nodeAt(0);
+        QSGTextNode *first = pool.nodeAt(0);
 
         // Same keys next frame: no new nodes, and the existing ones are reused
         // rather than rebuilt, which is what keeps a steady-state frame

@@ -1,6 +1,6 @@
+#include <msgpack.hpp>
 #include <QSignalSpy>
 #include <QtTest>
-#include <msgpack.hpp>
 
 #include "PopupMenuModel.h"
 
@@ -8,11 +8,11 @@ using namespace qvim;
 
 namespace {
 
-msgpack::object_handle packItems(const std::vector<std::array<std::string, 4>>& items) {
+msgpack::object_handle packItems(const std::vector<std::array<std::string, 4>> &items) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(items.size()));
-    for (const auto& it : items) {
+    for(const auto &it: items) {
         pk.pack_array(4);
         pk.pack(it[0]);
         pk.pack(it[1]);
@@ -31,7 +31,8 @@ class TestPopupmenuSelect : public QObject {
 private slots:
     void selectChangesIndexAndEmits() {
         PopupMenuModel m;
-        auto items = packItems({{"foo", "f", "", ""}, {"bar", "v", "", ""}, {"baz", "m", "", ""}});
+        auto items =
+            packItems({ { "foo", "f", "", "" }, { "bar", "v", "", "" }, { "baz", "m", "", "" } });
         m.show(items.get(), 0, 1, 2);
 
         QSignalSpy spy(&m, &PopupMenuModel::selectedChanged);
@@ -48,7 +49,7 @@ private slots:
 
     void selectSameIndexIsNoOp() {
         PopupMenuModel m;
-        auto items = packItems({{"foo", "f", "", ""}, {"bar", "v", "", ""}});
+        auto items = packItems({ { "foo", "f", "", "" }, { "bar", "v", "", "" } });
         m.show(items.get(), 1, 0, 0);
 
         QSignalSpy spy(&m, &PopupMenuModel::selectedChanged);
@@ -62,7 +63,7 @@ private slots:
 
     void selectMinusOneClearsSelection() {
         PopupMenuModel m;
-        auto items = packItems({{"foo", "f", "", ""}, {"bar", "v", "", ""}});
+        auto items = packItems({ { "foo", "f", "", "" }, { "bar", "v", "", "" } });
         m.show(items.get(), 0, 0, 0);
 
         QSignalSpy spy(&m, &PopupMenuModel::selectedChanged);
@@ -79,7 +80,7 @@ private slots:
         // PopupMenuModel::select() does not clamp — it stores whatever idx
         // the server sent. The view layer is responsible for bounds checks.
         PopupMenuModel m;
-        auto items = packItems({{"a", "", "", ""}, {"b", "", "", ""}});
+        auto items = packItems({ { "a", "", "", "" }, { "b", "", "", "" } });
         m.show(items.get(), 0, 0, 0);
 
         QSignalSpy spy(&m, &PopupMenuModel::selectedChanged);
@@ -90,7 +91,7 @@ private slots:
 
     void selectDoesNotAffectAnchorOrVisibility() {
         PopupMenuModel m;
-        auto items = packItems({{"a", "", "", ""}, {"b", "", "", ""}});
+        auto items = packItems({ { "a", "", "", "" }, { "b", "", "", "" } });
         m.show(items.get(), 0, 7, 11);
 
         QSignalSpy visSpy(&m, &PopupMenuModel::visibilityChanged);

@@ -16,15 +16,13 @@
 using namespace qvim;
 
 namespace {
-QString compact(const QJsonObject& obj) {
+QString compact(const QJsonObject &obj) {
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
-QJsonObject parse(const QString& text) {
-    return QJsonDocument::fromJson(text.toUtf8()).object();
-}
+QJsonObject parse(const QString &text) { return QJsonDocument::fromJson(text.toUtf8()).object(); }
 
-QString typeOf(const QString& frame) {
+QString typeOf(const QString &frame) {
     return parse(frame).value(QStringLiteral("type")).toString();
 }
 
@@ -32,7 +30,7 @@ template <typename Pred>
 bool waitUntil(Pred pred, int timeoutMs) {
     QElapsedTimer timer;
     timer.start();
-    while (!pred() && timer.elapsed() < timeoutMs) {
+    while(!pred() && timer.elapsed() < timeoutMs) {
         QCoreApplication::processEvents(QEventLoop::WaitForMoreEvents, 25);
     }
     return pred();
@@ -63,8 +61,8 @@ void TestSessionMirror::echoMirrorsPanelSession() {
 
     QWebSocket client;
     QStringList frames;
-    connect(&client, &QWebSocket::textMessageReceived,
-            &client, [&frames](const QString& m) { frames << m; });
+    connect(&client, &QWebSocket::textMessageReceived, &client,
+            [&frames](const QString &m) { frames << m; });
 
     client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(port)));
     QVERIFY(waitUntil([&] { return client.state() == QAbstractSocket::ConnectedState; }, 5000));
@@ -80,19 +78,18 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     // Complete the handshake, then send an input. Message ordering is preserved
     // on a WebSocket, so the consecutive sends are safe.
     client.sendTextMessage(compact(QJsonObject{
-        {QStringLiteral("type"), QStringLiteral("resume")},
-        {QStringLiteral("lastSeq"), 0},
+        { QStringLiteral("type"), QStringLiteral("resume") },
+        { QStringLiteral("lastSeq"), 0 },
     }));
     client.sendTextMessage(compact(QJsonObject{
-        {QStringLiteral("type"), QStringLiteral("input")},
-        {QStringLiteral("text"), QStringLiteral("hi")},
+        { QStringLiteral("type"), QStringLiteral("input") },
+        { QStringLiteral("text"), QStringLiteral("hi") },
     }));
 
     // The turn is a streamed echo, so wait for message.end to arrive (delta
     // count is ChatModel's business — do not hard-code it).
     QVERIFY(waitUntil([&] {
-        return frames.size() >= 2
-            && typeOf(frames.last()) == QStringLiteral("message.end");
+        return frames.size() >= 2 && typeOf(frames.last()) == QStringLiteral("message.end");
     }, 5000));
 
     // frames: [hello, message(user), message.begin, delta*, message.end]
@@ -118,7 +115,7 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     // Middle frames are the assistant deltas; they all carry the assistant id
     // and reassemble the echoed reply.
     QString reply;
-    for (int i = 3; i < lastIdx; ++i) {
+    for(int i = 3; i < lastIdx; ++i) {
         const QJsonObject d = parse(frames.at(i));
         QCOMPARE(d.value(QStringLiteral("type")).toString(), QStringLiteral("message.delta"));
         QCOMPARE(d.value(QStringLiteral("id")).toString(), assistantId);
@@ -128,7 +125,7 @@ void TestSessionMirror::echoMirrorsPanelSession() {
 
     // Every non-hello frame carries a strictly increasing seq.
     quint64 prev = 0;
-    for (int i = 1; i < frames.size(); ++i) {
+    for(int i = 1; i < frames.size(); ++i) {
         const QJsonObject f = parse(frames.at(i));
         QVERIFY(f.contains(QStringLiteral("seq")));
         const quint64 seq = static_cast<quint64>(f.value(QStringLiteral("seq")).toInteger());
@@ -158,8 +155,7 @@ void TestSessionMirror::activeToggleReleasesPort() {
 
     QWebSocket client1;
     bool client1Disconnected = false;
-    connect(&client1, &QWebSocket::disconnected,
-            &client1, [&] { client1Disconnected = true; });
+    connect(&client1, &QWebSocket::disconnected, &client1, [&] { client1Disconnected = true; });
     client1.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.serverPort())));
     QVERIFY(waitUntil([&] { return client1.state() == QAbstractSocket::ConnectedState; }, 5000));
 
@@ -177,8 +173,8 @@ void TestSessionMirror::activeToggleReleasesPort() {
 
     QWebSocket client2;
     QStringList frames2;
-    connect(&client2, &QWebSocket::textMessageReceived,
-            &client2, [&frames2](const QString& m) { frames2 << m; });
+    connect(&client2, &QWebSocket::textMessageReceived, &client2,
+            [&frames2](const QString &m) { frames2 << m; });
     client2.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(rebindPort)));
     QVERIFY(waitUntil([&] { return client2.state() == QAbstractSocket::ConnectedState; }, 5000));
     QVERIFY(waitUntil([&] { return frames2.size() >= 1; }, 5000));

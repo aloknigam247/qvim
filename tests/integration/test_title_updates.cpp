@@ -1,17 +1,18 @@
-#include <QtTest>
+#include "IntegrationHelpers.h"
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
-#include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
 
 namespace {
 bool waitFor(std::function<bool()> pred, int timeoutMs = 5000) {
-    QElapsedTimer t; t.start();
-    while (!pred()) {
-        if (t.elapsed() > timeoutMs) return false;
+    QElapsedTimer t;
+    t.start();
+    while(!pred()) {
+        if(t.elapsed() > timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     }
     return true;
@@ -44,8 +45,9 @@ private slots:
         QString cmd = QStringLiteral("edit ") + QDir::fromNativeSeparators(filePath);
         conn.command(cmd);
 
-        QVERIFY2(waitFor([&]() { return conn.title().contains(QStringLiteral("foo.txt")); }, 5000),
-                 qPrintable(QStringLiteral("title never contained 'foo.txt': '%1'").arg(conn.title())));
+        QVERIFY2(
+            waitFor([&]() { return conn.title().contains(QStringLiteral("foo.txt")); }, 5000),
+            qPrintable(QStringLiteral("title never contained 'foo.txt': '%1'").arg(conn.title())));
         QVERIFY(titleSpy.count() >= 1);
 
         // Dirty the buffer; expect the modified marker ("+") to appear.

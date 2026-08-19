@@ -4,9 +4,9 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QPointer>
+#include <qqmlregistration.h>
 #include <QSet>
 #include <QString>
-#include <qqmlregistration.h>
 
 #include "ChatModel.h"
 #include "SessionEventBuffer.h"
@@ -39,26 +39,26 @@ class SessionMirrorServer : public QObject {
     Q_OBJECT
     QML_ELEMENT
 
-    Q_PROPERTY(qvim::ChatModel* source READ source WRITE setSource NOTIFY sourceChanged)
+    Q_PROPERTY(qvim::ChatModel *source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(bool active READ isActive WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(int port READ port WRITE setPort NOTIFY portChanged)
     Q_PROPERTY(QString address READ address WRITE setAddress NOTIFY addressChanged)
 
 public:
-    explicit SessionMirrorServer(QObject* parent = nullptr);
+    explicit SessionMirrorServer(QObject *parent = nullptr);
     ~SessionMirrorServer() override;
 
-    ChatModel* source() const { return m_source; }
-    void       setSource(ChatModel* source);
+    ChatModel *source() const { return m_source; }
+    void setSource(ChatModel *source);
 
     bool isActive() const { return m_active; }
     void setActive(bool active);
 
-    int  port() const { return m_port; }
+    int port() const { return m_port; }
     void setPort(int port);
 
     QString address() const { return m_address; }
-    void    setAddress(const QString& address);
+    void setAddress(const QString &address);
 
     // The bound port (0 when not listening). With port 0 the OS assigns a free
     // port — used by tests to avoid a fixed-port collision.
@@ -74,31 +74,31 @@ signals:
 
 private:
     void onNewConnection();
-    void onTextMessage(const QString& message);
+    void onTextMessage(const QString &message);
     void onSocketDisconnected();
 
-    void onUserMessage(const QString& id, const QString& text);
-    void onAssistantBegin(const QString& id);
-    void onAssistantDelta(const QString& id, const QString& text);
-    void onAssistantEnd(const QString& id);
+    void onUserMessage(const QString &id, const QString &text);
+    void onAssistantBegin(const QString &id);
+    void onAssistantDelta(const QString &id, const QString &text);
+    void onAssistantEnd(const QString &id);
 
     void startListening();
     void stopListening();
 
-    void sendHello(QWebSocket* client);
-    void handleInput(const QString& text);
+    void sendHello(QWebSocket *client);
+    void handleInput(const QString &text);
     void bufferAndBroadcast(QJsonObject frame);
-    void broadcast(const QByteArray& payload);
+    void broadcast(const QByteArray &payload);
 
-    QWebSocketServer*   m_server = nullptr;
-    SessionEventBuffer  m_buffer;
-    QString             m_sessionId;
+    QWebSocketServer *m_server = nullptr;
+    SessionEventBuffer m_buffer;
+    QString m_sessionId;
     QPointer<ChatModel> m_source;
-    QSet<QWebSocket*>   m_clients; // all accepted sockets
-    QSet<QWebSocket*>   m_ready;   // clients that completed the `resume` handshake
-    bool                m_active  = false;
-    int                 m_port    = 8765;
-    QString             m_address;
+    QSet<QWebSocket *> m_clients; // all accepted sockets
+    QSet<QWebSocket *> m_ready;   // clients that completed the `resume` handshake
+    bool m_active = false;
+    int m_port = 8765;
+    QString m_address;
 };
 
 } // namespace qvim

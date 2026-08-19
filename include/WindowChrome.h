@@ -2,8 +2,8 @@
 
 #include <QColor>
 #include <QObject>
-#include <QQuickWindow>
 #include <qqmlregistration.h>
+#include <QQuickWindow>
 
 namespace qvim {
 
@@ -13,9 +13,9 @@ class WindowChrome : public QObject {
     QML_UNCREATABLE("Provided via context property $windowChrome")
 
 public:
-    explicit WindowChrome(QObject* parent = nullptr);
+    explicit WindowChrome(QObject *parent = nullptr);
 
-    Q_INVOKABLE void applyToWindow(QQuickWindow* window, QColor background);
+    Q_INVOKABLE void applyToWindow(QQuickWindow *window, QColor background);
 };
 
 } // namespace qvim

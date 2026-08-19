@@ -13,9 +13,7 @@ private slots:
         c.setIntervalMs(5);
         QSignalSpy spy(&c, &ResizeCoalescer::resizeRequested);
 
-        for (int i = 0; i < 20; ++i) {
-            c.requestResize(100 + i, 30 + i);
-        }
+        for(int i = 0; i < 20; ++i) { c.requestResize(100 + i, 30 + i); }
         QVERIFY(spy.wait(200));
         // No further fires after the single debounce window.
         QTest::qWait(50);
@@ -56,7 +54,7 @@ private slots:
 
     void flushNowFiresImmediately() {
         ResizeCoalescer c;
-        c.setIntervalMs(10000);  // long, so we know flushNow bypassed it
+        c.setIntervalMs(10000); // long, so we know flushNow bypassed it
         QSignalSpy spy(&c, &ResizeCoalescer::resizeRequested);
 
         c.requestResize(90, 28);

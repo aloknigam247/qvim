@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <msgpack.hpp>
+#include <QtTest>
 
 #include "GridModel.h"
 
@@ -7,14 +7,25 @@ using namespace qvim;
 
 namespace {
 
-msgpack::object_handle packGridLineCells(const std::vector<std::tuple<std::string, int, int>>& cells) {
+msgpack::object_handle
+    packGridLineCells(const std::vector<std::tuple<std::string, int, int>> &cells) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(cells.size()));
-    for (const auto& [text, hl, repeat] : cells) {
-        if (repeat > 0 && hl >= 0)      { pk.pack_array(3); pk.pack(text); pk.pack(hl); pk.pack(repeat); }
-        else if (hl >= 0)               { pk.pack_array(2); pk.pack(text); pk.pack(hl); }
-        else                            { pk.pack_array(1); pk.pack(text); }
+    for(const auto &[text, hl, repeat]: cells) {
+        if(repeat > 0 && hl >= 0) {
+            pk.pack_array(3);
+            pk.pack(text);
+            pk.pack(hl);
+            pk.pack(repeat);
+        } else if(hl >= 0) {
+            pk.pack_array(2);
+            pk.pack(text);
+            pk.pack(hl);
+        } else {
+            pk.pack_array(1);
+            pk.pack(text);
+        }
     }
     msgpack::object_handle h;
     msgpack::unpack(h, buf.data(), buf.size());
@@ -38,7 +49,7 @@ private slots:
     void applyLineBasic() {
         GridModel g;
         g.resize(5, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 1, -1}, {"c", 1, -1}});
+        auto cells = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
         g.applyLine(0, 0, cells.get());
         QCOMPARE(g.cell(0, 0).text, QStringLiteral("a"));
         QCOMPARE(g.cell(0, 1).text, QStringLiteral("b"));
@@ -49,10 +60,10 @@ private slots:
     void applyLineWithRepeat() {
         GridModel g;
         g.resize(10, 1);
-        auto cells = packGridLineCells({{"x", 2, 5}});
+        auto cells = packGridLineCells({ { "x", 2, 5 } });
         g.applyLine(0, 2, cells.get());
         QCOMPARE(g.cell(0, 1).text, QStringLiteral(" "));
-        for (int c = 2; c < 7; ++c) {
+        for(int c = 2; c < 7; ++c) {
             QCOMPARE(g.cell(0, c).text, QStringLiteral("x"));
             QCOMPARE(g.cell(0, c).hlId, 2);
         }
@@ -62,7 +73,7 @@ private slots:
     void applyLineOmittedHlReusesPrevious() {
         GridModel g;
         g.resize(5, 1);
-        auto cells = packGridLineCells({{"a", 9, -1}, {"b", -1, -1}, {"c", -1, -1}});
+        auto cells = packGridLineCells({ { "a", 9, -1 }, { "b", -1, -1 }, { "c", -1, -1 } });
         g.applyLine(0, 0, cells.get());
         QCOMPARE(g.cell(0, 0).hlId, 9);
         QCOMPARE(g.cell(0, 1).hlId, 9);
@@ -72,22 +83,22 @@ private slots:
     void clearReturnsToSpaces() {
         GridModel g;
         g.resize(3, 1);
-        auto cells = packGridLineCells({{"a", 1, -1}, {"b", 1, -1}, {"c", 1, -1}});
+        auto cells = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
         g.applyLine(0, 0, cells.get());
         g.clear();
-        for (int c = 0; c < 3; ++c) QCOMPARE(g.cell(0, c).text, QStringLiteral(" "));
+        for(int c = 0; c < 3; ++c) QCOMPARE(g.cell(0, c).text, QStringLiteral(" "));
     }
 
     void scrollUp() {
         GridModel g;
         g.resize(3, 3);
-        auto row0 = packGridLineCells({{"a", 1, -1}, {"b", 1, -1}, {"c", 1, -1}});
-        auto row1 = packGridLineCells({{"d", 1, -1}, {"e", 1, -1}, {"f", 1, -1}});
-        auto row2 = packGridLineCells({{"g", 1, -1}, {"h", 1, -1}, {"i", 1, -1}});
+        auto row0 = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
+        auto row1 = packGridLineCells({ { "d", 1, -1 }, { "e", 1, -1 }, { "f", 1, -1 } });
+        auto row2 = packGridLineCells({ { "g", 1, -1 }, { "h", 1, -1 }, { "i", 1, -1 } });
         g.applyLine(0, 0, row0.get());
         g.applyLine(1, 0, row1.get());
         g.applyLine(2, 0, row2.get());
-        g.scroll(0, 3, 0, 3, 1);  // scroll up by 1
+        g.scroll(0, 3, 0, 3, 1); // scroll up by 1
         QCOMPARE(g.cell(0, 0).text, QStringLiteral("d"));
         QCOMPARE(g.cell(1, 0).text, QStringLiteral("g"));
     }
@@ -107,7 +118,8 @@ private slots:
         // right cell as an empty string with doubleWidth=true.
         GridModel g;
         g.resize(4, 1);
-        auto cells = packGridLineCells({{"\xE5\xAD\x97", 1, -1}, {"", 1, -1}, {"a", 1, -1}});
+        auto cells =
+            packGridLineCells({ { "\xE5\xAD\x97", 1, -1 }, { "", 1, -1 }, { "a", 1, -1 } });
         g.applyLine(0, 0, cells.get());
         QCOMPARE(g.cell(0, 0).text, QString::fromUtf8("\xE5\xAD\x97"));
         QCOMPARE(g.cell(0, 0).doubleWidth, false);
@@ -124,7 +136,8 @@ private slots:
         // is the trailing half of a wide glyph.
         GridModel g;
         g.resize(4, 1);
-        auto cells = packGridLineCells({{"", 1, -1}, {"", 1, -1}, {"x", 1, -1}, {"", 1, -1}});
+        auto cells =
+            packGridLineCells({ { "", 1, -1 }, { "", 1, -1 }, { "x", 1, -1 }, { "", 1, -1 } });
         g.applyLine(0, 0, cells.get());
         QCOMPARE(g.cell(0, 0).text, QStringLiteral(" "));
         QCOMPARE(g.cell(0, 0).doubleWidth, false);
@@ -142,12 +155,12 @@ private slots:
         // First paint after construction needs a full draw.
         GridModel g;
         QVERIFY(g.takeDirty(1));
-        QVERIFY(!g.takeDirty(1));  // takeDirty clears the flag
+        QVERIFY(!g.takeDirty(1)); // takeDirty clears the flag
     }
 
     void resizeMarksDirty() {
         GridModel g;
-        g.takeDirty(1);            // clear initial dirty
+        g.takeDirty(1); // clear initial dirty
         g.resize(10, 5);
         QVERIFY(g.takeDirty(1));
     }
@@ -156,7 +169,7 @@ private slots:
         GridModel g;
         g.resize(5, 1);
         g.takeDirty(1);
-        const auto h = packGridLineCells({{"a", 0, -1}, {"b", -1, -1}});
+        const auto h = packGridLineCells({ { "a", 0, -1 }, { "b", -1, -1 } });
         g.applyLine(0, 0, h.get());
         QVERIFY(g.takeDirty(1));
     }
@@ -189,20 +202,20 @@ private slots:
 
     void dirtyIsPerGrid() {
         GridModel g;
-        g.resize(2, 5, 5);           // grid 2
+        g.resize(2, 5, 5); // grid 2
         g.takeDirty(1);
         g.takeDirty(2);
-        const auto h = packGridLineCells({{"x", 0, -1}});
+        const auto h = packGridLineCells({ { "x", 0, -1 } });
         g.applyLine(2, 0, 0, h.get());
-        QVERIFY(!g.takeDirty(1));   // grid 1 untouched
-        QVERIFY(g.takeDirty(2));    // grid 2 dirty
+        QVERIFY(!g.takeDirty(1)); // grid 1 untouched
+        QVERIFY(g.takeDirty(2));  // grid 2 dirty
     }
 
     void dumpAsciiSnapshot() {
         GridModel g;
         g.resize(3, 2);
-        auto row0 = packGridLineCells({{"a", 0, -1}, {"b", 0, -1}, {"c", 0, -1}});
-        auto row1 = packGridLineCells({{"d", 0, -1}, {"e", 0, -1}, {"f", 0, -1}});
+        auto row0 = packGridLineCells({ { "a", 0, -1 }, { "b", 0, -1 }, { "c", 0, -1 } });
+        auto row1 = packGridLineCells({ { "d", 0, -1 }, { "e", 0, -1 }, { "f", 0, -1 } });
         g.applyLine(0, 0, row0.get());
         g.applyLine(1, 0, row1.get());
         QCOMPARE(g.dumpAscii(), QStringLiteral("abc\ndef\n"));

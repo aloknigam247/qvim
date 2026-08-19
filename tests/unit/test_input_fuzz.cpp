@@ -24,33 +24,30 @@ using namespace qvim;
 namespace {
 
 struct GeneratedEvent {
-    int                   key{};
+    int key{};
     Qt::KeyboardModifiers mods{};
-    QString               text;
+    QString text;
 };
 
-QString describe(const GeneratedEvent& g) {
+QString describe(const GeneratedEvent &g) {
     return QStringLiteral("key=0x%1 mods=0x%2 text=%3")
         .arg(g.key, 0, 16)
         .arg(static_cast<int>(g.mods), 0, 16)
-        .arg(g.text.isEmpty() ? QStringLiteral("\"\"")
-                              : QStringLiteral("\"%1\"").arg(g.text));
+        .arg(g.text.isEmpty() ? QStringLiteral("\"\"") : QStringLiteral("\"%1\"").arg(g.text));
 }
 
 // Curated key list spanning the interesting paths through keyToNvim.
 constexpr std::array<int, 48> kKeyPool{
-    Qt::Key_A,         Qt::Key_B,         Qt::Key_C,         Qt::Key_D,
-    Qt::Key_E,         Qt::Key_F,         Qt::Key_M,         Qt::Key_X,
-    Qt::Key_Z,         Qt::Key_0,         Qt::Key_1,         Qt::Key_5,
-    Qt::Key_9,         Qt::Key_Escape,    Qt::Key_Tab,       Qt::Key_Backtab,
-    Qt::Key_Backspace, Qt::Key_Return,    Qt::Key_Enter,     Qt::Key_Space,
-    Qt::Key_Delete,    Qt::Key_Insert,    Qt::Key_Home,      Qt::Key_End,
-    Qt::Key_PageUp,    Qt::Key_PageDown,  Qt::Key_Up,        Qt::Key_Down,
-    Qt::Key_Left,      Qt::Key_Right,     Qt::Key_F1,        Qt::Key_F4,
-    Qt::Key_F12,       Qt::Key_Shift,     Qt::Key_Control,   Qt::Key_Alt,
-    Qt::Key_Meta,      Qt::Key_CapsLock,  Qt::Key_Less,      Qt::Key_Greater,
-    Qt::Key_Backslash, Qt::Key_Bar,       Qt::Key_QuoteLeft, Qt::Key_Period,
-    Qt::Key_Comma,     Qt::Key_Slash,     Qt::Key_Semicolon, Qt::Key_BracketLeft,
+    Qt::Key_A,         Qt::Key_B,         Qt::Key_C,           Qt::Key_D,      Qt::Key_E,
+    Qt::Key_F,         Qt::Key_M,         Qt::Key_X,           Qt::Key_Z,      Qt::Key_0,
+    Qt::Key_1,         Qt::Key_5,         Qt::Key_9,           Qt::Key_Escape, Qt::Key_Tab,
+    Qt::Key_Backtab,   Qt::Key_Backspace, Qt::Key_Return,      Qt::Key_Enter,  Qt::Key_Space,
+    Qt::Key_Delete,    Qt::Key_Insert,    Qt::Key_Home,        Qt::Key_End,    Qt::Key_PageUp,
+    Qt::Key_PageDown,  Qt::Key_Up,        Qt::Key_Down,        Qt::Key_Left,   Qt::Key_Right,
+    Qt::Key_F1,        Qt::Key_F4,        Qt::Key_F12,         Qt::Key_Shift,  Qt::Key_Control,
+    Qt::Key_Alt,       Qt::Key_Meta,      Qt::Key_CapsLock,    Qt::Key_Less,   Qt::Key_Greater,
+    Qt::Key_Backslash, Qt::Key_Bar,       Qt::Key_QuoteLeft,   Qt::Key_Period, Qt::Key_Comma,
+    Qt::Key_Slash,     Qt::Key_Semicolon, Qt::Key_BracketLeft,
 };
 
 constexpr std::array<Qt::KeyboardModifier, 4> kModBits{
@@ -63,64 +60,88 @@ constexpr std::array<Qt::KeyboardModifier, 4> kModBits{
 // Natural single-char text for a few keys; otherwise empty / random.
 QString naturalText(int key, Qt::KeyboardModifiers mods) {
     const bool shift = (mods & Qt::ShiftModifier) != 0;
-    switch (key) {
-    case Qt::Key_A:           return shift ? QStringLiteral("A") : QStringLiteral("a");
-    case Qt::Key_B:           return shift ? QStringLiteral("B") : QStringLiteral("b");
-    case Qt::Key_C:           return shift ? QStringLiteral("C") : QStringLiteral("c");
-    case Qt::Key_D:           return shift ? QStringLiteral("D") : QStringLiteral("d");
-    case Qt::Key_E:           return shift ? QStringLiteral("E") : QStringLiteral("e");
-    case Qt::Key_F:           return shift ? QStringLiteral("F") : QStringLiteral("f");
-    case Qt::Key_M:           return shift ? QStringLiteral("M") : QStringLiteral("m");
-    case Qt::Key_X:           return shift ? QStringLiteral("X") : QStringLiteral("x");
-    case Qt::Key_Z:           return shift ? QStringLiteral("Z") : QStringLiteral("z");
-    case Qt::Key_0:           return QStringLiteral("0");
-    case Qt::Key_1:           return QStringLiteral("1");
-    case Qt::Key_5:           return QStringLiteral("5");
-    case Qt::Key_9:           return QStringLiteral("9");
-    case Qt::Key_Less:        return QStringLiteral("<");
-    case Qt::Key_Greater:     return QStringLiteral(">");
-    case Qt::Key_Backslash:   return QStringLiteral("\\");
-    case Qt::Key_Bar:         return QStringLiteral("|");
-    case Qt::Key_QuoteLeft:   return QStringLiteral("`");
-    case Qt::Key_Period:      return QStringLiteral(".");
-    case Qt::Key_Comma:       return QStringLiteral(",");
-    case Qt::Key_Slash:       return QStringLiteral("/");
-    case Qt::Key_Semicolon:   return QStringLiteral(";");
-    case Qt::Key_BracketLeft: return QStringLiteral("[");
-    default:                  return {};
+    switch(key) {
+        case Qt::Key_A:
+            return shift ? QStringLiteral("A") : QStringLiteral("a");
+        case Qt::Key_B:
+            return shift ? QStringLiteral("B") : QStringLiteral("b");
+        case Qt::Key_C:
+            return shift ? QStringLiteral("C") : QStringLiteral("c");
+        case Qt::Key_D:
+            return shift ? QStringLiteral("D") : QStringLiteral("d");
+        case Qt::Key_E:
+            return shift ? QStringLiteral("E") : QStringLiteral("e");
+        case Qt::Key_F:
+            return shift ? QStringLiteral("F") : QStringLiteral("f");
+        case Qt::Key_M:
+            return shift ? QStringLiteral("M") : QStringLiteral("m");
+        case Qt::Key_X:
+            return shift ? QStringLiteral("X") : QStringLiteral("x");
+        case Qt::Key_Z:
+            return shift ? QStringLiteral("Z") : QStringLiteral("z");
+        case Qt::Key_0:
+            return QStringLiteral("0");
+        case Qt::Key_1:
+            return QStringLiteral("1");
+        case Qt::Key_5:
+            return QStringLiteral("5");
+        case Qt::Key_9:
+            return QStringLiteral("9");
+        case Qt::Key_Less:
+            return QStringLiteral("<");
+        case Qt::Key_Greater:
+            return QStringLiteral(">");
+        case Qt::Key_Backslash:
+            return QStringLiteral("\\");
+        case Qt::Key_Bar:
+            return QStringLiteral("|");
+        case Qt::Key_QuoteLeft:
+            return QStringLiteral("`");
+        case Qt::Key_Period:
+            return QStringLiteral(".");
+        case Qt::Key_Comma:
+            return QStringLiteral(",");
+        case Qt::Key_Slash:
+            return QStringLiteral("/");
+        case Qt::Key_Semicolon:
+            return QStringLiteral(";");
+        case Qt::Key_BracketLeft:
+            return QStringLiteral("[");
+        default:
+            return {};
     }
 }
 
-QString randomMultibyte(std::mt19937_64& rng) {
+QString randomMultibyte(std::mt19937_64 &rng) {
     // Pull a random non-ASCII BMP codepoint (avoid surrogates and control range).
     std::uniform_int_distribution<uint32_t> dist(0x00A1, 0xFFFD);
-    while (true) {
+    while(true) {
         const uint32_t cp = dist(rng);
-        if (cp >= 0xD800 && cp <= 0xDFFF) continue;
+        if(cp >= 0xD800 && cp <= 0xDFFF) continue;
         return QString(QChar(static_cast<char16_t>(cp)));
     }
 }
 
-GeneratedEvent makeEvent(std::mt19937_64& rng) {
+GeneratedEvent makeEvent(std::mt19937_64 &rng) {
     GeneratedEvent g;
     std::uniform_int_distribution<size_t> keyDist(0, kKeyPool.size() - 1);
     g.key = kKeyPool[keyDist(rng)];
 
     Qt::KeyboardModifiers mods = Qt::NoModifier;
     std::uniform_int_distribution<int> coin(0, 1);
-    for (const auto bit : kModBits) {
-        if (coin(rng)) mods |= bit;
+    for(const auto bit: kModBits) {
+        if(coin(rng)) mods |= bit;
     }
     g.mods = mods;
 
     // Text selection strategy.
     std::uniform_int_distribution<int> texPick(0, 9);
     const int p = texPick(rng);
-    if (p < 5) {
+    if(p < 5) {
         g.text = naturalText(g.key, g.mods);
-    } else if (p < 7) {
+    } else if(p < 7) {
         g.text = QString();
-    } else if (p < 9) {
+    } else if(p < 9) {
         g.text = randomMultibyte(rng);
     } else {
         // Random ASCII printable.
@@ -132,36 +153,35 @@ GeneratedEvent makeEvent(std::mt19937_64& rng) {
 
 // Validate that `s` contains only well-formed bracketed tokens.
 // Returns empty string on success, or an error message on failure.
-QString validateBrackets(const QString& s) {
+QString validateBrackets(const QString &s) {
     int i = 0;
     const int n = static_cast<int>(s.size());
-    while (i < n) {
+    while(i < n) {
         const QChar c = s.at(i);
         // A bare '>' outside any token is a literal character (vim keycode
         // grammar only treats '>' specially when it closes an open '<').
-        if (c == QChar('<')) {
+        if(c == QChar('<')) {
             // Find the matching '>'. Disallow nested '<'.
             int j = i + 1;
-            while (j < n && s.at(j) != QChar('>')) {
-                if (s.at(j) == QChar('<')) {
-                    return QStringLiteral("nested '<' at index %1 inside token starting at %2").arg(j).arg(i);
+            while(j < n && s.at(j) != QChar('>')) {
+                if(s.at(j) == QChar('<')) {
+                    return QStringLiteral("nested '<' at index %1 inside token starting at %2")
+                        .arg(j)
+                        .arg(i);
                 }
                 ++j;
             }
-            if (j >= n) {
-                return QStringLiteral("unterminated '<' at index %1").arg(i);
-            }
+            if(j >= n) { return QStringLiteral("unterminated '<' at index %1").arg(i); }
             const QString token = s.mid(i + 1, j - i - 1);
             // Lenient shape: non-empty, no embedded whitespace. Nvim accepts a
             // wide variety of single-byte key names and printable characters
             // (e.g. <M-;>, <C-\>) so we don't try to enumerate them here.
-            if (token.isEmpty()) {
-                return QStringLiteral("empty token \"<>\" at index %1").arg(i);
-            }
-            for (const QChar tc : token) {
-                if (tc.isSpace()) {
+            if(token.isEmpty()) { return QStringLiteral("empty token \"<>\" at index %1").arg(i); }
+            for(const QChar tc: token) {
+                if(tc.isSpace()) {
                     return QStringLiteral("whitespace inside token \"<%1>\" at index %2")
-                        .arg(token).arg(i);
+                        .arg(token)
+                        .arg(i);
                 }
             }
             i = j + 1;
@@ -172,17 +192,17 @@ QString validateBrackets(const QString& s) {
     return {};
 }
 
-QString translate(const GeneratedEvent& g) {
+QString translate(const GeneratedEvent &g) {
     QKeyEvent ev(QEvent::KeyPress, g.key, g.mods, g.text);
     return InputHandler::keyToNvim(&ev);
 }
 
 uint64_t resolveSeed() {
     const QByteArray env = qgetenv("QTEST_SEED");
-    if (!env.isEmpty()) {
+    if(!env.isEmpty()) {
         bool ok = false;
         const qulonglong v = env.toULongLong(&ok, 0);
-        if (ok) return static_cast<uint64_t>(v);
+        if(ok) return static_cast<uint64_t>(v);
     }
     return 0xC0FFEE12345ULL;
 }
@@ -211,8 +231,7 @@ private slots:
         // Ctrl+Shift+< : text is the '<' character with control bit cleared
         // by Qt; the implementation must escape it as <lt> even when modifiers
         // wrap it.
-        QKeyEvent ev(QEvent::KeyPress, Qt::Key_Less,
-                     Qt::ControlModifier | Qt::ShiftModifier,
+        QKeyEvent ev(QEvent::KeyPress, Qt::Key_Less, Qt::ControlModifier | Qt::ShiftModifier,
                      QStringLiteral("<"));
         const QString out = InputHandler::keyToNvim(&ev);
         const QString err = validateBrackets(out);
@@ -225,9 +244,9 @@ private slots:
         // nvim also reads as <Tab>) and a <C-S-i> mapping can never fire.
         // modString() emits S- before C-, and nvim canonicalises <S-C-i> and
         // <C-S-i> to the same key.
-        for (const QString& text : {QStringLiteral("\x09"), QStringLiteral("I")}) {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_I,
-                         Qt::ControlModifier | Qt::ShiftModifier, text);
+        for(const QString &text: { QStringLiteral("\x09"), QStringLiteral("I") }) {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_I, Qt::ControlModifier | Qt::ShiftModifier,
+                         text);
             const QString out = InputHandler::keyToNvim(&ev);
             QCOMPARE(out, QStringLiteral("<S-C-i>"));
             const QString err = validateBrackets(out);
@@ -242,39 +261,47 @@ private slots:
         std::mt19937_64 rng(seed);
 
         constexpr int kIterations = 5000;
-        for (int i = 0; i < kIterations; ++i) {
+        for(int i = 0; i < kIterations; ++i) {
             const GeneratedEvent g = makeEvent(rng);
 
             QString out;
             try {
                 out = translate(g);
-            } catch (const std::exception& e) {
-                QFAIL(qPrintable(
-                    QStringLiteral("exception thrown (seed=0x%1 iter=%2 %3): %4")
-                        .arg(seed, 0, 16).arg(i).arg(describe(g))
-                        .arg(QString::fromUtf8(e.what()))));
-            } catch (...) {
-                QFAIL(qPrintable(
-                    QStringLiteral("unknown exception (seed=0x%1 iter=%2 %3)")
-                        .arg(seed, 0, 16).arg(i).arg(describe(g))));
+            } catch(const std::exception &e) {
+                QFAIL(qPrintable(QStringLiteral("exception thrown (seed=0x%1 iter=%2 %3): %4")
+                                     .arg(seed, 0, 16)
+                                     .arg(i)
+                                     .arg(describe(g))
+                                     .arg(QString::fromUtf8(e.what()))));
+            } catch(...) {
+                QFAIL(qPrintable(QStringLiteral("unknown exception (seed=0x%1 iter=%2 %3)")
+                                     .arg(seed, 0, 16)
+                                     .arg(i)
+                                     .arg(describe(g))));
             }
 
             // 1. UTF-8 round-trip.
             const QByteArray bytes = out.toUtf8();
             const QString roundtrip = QString::fromUtf8(bytes);
-            if (roundtrip != out) {
+            if(roundtrip != out) {
                 QFAIL(qPrintable(
                     QStringLiteral("UTF-8 round-trip failed (seed=0x%1 iter=%2 %3): out=\"%4\"")
-                        .arg(seed, 0, 16).arg(i).arg(describe(g)).arg(out)));
+                        .arg(seed, 0, 16)
+                        .arg(i)
+                        .arg(describe(g))
+                        .arg(out)));
             }
 
             // 2. Bracket / token shape.
             const QString err = validateBrackets(out);
-            if (!err.isEmpty()) {
-                QFAIL(qPrintable(
-                    QStringLiteral("bracket validation failed (seed=0x%1 iter=%2 %3): "
-                                   "out=\"%4\" err=%5")
-                        .arg(seed, 0, 16).arg(i).arg(describe(g)).arg(out).arg(err)));
+            if(!err.isEmpty()) {
+                QFAIL(qPrintable(QStringLiteral("bracket validation failed (seed=0x%1 iter=%2 %3): "
+                                                "out=\"%4\" err=%5")
+                                     .arg(seed, 0, 16)
+                                     .arg(i)
+                                     .arg(describe(g))
+                                     .arg(out)
+                                     .arg(err)));
             }
 
             // 3. No stray <lt>: only plain Key_Less (or text containing '<' on
@@ -284,13 +311,15 @@ private slots:
             //    already accepts it as a well-formed token, so we just sanity
             //    check that if "<lt>" appears, the input did contain a '<'
             //    OR the natural text mapping for the key is '<'.
-            if (out.contains(QStringLiteral("<lt>"))) {
+            if(out.contains(QStringLiteral("<lt>"))) {
                 const bool textHasLess = g.text.contains(QChar('<'));
-                const bool keyIsLess   = (g.key == Qt::Key_Less);
-                if (!textHasLess && !keyIsLess) {
-                    QFAIL(qPrintable(
-                        QStringLiteral("stray <lt> (seed=0x%1 iter=%2 %3): out=\"%4\"")
-                            .arg(seed, 0, 16).arg(i).arg(describe(g)).arg(out)));
+                const bool keyIsLess = (g.key == Qt::Key_Less);
+                if(!textHasLess && !keyIsLess) {
+                    QFAIL(qPrintable(QStringLiteral("stray <lt> (seed=0x%1 iter=%2 %3): out=\"%4\"")
+                                         .arg(seed, 0, 16)
+                                         .arg(i)
+                                         .arg(describe(g))
+                                         .arg(out)));
                 }
             }
         }

@@ -21,20 +21,20 @@
 #include <QSignalSpy>
 #include <QtTest>
 
+#include "CmdlineModel.h"
 #include "IntegrationHelpers.h"
 #include "NvimConnector.h"
-#include "CmdlineModel.h"
 
 using namespace qvim;
 using namespace qvim::test;
 
 namespace {
 
-QQuickWindow* loadMainQml(QQmlApplicationEngine& engine, NvimConnector* conn) {
+QQuickWindow *loadMainQml(QQmlApplicationEngine &engine, NvimConnector *conn) {
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), conn);
     engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
-    if (engine.rootObjects().isEmpty()) return nullptr;
-    return qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+    if(engine.rootObjects().isEmpty()) return nullptr;
+    return qobject_cast<QQuickWindow *>(engine.rootObjects().first());
 }
 
 // Polls a predicate up to timeoutMs, processing events between checks. Returns
@@ -42,11 +42,11 @@ QQuickWindow* loadMainQml(QQmlApplicationEngine& engine, NvimConnector* conn) {
 // for predicates that depend on accumulated nvim state across multiple
 // flush()es (e.g. cmdline content updating).
 template <typename F>
-bool waitUntil(F&& predicate, int timeoutMs) {
+bool waitUntil(F &&predicate, int timeoutMs) {
     QElapsedTimer t;
     t.start();
-    while (!predicate()) {
-        if (t.elapsed() >= timeoutMs) return false;
+    while(!predicate()) {
+        if(t.elapsed() >= timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return true;
@@ -55,12 +55,12 @@ bool waitUntil(F&& predicate, int timeoutMs) {
 // Synchronously renders the QML subtree rooted at `item` into a QImage via
 // the scene graph software backend. Works under minimal QPA where
 // QQuickWindow::grabWindow() returns null because no real surface exists.
-QImage grabItem(QQuickItem* item, int timeoutMs = 2000) {
+QImage grabItem(QQuickItem *item, int timeoutMs = 2000) {
     QSharedPointer<QQuickItemGrabResult> result = item->grabToImage();
-    if (!result) return {};
+    if(!result) return {};
     QElapsedTimer t;
     t.start();
-    while (result->image().isNull() && t.elapsed() < timeoutMs) {
+    while(result->image().isNull() && t.elapsed() < timeoutMs) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return result->image();
@@ -94,7 +94,7 @@ private slots:
         QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
-        QQuickWindow* window = loadMainQml(engine, &conn);
+        QQuickWindow *window = loadMainQml(engine, &conn);
         QVERIFY2(window, "Main.qml failed to load");
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
@@ -104,7 +104,7 @@ private slots:
                  "No active focus item after attach — Shell didn't force focus");
 
         QTest::keyClick(window, Qt::Key_Colon);
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
 
         // ext_cmdline is off — cmdline_show is never emitted.
         QVERIFY2(!conn.cmdline()->visible(),
@@ -122,15 +122,15 @@ private slots:
         QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
-        QQuickWindow* window = loadMainQml(engine, &conn);
+        QQuickWindow *window = loadMainQml(engine, &conn);
         QVERIFY(window);
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
 
-        QQuickItem* cmdlineItem = nullptr;
-        for (QQuickItem* c : window->contentItem()->childItems()) {
-            if (QString::fromLatin1(c->metaObject()->className()).contains("Cmdline")) {
+        QQuickItem *cmdlineItem = nullptr;
+        for(QQuickItem *c: window->contentItem()->childItems()) {
+            if(QString::fromLatin1(c->metaObject()->className()).contains("Cmdline")) {
                 cmdlineItem = c;
                 break;
             }
@@ -140,7 +140,7 @@ private slots:
                  "Cmdline shouldn't be visible before any ':' is pressed");
 
         QTest::keyClick(window, Qt::Key_Colon);
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
 
         QVERIFY2(!conn.cmdline()->visible(),
                  "CmdlineModel reported visible — ext_cmdline may have been re-enabled");
@@ -156,17 +156,17 @@ private slots:
         QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
-        QQuickWindow* window = loadMainQml(engine, &conn);
+        QQuickWindow *window = loadMainQml(engine, &conn);
         QVERIFY(window);
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
         QVERIFY(waitForFlush(&conn));
 
         QTest::keyClick(window, Qt::Key_Colon);
-        for (Qt::Key k : {Qt::Key_E, Qt::Key_C, Qt::Key_H, Qt::Key_O}) {
+        for(Qt::Key k: { Qt::Key_E, Qt::Key_C, Qt::Key_H, Qt::Key_O }) {
             QTest::keyClick(window, k);
         }
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
 
         QVERIFY2(conn.cmdline()->content().isEmpty(),
                  qPrintable(QStringLiteral("CmdlineModel content was '%1' "

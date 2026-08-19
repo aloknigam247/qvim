@@ -15,7 +15,7 @@ namespace qvim {
 class ResizeCoalescer : public QObject {
     Q_OBJECT
 public:
-    explicit ResizeCoalescer(QObject* parent = nullptr);
+    explicit ResizeCoalescer(QObject *parent = nullptr);
 
     void requestResize(int cols, int rows);
     void setIntervalMs(int ms);

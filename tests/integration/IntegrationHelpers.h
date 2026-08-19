@@ -5,11 +5,11 @@
 #include <QString>
 #include <QtTest>
 
-#include "NvimConnector.h"
-#include "GridModel.h"
-#include "TablineModel.h"
-#include "PopupMenuModel.h"
 #include "CmdlineModel.h"
+#include "GridModel.h"
+#include "NvimConnector.h"
+#include "PopupMenuModel.h"
+#include "TablineModel.h"
 
 namespace qvim::test {
 
@@ -24,7 +24,7 @@ inline QString locateNvim() {
 // break on machines whose config adds `set number`, `set cmdheight=0`, etc.
 // Tests that need specific nvim options should pass them explicitly via
 // `--cmd 'set ...'` or `-u <path-to-test-config.lua>` in extraArgs.
-inline bool startTestNvim(NvimConnector& conn, const QStringList& extraArgs = {}) {
+inline bool startTestNvim(NvimConnector &conn, const QStringList &extraArgs = {}) {
     QStringList args;
     args.reserve(extraArgs.size() + 1);
     args << QStringLiteral("--clean");
@@ -32,13 +32,13 @@ inline bool startTestNvim(NvimConnector& conn, const QStringList& extraArgs = {}
     return conn.start(locateNvim(), args);
 }
 
-inline bool waitForFlush(NvimConnector* conn, int timeoutMs = 5000) {
+inline bool waitForFlush(NvimConnector *conn, int timeoutMs = 5000) {
     QSignalSpy spy(conn, &NvimConnector::flush);
     return spy.wait(timeoutMs);
 }
 
-inline bool waitForAttach(NvimConnector* conn, int timeoutMs = 5000) {
-    if (conn->attached()) return true;
+inline bool waitForAttach(NvimConnector *conn, int timeoutMs = 5000) {
+    if(conn->attached()) return true;
     QSignalSpy spy(conn, &NvimConnector::attachedChanged);
     return spy.wait(timeoutMs) && conn->attached();
 }

@@ -36,6 +36,7 @@
 // If a bundled TTF is later placed at tests/fonts/Test-Regular.ttf, this
 // test will load it preferentially and prefer that family name.
 
+#include <msgpack.hpp>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -48,7 +49,6 @@
 #include <QImageWriter>
 #include <QString>
 #include <QtTest>
-#include <msgpack.hpp>
 
 #include "support/QuickRasterizer.h"
 
@@ -62,16 +62,25 @@ using namespace qvim;
 namespace {
 
 // Same helper used by other tests: packs a Neovim grid_line cells array.
-msgpack::object_handle packGridLineCells(
-    const std::vector<std::tuple<std::string, int, int>>& cells)
-{
+msgpack::object_handle
+    packGridLineCells(const std::vector<std::tuple<std::string, int, int>> &cells) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(cells.size()));
-    for (const auto& [text, hl, repeat] : cells) {
-        if (repeat > 0 && hl >= 0)      { pk.pack_array(3); pk.pack(text); pk.pack(hl); pk.pack(repeat); }
-        else if (hl >= 0)               { pk.pack_array(2); pk.pack(text); pk.pack(hl); }
-        else                            { pk.pack_array(1); pk.pack(text); }
+    for(const auto &[text, hl, repeat]: cells) {
+        if(repeat > 0 && hl >= 0) {
+            pk.pack_array(3);
+            pk.pack(text);
+            pk.pack(hl);
+            pk.pack(repeat);
+        } else if(hl >= 0) {
+            pk.pack_array(2);
+            pk.pack(text);
+            pk.pack(hl);
+        } else {
+            pk.pack_array(1);
+            pk.pack(text);
+        }
     }
     msgpack::object_handle h;
     msgpack::unpack(h, buf.data(), buf.size());
@@ -80,20 +89,31 @@ msgpack::object_handle packGridLineCells(
 
 // Pack a single highlight attribute as the msgpack map shape that
 // HighlightTable::defineAttr expects.
-msgpack::object_handle packAttr(int fgRgb, int bgRgb, bool bold, bool italic)
-{
+msgpack::object_handle packAttr(int fgRgb, int bgRgb, bool bold, bool italic) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     int n = 0;
-    if (fgRgb >= 0) ++n;
-    if (bgRgb >= 0) ++n;
-    if (bold)       ++n;
-    if (italic)     ++n;
+    if(fgRgb >= 0) ++n;
+    if(bgRgb >= 0) ++n;
+    if(bold) ++n;
+    if(italic) ++n;
     pk.pack_map(static_cast<uint32_t>(n));
-    if (fgRgb >= 0) { pk.pack(std::string("foreground")); pk.pack(fgRgb); }
-    if (bgRgb >= 0) { pk.pack(std::string("background")); pk.pack(bgRgb); }
-    if (bold)       { pk.pack(std::string("bold"));       pk.pack(true);  }
-    if (italic)     { pk.pack(std::string("italic"));     pk.pack(true);  }
+    if(fgRgb >= 0) {
+        pk.pack(std::string("foreground"));
+        pk.pack(fgRgb);
+    }
+    if(bgRgb >= 0) {
+        pk.pack(std::string("background"));
+        pk.pack(bgRgb);
+    }
+    if(bold) {
+        pk.pack(std::string("bold"));
+        pk.pack(true);
+    }
+    if(italic) {
+        pk.pack(std::string("italic"));
+        pk.pack(true);
+    }
     msgpack::object_handle h;
     msgpack::unpack(h, buf.data(), buf.size());
     return h;
@@ -101,23 +121,22 @@ msgpack::object_handle packAttr(int fgRgb, int bgRgb, bool bold, bool italic)
 
 // Per-channel absolute difference between two same-sized images.
 // Returns the count of pixels whose max RGB delta exceeds tol.
-qsizetype pixelDiffCount(const QImage& a, const QImage& b, int tol)
-{
-    if (a.size() != b.size()) return std::numeric_limits<qsizetype>::max();
+qsizetype pixelDiffCount(const QImage &a, const QImage &b, int tol) {
+    if(a.size() != b.size()) return std::numeric_limits<qsizetype>::max();
     QImage ax = a.convertToFormat(QImage::Format_ARGB32);
     QImage bx = b.convertToFormat(QImage::Format_ARGB32);
     qsizetype bad = 0;
-    for (int y = 0; y < ax.height(); ++y) {
-        const QRgb* ar = reinterpret_cast<const QRgb*>(ax.constScanLine(y));
-        const QRgb* br = reinterpret_cast<const QRgb*>(bx.constScanLine(y));
-        for (int x = 0; x < ax.width(); ++x) {
+    for(int y = 0; y < ax.height(); ++y) {
+        const QRgb *ar = reinterpret_cast<const QRgb *>(ax.constScanLine(y));
+        const QRgb *br = reinterpret_cast<const QRgb *>(bx.constScanLine(y));
+        for(int x = 0; x < ax.width(); ++x) {
             const QRgb p = ar[x];
             const QRgb q = br[x];
-            const int dr = std::abs(qRed(p)   - qRed(q));
+            const int dr = std::abs(qRed(p) - qRed(q));
             const int dg = std::abs(qGreen(p) - qGreen(q));
-            const int db = std::abs(qBlue(p)  - qBlue(q));
+            const int db = std::abs(qBlue(p) - qBlue(q));
             const int da = std::abs(qAlpha(p) - qAlpha(q));
-            if (std::max({dr, dg, db, da}) > tol) ++bad;
+            if(std::max({ dr, dg, db, da }) > tol) ++bad;
         }
     }
     return bad;
@@ -139,7 +158,7 @@ private slots:
         // Pin platform-level scaling so the QImage backing store matches the
         // golden across machines. These env vars are also set by CTest, but
         // setting them belt-and-braces protects against ad-hoc runs.
-        qputenv("QT_SCALE_FACTOR",             "1");
+        qputenv("QT_SCALE_FACTOR", "1");
         qputenv("QT_AUTO_SCREEN_SCALE_FACTOR", "0");
 
         // Ensure the PNG image-format plugin is discoverable. The CTest
@@ -148,7 +167,7 @@ private slots:
         // (qjpeg, qpng-via-libqgif, etc.) live alongside. Walking up one
         // directory from the platforms/ folder finds plugins/ which is what
         // QCoreApplication::addLibraryPath expects.
-        if (const QByteArray qpa = qgetenv("QT_QPA_PLATFORM_PLUGIN_PATH"); !qpa.isEmpty()) {
+        if(const QByteArray qpa = qgetenv("QT_QPA_PLATFORM_PLUGIN_PATH"); !qpa.isEmpty()) {
             const QString pluginsRoot = QFileInfo(QString::fromLocal8Bit(qpa)).absolutePath();
             QCoreApplication::addLibraryPath(pluginsRoot);
         }
@@ -156,7 +175,7 @@ private slots:
         // Prefer a bundled TTF if present; fall back to Courier New otherwise.
         // The test's WORKING_DIRECTORY is tests/, so paths are relative there.
         const QString bundled = QStringLiteral("fonts/Test-Regular.ttf");
-        if (QFileInfo::exists(bundled)) {
+        if(QFileInfo::exists(bundled)) {
             const int id = QFontDatabase::addApplicationFont(bundled);
             QVERIFY2(id >= 0, "Failed to load bundled test font");
             const QStringList families = QFontDatabase::applicationFontFamilies(id);
@@ -170,8 +189,8 @@ private slots:
     void rendersDeterministicGrid() {
         // Build models directly through NvimConnector — no RPC, no nvim.
         NvimConnector conn;
-        GridModel*      gm = conn.grid();
-        HighlightTable* hl = conn.highlights();
+        GridModel *gm = conn.grid();
+        HighlightTable *hl = conn.highlights();
         QVERIFY(gm != nullptr);
         QVERIFY(hl != nullptr);
 
@@ -186,7 +205,7 @@ private slots:
 
         // Seed a small attribute table: id 1 = highlighted keyword, id 2 = comment.
         {
-            auto a1 = packAttr(/*fg*/ 0x80C7FF, /*bg*/ -1, /*bold*/ true,  /*italic*/ false);
+            auto a1 = packAttr(/*fg*/ 0x80C7FF, /*bg*/ -1, /*bold*/ true, /*italic*/ false);
             auto a2 = packAttr(/*fg*/ 0x7CA982, /*bg*/ -1, /*bold*/ false, /*italic*/ false);
             hl->defineAttr(1, a1.get());
             hl->defineAttr(2, a2.get());
@@ -194,21 +213,17 @@ private slots:
 
         // Deterministic content per row.
         const std::vector<std::tuple<std::string, int>> lines = {
-            {"function hello() {  ", 1},
-            {"  print('world!')   ", 0},
-            {"}                   ", 0},
-            {"// a comment line   ", 2},
-            {"x = 1 + 2 + 3       ", 0},
+            { "function hello() {  ", 1 }, { "  print('world!')   ", 0 },
+            { "}                   ", 0 }, { "// a comment line   ", 2 },
+            { "x = 1 + 2 + 3       ", 0 },
         };
         QCOMPARE(static_cast<int>(lines.size()), kRows);
-        for (int r = 0; r < kRows; ++r) {
-            const auto& [text, hlId] = lines[static_cast<size_t>(r)];
+        for(int r = 0; r < kRows; ++r) {
+            const auto &[text, hlId] = lines[static_cast<size_t>(r)];
             QCOMPARE(static_cast<int>(text.size()), kCols);
             std::vector<std::tuple<std::string, int, int>> cells;
             cells.reserve(text.size());
-            for (char ch : text) {
-                cells.push_back({std::string(1, ch), hlId, -1});
-            }
+            for(char ch: text) { cells.push_back({ std::string(1, ch), hlId, -1 }); }
             auto packed = packGridLineCells(cells);
             gm->applyLine(r, 0, packed.get());
         }
@@ -240,30 +255,30 @@ private slots:
         QuickRasterizer raster;
         QImage image = raster.render(&item).convertToFormat(QImage::Format_ARGB32);
         QVERIFY2(!image.isNull(), "scene graph produced no image");
-        QVERIFY2(raster.isUnscaled(),
-                 "render surface is scaled; the golden is stored at 1:1");
-        QCOMPARE(image.width(),  pxW);
+        QVERIFY2(raster.isUnscaled(), "render surface is scaled; the golden is stored at 1:1");
+        QCOMPARE(image.width(), pxW);
         QCOMPARE(image.height(), pxH);
 
         // Compare against the golden image; on first run, create it.
         const QString goldenPath = QStringLiteral("golden/grid_basic.bmp");
         QDir().mkpath(QStringLiteral("golden"));
 
-        if (!QFile::exists(goldenPath)) {
+        if(!QFile::exists(goldenPath)) {
             QImageWriter writer(goldenPath, "BMP");
             const bool ok = writer.write(image);
-            QVERIFY2(ok,
-                qPrintable(QStringLiteral("Failed to write golden to %1: %2 (supported writers: %3)")
-                    .arg(goldenPath)
-                    .arg(writer.errorString())
-                    .arg(QString::fromLatin1(QImageWriter::supportedImageFormats().join(',')))));
+            QVERIFY2(ok, qPrintable(QStringLiteral(
+                                        "Failed to write golden to %1: %2 (supported writers: %3)")
+                                        .arg(goldenPath)
+                                        .arg(writer.errorString())
+                                        .arg(QString::fromLatin1(
+                                            QImageWriter::supportedImageFormats().join(',')))));
             qWarning("Golden did not exist; wrote it now. Re-run the test to verify stability.");
             return;
         }
 
         QImage golden(goldenPath);
         QVERIFY2(!golden.isNull(),
-            qPrintable(QStringLiteral("Failed to load golden image %1").arg(goldenPath)));
+                 qPrintable(QStringLiteral("Failed to load golden image %1").arg(goldenPath)));
         QCOMPARE(golden.size(), image.size());
 
         // Allow ≤2% of pixels to differ by up to 1 channel-step. This absorbs
@@ -273,16 +288,19 @@ private slots:
         constexpr int kChannelTol = 1;
         const qsizetype total = static_cast<qsizetype>(image.width()) * image.height();
         const qsizetype budget = (total * 2 + 99) / 100; // 2% rounded up
-        const qsizetype bad    = pixelDiffCount(image, golden, kChannelTol);
+        const qsizetype bad = pixelDiffCount(image, golden, kChannelTol);
 
-        if (bad > budget) {
+        if(bad > budget) {
             // Save the actual image alongside the golden for debugging.
             const QString diffPath = QStringLiteral("golden/grid_basic.actual.bmp");
             image.save(diffPath, "BMP");
-            QFAIL(qPrintable(QStringLiteral(
-                "Pixel diff exceeded tolerance: %1 / %2 pixels differ (budget=%3). "
-                "Actual image written to %4.")
-                .arg(bad).arg(total).arg(budget).arg(diffPath)));
+            QFAIL(qPrintable(
+                QStringLiteral("Pixel diff exceeded tolerance: %1 / %2 pixels differ (budget=%3). "
+                               "Actual image written to %4.")
+                    .arg(bad)
+                    .arg(total)
+                    .arg(budget)
+                    .arg(diffPath)));
         }
     }
 

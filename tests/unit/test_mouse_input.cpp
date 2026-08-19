@@ -1,6 +1,6 @@
-#include <QtTest>
 #include <QMouseEvent>
 #include <QPointF>
+#include <QtTest>
 
 #include "InputHandler.h"
 
@@ -10,9 +10,7 @@ namespace {
 // Build a QMouseEvent matching what Qt's event system delivers for a given
 // gesture. For QEvent::MouseMove, Qt sets button() == Qt::NoButton (no
 // transition this event) while buttons() reports the currently-held set.
-QMouseEvent makeEvent(QEvent::Type type,
-                      Qt::MouseButton button,
-                      Qt::MouseButtons buttons,
+QMouseEvent makeEvent(QEvent::Type type, Qt::MouseButton button, Qt::MouseButtons buttons,
                       Qt::KeyboardModifiers mods = Qt::NoModifier) {
     const QPointF localPos(5.0, 5.0);
     return QMouseEvent(type, localPos, localPos, button, buttons, mods);
@@ -76,8 +74,7 @@ private slots:
     }
 
     void shiftDragCarriesModifier() {
-        auto ev = makeEvent(QEvent::MouseMove, Qt::NoButton, Qt::LeftButton,
-                            Qt::ShiftModifier);
+        auto ev = makeEvent(QEvent::MouseMove, Qt::NoButton, Qt::LeftButton, Qt::ShiftModifier);
         const auto m = InputHandler::mouseFor(&ev, QEvent::MouseMove);
         QVERIFY(m.valid);
         QCOMPARE(m.button, QStringLiteral("left"));
@@ -88,8 +85,7 @@ private slots:
     void multiButtonDragPicksLeft() {
         // If the user has both left and right held, prefer Left (matches the
         // priority documented on `:help nvim_input_mouse` for ambiguous state).
-        auto ev = makeEvent(QEvent::MouseMove, Qt::NoButton,
-                            Qt::LeftButton | Qt::RightButton);
+        auto ev = makeEvent(QEvent::MouseMove, Qt::NoButton, Qt::LeftButton | Qt::RightButton);
         const auto m = InputHandler::mouseFor(&ev, QEvent::MouseMove);
         QVERIFY(m.valid);
         QCOMPARE(m.button, QStringLiteral("left"));

@@ -10,9 +10,9 @@
 #include <QSignalSpy>
 #include <QtTest>
 
+#include "GridModel.h"
 #include "IntegrationHelpers.h"
 #include "NvimConnector.h"
-#include "GridModel.h"
 
 using namespace qvim;
 using namespace qvim::test;
@@ -20,21 +20,21 @@ using namespace qvim::test;
 namespace {
 
 template <typename F>
-bool waitUntil(F&& predicate, int timeoutMs) {
+bool waitUntil(F &&predicate, int timeoutMs) {
     QElapsedTimer t;
     t.start();
-    while (!predicate()) {
-        if (t.elapsed() >= timeoutMs) return false;
+    while(!predicate()) {
+        if(t.elapsed() >= timeoutMs) return false;
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
     }
     return true;
 }
 
-QQuickWindow* loadMainQml(QQmlApplicationEngine& engine, NvimConnector* conn) {
+QQuickWindow *loadMainQml(QQmlApplicationEngine &engine, NvimConnector *conn) {
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), conn);
     engine.loadFromModule(QStringLiteral("Qvim"), QStringLiteral("Main"));
-    if (engine.rootObjects().isEmpty()) return nullptr;
-    return qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+    if(engine.rootObjects().isEmpty()) return nullptr;
+    return qobject_cast<QQuickWindow *>(engine.rootObjects().first());
 }
 
 } // namespace
@@ -61,10 +61,9 @@ private slots:
 
         QSignalSpy spy(&conn, &NvimConnector::guifontChanged);
         conn.command(QStringLiteral("set guifont=Cascadia\\ Mono:h14"));
-        QVERIFY2(waitUntil([&] {
-                     return conn.guifont() == QStringLiteral("Cascadia Mono:h14");
-                 }, 5000),
-                 qPrintable(QStringLiteral("guifont was '%1'").arg(conn.guifont())));
+        QVERIFY2(
+            waitUntil([&] { return conn.guifont() == QStringLiteral("Cascadia Mono:h14"); }, 5000),
+            qPrintable(QStringLiteral("guifont was '%1'").arg(conn.guifont())));
         QVERIFY(spy.count() >= 1);
     }
 
@@ -94,7 +93,7 @@ private slots:
         QVERIFY(startTestNvim(conn));
 
         QQmlApplicationEngine engine;
-        QQuickWindow* window = loadMainQml(engine, &conn);
+        QQuickWindow *window = loadMainQml(engine, &conn);
         QVERIFY2(window, "Main.qml failed to load");
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QVERIFY(waitForAttach(&conn));
@@ -102,9 +101,8 @@ private slots:
 
         QSignalSpy guifontSpy(&conn, &NvimConnector::guifontChanged);
         conn.command(QStringLiteral("set guifont=Cascadia\\ Mono:h20"));
-        QVERIFY(waitUntil([&] {
-                              return conn.guifont() == QStringLiteral("Cascadia Mono:h20");
-                          }, 5000));
+        QVERIFY(
+            waitUntil([&] { return conn.guifont() == QStringLiteral("Cascadia Mono:h20"); }, 5000));
         QVERIFY(guifontSpy.count() >= 1);
         QCOMPARE(conn.guifontSize(), 20.0);
         QCOMPARE(conn.guifontFamily(), QStringLiteral("Cascadia Mono"));

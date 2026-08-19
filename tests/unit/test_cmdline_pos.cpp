@@ -1,6 +1,6 @@
+#include <msgpack.hpp>
 #include <QSignalSpy>
 #include <QtTest>
-#include <msgpack.hpp>
 
 #include "CmdlineModel.h"
 
@@ -9,13 +9,13 @@ using namespace qvim;
 namespace {
 
 // Pack a cmdline content array: [ [attrs, text], [attrs, text], ... ]
-msgpack::object_handle packContent(const std::vector<std::string>& chunks) {
+msgpack::object_handle packContent(const std::vector<std::string> &chunks) {
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
     pk.pack_array(static_cast<uint32_t>(chunks.size()));
-    for (const auto& s : chunks) {
+    for(const auto &s: chunks) {
         pk.pack_array(2);
-        pk.pack_map(0);    // empty attrs
+        pk.pack_map(0); // empty attrs
         pk.pack(s);
     }
     msgpack::object_handle h;
@@ -30,7 +30,7 @@ class TestCmdlinePos : public QObject {
 private slots:
     void setPosUpdatesCursorAndEmits() {
         CmdlineModel m;
-        auto content = packContent({"hello", " world"});
+        auto content = packContent({ "hello", " world" });
         m.show(content.get(), 0, ":", "", 0, 1);
         QCOMPARE(m.content(), QStringLiteral("hello world"));
         QCOMPARE(m.cursorPos(), 0);
@@ -50,7 +50,7 @@ private slots:
 
     void setPosToZeroEmits() {
         CmdlineModel m;
-        auto content = packContent({"abc"});
+        auto content = packContent({ "abc" });
         m.show(content.get(), 2, ":", "", 0, 1);
 
         QSignalSpy spy(&m, &CmdlineModel::contentChanged);
@@ -61,7 +61,7 @@ private slots:
 
     void setPosPreservesContent() {
         CmdlineModel m;
-        auto content = packContent({"foo bar"});
+        auto content = packContent({ "foo bar" });
         m.show(content.get(), 0, ":", "prompt", 2, 1);
 
         m.setPos(3, 1);
@@ -77,15 +77,15 @@ private slots:
         // content string. Current behaviour is to record the new level/pos
         // and emit contentChanged; content stays intact so the view can react.
         CmdlineModel m;
-        auto content = packContent({"outer"});
+        auto content = packContent({ "outer" });
         m.show(content.get(), 1, ":", "", 0, 1);
         QCOMPARE(m.level(), 1);
 
         QSignalSpy spy(&m, &CmdlineModel::contentChanged);
-        m.setPos(3, 2);   // level 2 while content belongs to level 1
+        m.setPos(3, 2); // level 2 while content belongs to level 1
         QCOMPARE(m.cursorPos(), 3);
         QCOMPARE(m.level(), 2);
-        QCOMPARE(m.content(), QStringLiteral("outer"));   // unchanged
+        QCOMPARE(m.content(), QStringLiteral("outer")); // unchanged
         QVERIFY(m.visible());
         QCOMPARE(spy.count(), 1);
     }

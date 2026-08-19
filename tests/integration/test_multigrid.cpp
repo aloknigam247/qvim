@@ -1,5 +1,5 @@
-#include <QtTest>
 #include "IntegrationHelpers.h"
+#include <QtTest>
 
 using namespace qvim;
 using namespace qvim::test;
@@ -20,13 +20,13 @@ private slots:
         QVERIFY(waitForFlush(&conn));
 
         conn.command(QStringLiteral("vsplit"));
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
 
         const QList<int> ids = conn.grid()->gridIds();
         QVERIFY2(ids.size() == 1,
                  qPrintable(QStringLiteral("expected only the global grid, got %1 grids "
                                            "— ext_multigrid may have been re-enabled")
-                            .arg(ids.size())));
+                                .arg(ids.size())));
     }
 
     // Cursor lives on the global grid (id=1) when ext_multigrid is off.
@@ -38,7 +38,7 @@ private slots:
         QVERIFY(waitForFlush(&conn));
 
         conn.command(QStringLiteral("vsplit"));
-        for (int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
+        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 500);
 
         QCOMPARE(conn.grid()->activeGrid(), 1);
     }
