@@ -32,8 +32,8 @@ private slots:
         QHash<QString, QVariant> vars;
         vars.insert(QStringLiteral("qvim_fallback"), QVariant(QStringList{ "a", "b", "c" }));
         ConfigGGlobalReader::readFromMap(vars, cfg);
-        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(),
-                 QStringList{ "a", "b", "c" });
+        const QStringList expected{ "a", "b", "c" };
+        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(), expected);
     }
 
     void missingVarsAreSilent() {

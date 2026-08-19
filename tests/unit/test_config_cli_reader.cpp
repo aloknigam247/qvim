@@ -65,8 +65,8 @@ private slots:
         cfg.registerOption(QStringLiteral("fallback"), ConfigType::StringList, QStringList{});
         QStringList args{ QStringLiteral("--qvim-fallback=a,b,c") };
         ConfigCliReader::extract(args, cfg);
-        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(),
-                 QStringList{ "a", "b", "c" });
+        const QStringList expected{ "a", "b", "c" };
+        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(), expected);
     }
 
     void unknownOptionIgnored() {

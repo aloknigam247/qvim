@@ -66,7 +66,8 @@ private slots:
         cfg.registerOption(QStringLiteral("alpha"), ConfigType::Int, 0);
         cfg.registerOption(QStringLiteral("mu"), ConfigType::String, QString());
         const QStringList n = cfg.registeredNames();
-        QCOMPARE(n, QStringList{ "alpha", "mu", "zeta" });
+        const QStringList expected{ "alpha", "mu", "zeta" };
+        QCOMPARE(n, expected);
     }
 };
 
