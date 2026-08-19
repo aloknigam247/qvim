@@ -1,0 +1,3 @@
+# Reformat: apply clang-format standard across the codebase (issue #41, PR #59).
+# git blame --ignore-revs-file .git-blame-ignore-revs  (GitHub applies this automatically)
+ed3285a43aec6969319146b09d0012133623ab0b
