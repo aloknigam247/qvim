@@ -27,6 +27,34 @@ env:
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/aloknigam247/index.json,readwrite"
 
 jobs:
+  # Enforce the clang-format standard (.clang-format) on every C++ source. This
+  # only needs clang-format, not Qt/vcpkg, so it runs on Linux in ~1 min in
+  # parallel with the heavy build job and fails fast on unformatted code. The
+  # version is pinned: clang-format output drifts between major releases, so a
+  # newer default would produce spurious diffs against the standard.
+  format-lint:
+    name: format-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install clang-format
+        run: pip install clang-format==22.1.8
+
+      - name: Check formatting
+        shell: pwsh
+        run: |
+          $files = git ls-files 'src/*.cpp' 'src/*.h' 'include/*.h' 'include/*.hpp' 'tests/*.cpp' 'tests/*.h'
+          if (-not $files) { throw "no C++ sources matched — check the ls-files globs." }
+          Write-Host "checking $($files.Count) file(s) against .clang-format"
+          clang-format --dry-run -Werror --style=file:.clang-format @files
+          if ($LASTEXITCODE -ne 0) {
+            throw "clang-format found unformatted code. Run: clang-format -i --style=file:.clang-format <files>"
+          }
+
   # Seed the vcpkg binary cache AND compile qvim exactly once. On a cold cache
   # the setup-qvim configure cold-builds Qt (~1-3 h) and pushes it to the NuGet
   # feed; every later job then RESTORES Qt in minutes. Compiling here (not in
