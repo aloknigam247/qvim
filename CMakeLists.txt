@@ -65,6 +65,7 @@ set(QVIM_LIB_SOURCES
     src/GridRuns.cpp            include/GridRuns.h
     src/HighlightTable.cpp      include/HighlightTable.h
     src/InputHandler.cpp        include/InputHandler.h
+    src/MdnsAdvertiser.cpp      include/MdnsAdvertiser.h
     src/MessagesModel.cpp       include/MessagesModel.h
     src/ModeInfo.cpp            include/ModeInfo.h
     src/MsgpackRpc.cpp          include/MsgpackRpc.h
@@ -92,6 +93,7 @@ target_link_libraries(qvim_lib
         msgpack-cxx
 )
 target_link_libraries(qvim_lib PRIVATE $<$<PLATFORM_ID:Windows>:dwmapi>)
+target_link_libraries(qvim_lib PRIVATE $<$<PLATFORM_ID:Windows>:dnsapi>)
 target_link_libraries(qvim_lib PRIVATE qvim_warnings)
 set_target_properties(qvim_lib PROPERTIES AUTOMOC ON)
 

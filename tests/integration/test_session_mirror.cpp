@@ -149,9 +149,16 @@ void TestSessionMirror::activeToggleReleasesPort() {
     server.setSource(&model);
     server.setPort(0);
 
+    // boundPort tracks the actually-bound listen port and notifies on each
+    // listen/close, so the mDNS advertiser can bind to it in QML.
+    QSignalSpy boundPortSpy(&server, &SessionMirrorServer::boundPortChanged);
+
     server.setActive(true);
     QVERIFY(server.isActive());
     QVERIFY(server.serverPort() != 0);
+    QVERIFY(boundPortSpy.count() >= 1);
+    QCOMPARE(server.property("boundPort").toUInt(), uint(server.serverPort()));
+    QVERIFY(server.property("boundPort").toUInt() != 0u);
 
     QWebSocket client1;
     bool client1Disconnected = false;
@@ -163,6 +170,7 @@ void TestSessionMirror::activeToggleReleasesPort() {
     server.setActive(false);
     QVERIFY(!server.isActive());
     QCOMPARE(server.serverPort(), quint16(0));
+    QCOMPARE(server.property("boundPort").toUInt(), 0u);
     QVERIFY(waitUntil([&] { return client1Disconnected; }, 5000));
 
     // Reopen: the server rebinds and accepts a fresh subscriber that gets hello.
