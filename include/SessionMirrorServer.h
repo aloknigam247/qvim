@@ -22,13 +22,14 @@ namespace qvim {
 // the client replies `resume`; the server then streams live events.
 //
 // The mirrored session is the desktop `ChatModel` itself, not a parallel echo:
-// `source` is the panel's model, and this server forwards its
-// userMessageAdded / assistantMessageBegan / *Delta / *Ended taps verbatim as
+// `source` is the panel's model, and this server forwards its transcript taps
+// (messageAdded / messageBegan / messageDelta / messageEnded) verbatim as
 // `message` / `message.begin` / `message.delta` / `message.end` frames, each
-// carrying the next monotonic `seq`. A remote `input` is fed straight back into
-// `ChatModel::submit()`, so remote and local input share one path and the reply
-// flows out to every subscriber (including the sender) through the same taps —
-// there is no self-echo shortcut.
+// carrying the next monotonic `seq`. Those taps fire for every message the
+// panel shows regardless of backend (local echo or copilot-bridge), so the
+// mirror always reflects the panel. A remote `input` is emitted as
+// `inputReceived`, which the panel dispatches to the active backend (echo
+// submit or copilot-bridge inject), so remote and local input share one path.
 //
 // `active` is the single lifecycle authority: it is bound to the chat panel's
 // visibility, so the port is only bound while the panel is open and is released
@@ -73,16 +74,19 @@ signals:
     void portChanged();
     void addressChanged();
     void boundPortChanged();
+    // Emitted for input arriving from a LAN subscriber. The panel dispatches it
+    // to the active backend so remote input joins the Copilot session.
+    void inputReceived(const QString &text);
 
 private:
     void onNewConnection();
     void onTextMessage(const QString &message);
     void onSocketDisconnected();
 
-    void onUserMessage(const QString &id, const QString &text);
-    void onAssistantBegin(const QString &id);
-    void onAssistantDelta(const QString &id, const QString &text);
-    void onAssistantEnd(const QString &id);
+    void onMessageAdded(const QString &id, const QString &role, const QString &text);
+    void onMessageBegan(const QString &id, const QString &role);
+    void onMessageDelta(const QString &id, const QString &text);
+    void onMessageEnded(const QString &id);
 
     void startListening();
     void stopListening();

@@ -154,6 +154,8 @@ int main(int argc, char *argv[]) {
     boot.mark("QGuiApplication ctor done");
 
     qvim::Config cfg;
+    cfg.registerOption(QStringLiteral("chat_backend"), qvim::ConfigType::String,
+                       QStringLiteral("bridge"));
     cfg.registerOption(QStringLiteral("rounded_highlights"), qvim::ConfigType::StringList,
                        QStringList{});
 

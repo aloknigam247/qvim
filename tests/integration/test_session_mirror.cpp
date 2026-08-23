@@ -42,6 +42,7 @@ class TestSessionMirror : public QObject {
 
 private slots:
     void echoMirrorsPanelSession();
+    void appendBlockForwardsRegardlessOfBackend();
     void activeToggleReleasesPort();
 };
 
@@ -53,6 +54,9 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     ChatModel model;
     SessionMirrorServer server;
     server.setSource(&model);
+    // The panel routes remote input to the active backend; simulate echo mode.
+    connect(&server, &SessionMirrorServer::inputReceived, &model,
+            [&model](const QString &t) { model.submit(t); });
     server.setPort(0); // OS-assigned ephemeral port — no fixed-8765 collision.
     server.setActive(true);
     QVERIFY(server.isActive());
@@ -137,6 +141,79 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     // block.
     QCOMPARE(model.count(), 2);
 
+    client.close();
+}
+
+// The mirror is driven by the ChatModel, not the echo backend: content added
+// via appendBlock() (the path any non-echo backend, e.g. CopilotBridgeClient,
+// uses) forwards to subscribers just the same, as atomic `message` frames that
+// preserve the block's role.
+void TestSessionMirror::appendBlockForwardsRegardlessOfBackend() {
+    ChatModel model;
+    SessionMirrorServer server;
+    server.setSource(&model);
+    connect(&server, &SessionMirrorServer::inputReceived, &model,
+            [&model](const QString &t) { model.submit(t); });
+    server.setPort(0);
+    server.setActive(true);
+    const quint16 port = server.serverPort();
+    QVERIFY(port != 0);
+
+    QWebSocket client;
+    QStringList frames;
+    connect(&client, &QWebSocket::textMessageReceived, &client,
+            [&frames](const QString &m) { frames << m; });
+    client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(port)));
+    QVERIFY(waitUntil([&] { return client.state() == QAbstractSocket::ConnectedState; }, 5000));
+    QVERIFY(waitUntil([&] { return frames.size() >= 1; }, 5000)); // hello
+
+    // Complete the handshake, then round-trip one echo so the server has marked
+    // this client ready (broadcast only reaches resumed clients, and there is no
+    // replay) before we exercise appendBlock. Ordering over the socket
+    // guarantees resume is processed first.
+    client.sendTextMessage(compact(QJsonObject{
+        { QStringLiteral("type"), QStringLiteral("resume") },
+        { QStringLiteral("lastSeq"), 0 },
+    }));
+    client.sendTextMessage(compact(QJsonObject{
+        { QStringLiteral("type"), QStringLiteral("input") },
+        { QStringLiteral("text"), QStringLiteral("sync") },
+    }));
+    QVERIFY(waitUntil([&] {
+        return !frames.isEmpty() && typeOf(frames.last()) == QStringLiteral("message.end");
+    }, 5000));
+
+    // Simulate a non-echo backend pushing user + assistant + system blocks.
+    model.appendBlock(QStringLiteral("user"), QStringLiteral("from bridge"));
+    model.appendBlock(QStringLiteral("assistant"), QStringLiteral("bridge reply"));
+    model.appendBlock(QStringLiteral("system"), QStringLiteral("tool: shell"));
+
+    // All three arrive as atomic `message` frames preserving their role.
+    QVERIFY(waitUntil([&] {
+        for(const QString &f: frames) {
+            if(parse(f).value(QStringLiteral("text")).toString() == QStringLiteral("tool: shell")) {
+                return true;
+            }
+        }
+        return false;
+    }, 5000));
+
+    QJsonObject u, a, s;
+    for(const QString &f: frames) {
+        const QJsonObject o = parse(f);
+        const QString text = o.value(QStringLiteral("text")).toString();
+        if(text == QStringLiteral("from bridge")) u = o;
+        else if(text == QStringLiteral("bridge reply")) a = o;
+        else if(text == QStringLiteral("tool: shell")) s = o;
+    }
+    QCOMPARE(u.value(QStringLiteral("type")).toString(), QStringLiteral("message"));
+    QCOMPARE(u.value(QStringLiteral("role")).toString(), QStringLiteral("user"));
+    QCOMPARE(a.value(QStringLiteral("role")).toString(), QStringLiteral("assistant"));
+    QCOMPARE(s.value(QStringLiteral("role")).toString(), QStringLiteral("system"));
+    // Every appended frame carries a seq, like all other mirror frames.
+    QVERIFY(u.contains(QStringLiteral("seq")));
+    QVERIFY(s.value(QStringLiteral("seq")).toInteger() >
+            u.value(QStringLiteral("seq")).toInteger());
     client.close();
 }
 

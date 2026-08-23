@@ -17,7 +17,21 @@ Rectangle {
     property alias model: chatModel
     property alias inputField: input
 
+    // Active chat backend: "bridge" (default) mirrors the copilot-bridge hub;
+    // "echo" is the built-in local echo, kept for testing. Resolved from
+    // $config (g:qvim_chat_backend / --qvim-chat-backend), re-read when it
+    // resolves late (g: globals arrive after attachComplete).
+    property string backend: $config.value("chat_backend")
+
     signal closed()
+
+    Connections {
+        target: $config
+        function onChanged(name) {
+            if (name === "chat_backend")
+                panel.backend = $config.value("chat_backend")
+        }
+    }
 
     function open() {
         // visible MUST be set before forceActiveFocus(): focusing a hidden
@@ -31,7 +45,27 @@ Rectangle {
         closed()
     }
 
+    // Single entry point for outbound input regardless of source (local input
+    // field or a LAN subscriber via the mirror). Bridge backend injects into the
+    // Copilot session; echo backend submits to the local model.
+    function sendInput(text) {
+        if (backend === "bridge")
+            bridge.inject(text)
+        else
+            chatModel.submit(text)
+    }
+
     ChatModel { id: chatModel }
+
+    // Second chat backend: streams the copilot-bridge hub's mirror traffic into
+    // the same ChatModel. Only connects while the panel is open AND the bridge
+    // backend is selected, so no outbound socket exists otherwise.
+    CopilotBridgeClient {
+        id: bridge
+        sink: chatModel
+        showTools: true
+        active: panel.visible && panel.backend === "bridge"
+    }
 
     // Mirrors this panel's session to LAN subscribers over ws://, but only
     // while the panel is open — `active` binds the server's listen lifecycle to
@@ -40,6 +74,15 @@ Rectangle {
         id: mirror
         source: chatModel
         active: panel.visible
+    }
+
+    // Input from a LAN subscriber joins the active Copilot session through the
+    // same dispatch as local input.
+    Connections {
+        target: mirror
+        function onInputReceived(text) {
+            panel.sendInput(text)
+        }
     }
 
     // Advertises the mirror endpoint over mDNS/DNS-SD so the companion app finds
@@ -89,7 +132,9 @@ Rectangle {
                     width: parent.width - 16
                     height: msg.implicitHeight + 12
                     radius: 6
-                    color: block.author === "user" ? "#0e4429" : "#333333"
+                    color: block.author === "user" ? "#0e4429"
+                         : block.author === "system" ? "#1f2d3d"
+                         : "#333333"
 
                     Text {
                         id: msg
@@ -129,9 +174,12 @@ Rectangle {
                 font.family: $connector.guifontFamily
                 font.pointSize: $connector.guifontSize
 
-                // Submit on Enter.
+                // Submit on Enter. In bridge mode a line is injected as a user
+                // prompt into the Copilot session(s) — it returns through the
+                // mirror stream, so it is not echoed locally. In echo mode the
+                // line goes to the local echo model.
                 onAccepted: {
-                    chatModel.submit(text)
+                    panel.sendInput(text)
                     clear()
                 }
                 // Escape hands focus back to the grid via requestClose().

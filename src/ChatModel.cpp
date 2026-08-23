@@ -52,13 +52,13 @@ void ChatModel::submit(const QString &text) {
     const QString assistantId = QStringLiteral("a") + QString::number(m_turn);
 
     appendMessage(Author::User, trimmed);
-    emit userMessageAdded(userId, trimmed);
+    emit messageAdded(userId, QStringLiteral("user"), trimmed);
 
     // Begin an empty assistant block, then queue the echo split into chunks
     // targeting that specific row.
     appendMessage(Author::Assistant, QString());
     const int assistantRow = static_cast<int>(m_msgs.size()) - 1;
-    emit assistantMessageBegan(assistantId);
+    emit messageBegan(assistantId, QStringLiteral("assistant"));
 
     const QString reply = QStringLiteral("Echo: ") + trimmed;
     const QVector<QString> parts = chunkify(reply, kEchoChunks);
@@ -67,6 +67,14 @@ void ChatModel::submit(const QString &text) {
         m_pending.enqueue(Chunk{ assistantRow, assistantId, parts[i], last });
     }
     if(!m_pending.isEmpty() && !m_streamTimer->isActive()) { m_streamTimer->start(); }
+}
+
+void ChatModel::appendBlock(const QString &author, const QString &text) {
+    if(text.isEmpty()) return;
+    const Author a = authorFromName(author);
+    appendMessage(a, text);
+    const QString id = QStringLiteral("x") + QString::number(++m_block);
+    emit messageAdded(id, authorName(a), text);
 }
 
 void ChatModel::streamTick() {
@@ -80,8 +88,8 @@ void ChatModel::streamTick() {
         const QModelIndex idx = index(chunk.row, 0);
         emit dataChanged(idx, idx, { TextRole });
     }
-    emit assistantMessageDelta(chunk.id, chunk.text);
-    if(chunk.last) { emit assistantMessageEnded(chunk.id); }
+    emit messageDelta(chunk.id, chunk.text);
+    if(chunk.last) { emit messageEnded(chunk.id); }
     if(m_pending.isEmpty()) { m_streamTimer->stop(); }
 }
 
@@ -104,7 +112,21 @@ void ChatModel::appendMessage(Author author, const QString &text) {
 }
 
 QString ChatModel::authorName(Author a) {
-    return a == Author::User ? QStringLiteral("user") : QStringLiteral("assistant");
+    switch(a) {
+        case Author::User:
+            return QStringLiteral("user");
+        case Author::Assistant:
+            return QStringLiteral("assistant");
+        case Author::System:
+            return QStringLiteral("system");
+    }
+    return QStringLiteral("system");
+}
+
+ChatModel::Author ChatModel::authorFromName(const QString &name) {
+    if(name == QStringLiteral("user")) return Author::User;
+    if(name == QStringLiteral("assistant")) return Author::Assistant;
+    return Author::System;
 }
 
 QVector<QString> ChatModel::chunkify(const QString &s, int parts) {
