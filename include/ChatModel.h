@@ -44,6 +44,12 @@ public:
     // assistant block streamed in a few chunks. No-op on empty/whitespace.
     Q_INVOKABLE void submit(const QString &text);
 
+    // Appends an externally-sourced block verbatim (no echo, no streaming). Used
+    // by non-echo backends such as CopilotBridgeClient that already carry the
+    // authored text. `author` is "user", "assistant", or "system"; anything else
+    // is treated as "system". No-op on empty `text`.
+    Q_INVOKABLE void appendBlock(const QString &author, const QString &text);
+
     // Read helpers for bindings and tests. Return empty on out-of-range.
     Q_INVOKABLE QString textAt(int row) const;
     Q_INVOKABLE QString authorAt(int row) const;
@@ -51,20 +57,24 @@ public:
 signals:
     void countChanged();
 
-    // Session-mirror taps. These describe the same turn the model rows do, but
-    // as an ordered event stream a subscriber (SessionMirrorServer) can forward
-    // verbatim: the user block is atomic (userMessageAdded), the assistant reply
-    // is a begin / delta* / end sequence. Ids are stable per turn (`u<n>` /
-    // `a<n>`) so a client can attribute streamed deltas to the right block.
-    void userMessageAdded(const QString &id, const QString &text);
-    void assistantMessageBegan(const QString &id);
-    void assistantMessageDelta(const QString &id, const QString &text);
-    void assistantMessageEnded(const QString &id);
+    // Transcript event stream, forwarded verbatim by a subscriber
+    // (SessionMirrorServer). Emitted for every message the panel shows,
+    // regardless of which backend produced it: the ChatModel is the single
+    // source of truth, so the mirror stays in sync no matter the backend. An
+    // atomic block (user input, or an external backend message) is one
+    // messageAdded; a streamed reply is messageBegan / messageDelta* /
+    // messageEnded. Ids are stable per block so a client can attribute streamed
+    // deltas to the right author.
+    void messageAdded(const QString &id, const QString &role, const QString &text);
+    void messageBegan(const QString &id, const QString &role);
+    void messageDelta(const QString &id, const QString &text);
+    void messageEnded(const QString &id);
 
 private:
     enum class Author {
         User,
-        Assistant
+        Assistant,
+        System
     };
 
     struct Message {
@@ -87,12 +97,14 @@ private:
     void streamTick();
 
     static QString authorName(Author a);
+    static Author authorFromName(const QString &name);
     static QVector<QString> chunkify(const QString &s, int parts);
 
     QVector<Message> m_msgs;
     QQueue<Chunk> m_pending;
     QTimer *m_streamTimer = nullptr;
-    quint64 m_turn = 0; // per-turn id counter for session taps
+    quint64 m_turn = 0;  // per-turn id counter for session taps
+    quint64 m_block = 0; // id counter for appendBlock() atomic-block taps
 };
 
 } // namespace qvim

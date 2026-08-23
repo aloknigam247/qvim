@@ -35,13 +35,10 @@ void SessionMirrorServer::setSource(ChatModel *source) {
     if(m_source) { disconnect(m_source, nullptr, this, nullptr); }
     m_source = source;
     if(m_source) {
-        connect(m_source, &ChatModel::userMessageAdded, this, &SessionMirrorServer::onUserMessage);
-        connect(m_source, &ChatModel::assistantMessageBegan, this,
-                &SessionMirrorServer::onAssistantBegin);
-        connect(m_source, &ChatModel::assistantMessageDelta, this,
-                &SessionMirrorServer::onAssistantDelta);
-        connect(m_source, &ChatModel::assistantMessageEnded, this,
-                &SessionMirrorServer::onAssistantEnd);
+        connect(m_source, &ChatModel::messageAdded, this, &SessionMirrorServer::onMessageAdded);
+        connect(m_source, &ChatModel::messageBegan, this, &SessionMirrorServer::onMessageBegan);
+        connect(m_source, &ChatModel::messageDelta, this, &SessionMirrorServer::onMessageDelta);
+        connect(m_source, &ChatModel::messageEnded, this, &SessionMirrorServer::onMessageEnded);
     }
     emit sourceChanged();
 }
@@ -139,26 +136,27 @@ void SessionMirrorServer::onSocketDisconnected() {
     client->deleteLater();
 }
 
-void SessionMirrorServer::onUserMessage(const QString &id, const QString &text) {
+void SessionMirrorServer::onMessageAdded(const QString &id, const QString &role,
+                                         const QString &text) {
     if(!m_active) return;
     bufferAndBroadcast(QJsonObject{
         { QStringLiteral("type"), QStringLiteral("message") },
         { QStringLiteral("id"), id },
-        { QStringLiteral("role"), QStringLiteral("user") },
+        { QStringLiteral("role"), role },
         { QStringLiteral("text"), text },
     });
 }
 
-void SessionMirrorServer::onAssistantBegin(const QString &id) {
+void SessionMirrorServer::onMessageBegan(const QString &id, const QString &role) {
     if(!m_active) return;
     bufferAndBroadcast(QJsonObject{
         { QStringLiteral("type"), QStringLiteral("message.begin") },
         { QStringLiteral("id"), id },
-        { QStringLiteral("role"), QStringLiteral("assistant") },
+        { QStringLiteral("role"), role },
     });
 }
 
-void SessionMirrorServer::onAssistantDelta(const QString &id, const QString &text) {
+void SessionMirrorServer::onMessageDelta(const QString &id, const QString &text) {
     if(!m_active) return;
     bufferAndBroadcast(QJsonObject{
         { QStringLiteral("type"), QStringLiteral("message.delta") },
@@ -167,7 +165,7 @@ void SessionMirrorServer::onAssistantDelta(const QString &id, const QString &tex
     });
 }
 
-void SessionMirrorServer::onAssistantEnd(const QString &id) {
+void SessionMirrorServer::onMessageEnded(const QString &id) {
     if(!m_active) return;
     bufferAndBroadcast(QJsonObject{
         { QStringLiteral("type"), QStringLiteral("message.end") },
@@ -186,13 +184,14 @@ void SessionMirrorServer::sendHello(QWebSocket *client) {
 }
 
 void SessionMirrorServer::handleInput(const QString &text) {
-    if(!m_active || !m_source) return;
+    if(!m_active) return;
     const QString trimmed = text.trimmed();
     if(trimmed.isEmpty() || trimmed.size() > kMaxInputChars) return;
-    // Feed the remote input through the real panel model. The resulting user
-    // block and streamed reply come back via the ChatModel taps and broadcast
-    // to every subscriber, so remote input mirrors exactly like local input.
-    m_source->submit(trimmed);
+    // Hand the remote input to the panel, which routes it to the active backend
+    // (echo submit or copilot-bridge inject). The resulting turn comes back via
+    // the ChatModel taps and broadcasts to every subscriber, so remote input
+    // mirrors exactly like local input regardless of backend.
+    emit inputReceived(trimmed);
 }
 
 void SessionMirrorServer::bufferAndBroadcast(QJsonObject frame) {

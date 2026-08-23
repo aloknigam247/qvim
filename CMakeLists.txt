@@ -58,6 +58,7 @@ set(QVIM_LIB_SOURCES
     src/Config.cpp              include/Config.h
     src/ConfigCliReader.cpp     include/ConfigCliReader.h
     src/ConfigGGlobalReader.cpp include/ConfigGGlobalReader.h
+    src/CopilotBridgeClient.cpp include/CopilotBridgeClient.h
     src/CursorBlinkState.cpp    include/CursorBlinkState.h
     src/CursorItem.cpp          include/CursorItem.h
     src/GridItem.cpp            include/GridItem.h
