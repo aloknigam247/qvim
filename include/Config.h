@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include <optional>
 #include <QHash>
@@ -66,3 +67,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

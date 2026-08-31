@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CURSORITEM_H
+#define CURSORITEM_H
 
 #include <utility>
 #include <QElapsedTimer>
@@ -160,3 +161,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

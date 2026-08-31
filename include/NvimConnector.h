@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NVIMCONNECTOR_H
+#define NVIMCONNECTOR_H
 
 #include <QColor>
 #include <QObject>
@@ -182,3 +183,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

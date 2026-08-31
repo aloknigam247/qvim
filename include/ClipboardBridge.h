@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CLIPBOARDBRIDGE_H
+#define CLIPBOARDBRIDGE_H
 
 #include "MsgpackRpc.h"
 #include <msgpack.hpp>
@@ -32,3 +33,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

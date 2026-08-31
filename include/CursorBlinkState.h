@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CURSORBLINKSTATE_H
+#define CURSORBLINKSTATE_H
 
 #include <QtGlobal>
 
@@ -41,3 +42,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

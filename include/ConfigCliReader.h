@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIGCLIREADER_H
+#define CONFIGCLIREADER_H
 
 #include <QStringList>
 
@@ -29,3 +30,5 @@ public:
 };
 
 } // namespace qvim
+
+#endif

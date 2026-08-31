@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SESSIONEVENTBUFFER_H
+#define SESSIONEVENTBUFFER_H
 
 #include <deque>
 #include <QByteArray>
@@ -46,3 +47,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

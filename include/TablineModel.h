@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TABLINEMODEL_H
+#define TABLINEMODEL_H
 
 #include <msgpack.hpp>
 #include <QAbstractListModel>
@@ -44,3 +45,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef POPUPMENUMODEL_H
+#define POPUPMENUMODEL_H
 
 #include <msgpack.hpp>
 #include <QAbstractListModel>
@@ -59,3 +60,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

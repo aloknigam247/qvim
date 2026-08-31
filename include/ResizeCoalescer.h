@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RESIZECOALESCER_H
+#define RESIZECOALESCER_H
 
 #include <QObject>
 #include <QTimer>
@@ -44,3 +45,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INPUTHANDLER_H
+#define INPUTHANDLER_H
 
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -42,3 +43,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

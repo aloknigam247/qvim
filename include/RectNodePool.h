@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RECTNODEPOOL_H
+#define RECTNODEPOOL_H
 
 #include <QColor>
 #include <QRectF>
@@ -58,3 +59,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

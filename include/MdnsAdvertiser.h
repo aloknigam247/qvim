@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MDNSADVERTISER_H
+#define MDNSADVERTISER_H
 
 #include <QMap>
 #include <QObject>
@@ -97,3 +98,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

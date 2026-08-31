@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MODEINFO_H
+#define MODEINFO_H
 
 #include <msgpack.hpp>
 #include <QObject>
@@ -60,3 +61,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

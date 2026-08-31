@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SESSIONMIRRORSERVER_H
+#define SESSIONMIRRORSERVER_H
 
 #include <QHostAddress>
 #include <QJsonObject>
@@ -108,3 +109,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

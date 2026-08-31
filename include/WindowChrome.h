@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WINDOWCHROME_H
+#define WINDOWCHROME_H
 
 #include <QColor>
 #include <QObject>
@@ -19,3 +20,5 @@ public:
 };
 
 } // namespace qvim
+
+#endif

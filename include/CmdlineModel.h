@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CMDLINEMODEL_H
+#define CMDLINEMODEL_H
 
 #include <msgpack.hpp>
 #include <QObject>
@@ -63,3 +64,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

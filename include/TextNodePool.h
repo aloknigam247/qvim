@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TEXTNODEPOOL_H
+#define TEXTNODEPOOL_H
 
 #include <QColor>
 #include <QFont>
@@ -62,3 +63,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

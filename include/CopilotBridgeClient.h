@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COPILOTBRIDGECLIENT_H
+#define COPILOTBRIDGECLIENT_H
 
 #include <QObject>
 #include <QPointer>
@@ -90,3 +91,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

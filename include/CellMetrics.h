@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CELLMETRICS_H
+#define CELLMETRICS_H
 
 #include <QFontMetricsF>
 #include <QtGlobal>
@@ -14,3 +15,5 @@ struct CellMetrics {
 CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr = 1.0);
 
 } // namespace qvim
+
+#endif

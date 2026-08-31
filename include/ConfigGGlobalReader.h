@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIGGGLOBALREADER_H
+#define CONFIGGGLOBALREADER_H
 
 #include <QHash>
 #include <QString>
@@ -25,3 +26,5 @@ public:
 };
 
 } // namespace qvim
+
+#endif

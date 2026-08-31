@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MSGPACKRPC_H
+#define MSGPACKRPC_H
 
 #include <expected>
 #include <functional>
@@ -81,3 +82,5 @@ inline std::string toStd(const QString &s) { return s.toStdString(); }
 
 Q_DECLARE_METATYPE(qvim::ObjectHandlePtr)
 Q_DECLARE_METATYPE(qvim::Notification)
+
+#endif

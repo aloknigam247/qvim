@@ -1,4 +1,5 @@
-#pragma once
+#ifndef GRIDITEM_H
+#define GRIDITEM_H
 
 #include <QFont>
 #include <QFontMetricsF>
@@ -130,3 +131,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif
