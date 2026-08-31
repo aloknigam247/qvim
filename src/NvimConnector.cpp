@@ -14,23 +14,21 @@
 
 namespace qvim {
 
-namespace {
-QString asQString(const msgpack::object &o) {
+static QString asQString(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
 
-bool asBool(const msgpack::object &o, bool def = false) {
+static bool asBool(const msgpack::object &o, bool def = false) {
     if(o.type == msgpack::type::BOOLEAN) return o.via.boolean;
     return def;
 }
 
-int64_t asInt(const msgpack::object &o, int64_t def = 0) {
+static int64_t asInt(const msgpack::object &o, int64_t def = 0) {
     if(o.type == msgpack::type::POSITIVE_INTEGER) return static_cast<int64_t>(o.via.u64);
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     return def;
 }
-} // namespace
 
 NvimConnector::NvimConnector(QObject *parent) :
     QObject(parent), m_rpc(new MsgpackRpc(this)), m_grid(new GridModel(this)),
@@ -48,7 +46,6 @@ bool NvimConnector::start(const QString &nvimExe, const QStringList &nvimForward
     return m_rpc->startEmbeddedNvim(nvimExe, nvimForwardArgs);
 }
 
-namespace {
 // Same parsing the GridItem uses for its own font selection. Centralised here
 // so QML overlays can bind via Q_PROPERTY without duplicating the regex.
 // Before nvim's first option_set arrives we defer to the OS-supplied fixed
@@ -56,14 +53,14 @@ namespace {
 // qvim doesn't impose its own font choice.
 constexpr qreal kDefaultGuifontSize = 14.0;
 
-QString systemFixedFontFamily() {
+static QString systemFixedFontFamily() {
     // Cached on first call so QFontDatabase isn't queried on every property
     // read. Safe because the platform's fixed font doesn't change at runtime.
     static const QString cached = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
     return cached;
 }
 
-void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
+static void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
     if(guifont.isEmpty()) return;
     const auto parts = guifont.split(QLatin1Char(':'));
     if(parts.isEmpty()) return;
@@ -78,7 +75,6 @@ void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
         }
     }
 }
-} // namespace
 
 QString NvimConnector::guifontFamily() const {
     QString family = systemFixedFontFamily();
@@ -166,8 +162,7 @@ bool NvimConnector::attachUi(int cols, int rows) {
     return true;
 }
 
-namespace {
-QVariant msgpackToVariant(const msgpack::object &o) {
+static QVariant msgpackToVariant(const msgpack::object &o) {
     switch(o.type) {
         case msgpack::type::NIL:
             return {};
@@ -196,7 +191,6 @@ QVariant msgpackToVariant(const msgpack::object &o) {
             return {};
     }
 }
-} // namespace
 
 void NvimConnector::getVar(const QString &name, GetVarCallback cb) {
     m_rpc->request(QStringLiteral("nvim_get_var"), [&name](msgpack::packer<msgpack::sbuffer> &pk) {

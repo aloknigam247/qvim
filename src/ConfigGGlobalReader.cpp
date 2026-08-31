@@ -10,11 +10,9 @@
 
 namespace qvim {
 
-namespace {
-
 constexpr auto kGGlobalPrefix = "qvim_";
 
-std::optional<QVariant> coerce(ConfigType type, const QVariant &raw) {
+static std::optional<QVariant> coerce(ConfigType type, const QVariant &raw) {
     switch(type) {
         case ConfigType::Bool: {
             if(raw.typeId() == QMetaType::Bool) return raw;
@@ -53,8 +51,6 @@ std::optional<QVariant> coerce(ConfigType type, const QVariant &raw) {
     }
     return std::nullopt;
 }
-
-} // namespace
 
 void ConfigGGlobalReader::read(NvimConnector &connector, Config &cfg) {
     const QStringList names = cfg.registeredNames();

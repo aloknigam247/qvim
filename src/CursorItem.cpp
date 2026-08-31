@@ -18,17 +18,6 @@
 
 namespace qvim {
 
-namespace {
-// Same PUA detection used by GridItem. Qt 6's text shaper drops Private Use
-// Area codepoints (QTBUG-116417), so block-mode cursor glyphs in PUA need the
-// QRawFont + drawGlyphRun bypass below.
-bool isPua(QChar c) {
-    const ushort u = c.unicode();
-    if(u >= 0xE000 && u <= 0xF8FF) return true;
-    return c.isHighSurrogate() && u >= 0xDB80;
-}
-} // namespace
-
 CursorItem::CursorItem(QQuickItem *parent) : QQuickItem(parent) {
     setFlag(ItemHasContents, true);
     // Cursor item must never take focus — qml/AGENTS.md mandates focus stay

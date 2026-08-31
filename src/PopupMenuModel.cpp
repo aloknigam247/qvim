@@ -2,12 +2,10 @@
 
 namespace qvim {
 
-namespace {
-QString strOrEmpty(const msgpack::object &o) {
+static QString strOrEmpty(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
-} // namespace
 
 PopupMenuModel::PopupMenuModel(QObject *parent) : QAbstractListModel(parent) {}
 

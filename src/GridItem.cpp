@@ -28,8 +28,7 @@
 
 namespace qvim {
 
-namespace {
-void parseGuifont(const QString &guifont, QString &family, qreal &size) {
+static void parseGuifont(const QString &guifont, QString &family, qreal &size) {
     if(guifont.isEmpty()) return;
     const auto parts = guifont.split(QLatin1Char(':'));
     if(parts.isEmpty()) return;
@@ -44,7 +43,6 @@ void parseGuifont(const QString &guifont, QString &family, qreal &size) {
         }
     }
 }
-} // namespace
 
 GridItem::~GridItem() = default;
 

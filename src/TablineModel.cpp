@@ -2,8 +2,7 @@
 
 namespace qvim {
 
-namespace {
-int64_t extInt(const msgpack::object &o) {
+static int64_t extInt(const msgpack::object &o) {
     if(o.type == msgpack::type::POSITIVE_INTEGER) return static_cast<int64_t>(o.via.u64);
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     if(o.type == msgpack::type::EXT) {
@@ -13,7 +12,6 @@ int64_t extInt(const msgpack::object &o) {
     }
     return 0;
 }
-} // namespace
 
 TablineModel::TablineModel(QObject *parent) : QAbstractListModel(parent) {}
 

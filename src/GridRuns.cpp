@@ -13,13 +13,11 @@ bool isPuaChar(QChar c) {
     return c.isHighSurrogate() && u >= 0xDB80;
 }
 
-namespace {
-
 // Collect the rounded-highlight spans and the ambient background each one sits
 // on. Sampling is deliberately O(1) per span — probe the two adjacent cells
 // only — because this runs on every frame in the redraw path.
-void collectPills(const GridModel &grid, const HighlightTable &hl, int gridId, int rows, int cols,
-                  QVector<PillSpan> &out) {
+static void collectPills(const GridModel &grid, const HighlightTable &hl, int gridId, int rows,
+                         int cols, QVector<PillSpan> &out) {
     for(int r = 0; r < rows; ++r) {
         int c = 0;
         while(c < cols) {
@@ -53,8 +51,8 @@ void collectPills(const GridModel &grid, const HighlightTable &hl, int gridId, i
 // Split a row into PUA clusters. A cluster runs while consecutive cells share
 // an hl_id and remain PUA, so each cluster needs a single colour and a single
 // draw call. Double-width right halves are absorbed without breaking the run.
-void collectPuaClusters(const GridModel &grid, int gridId, int row, int cols,
-                        QVector<PuaCluster> &out) {
+static void collectPuaClusters(const GridModel &grid, int gridId, int row, int cols,
+                               QVector<PuaCluster> &out) {
     int c = 0;
     while(c < cols) {
         const Cell &cell = grid.cell(gridId, row, c);
@@ -79,8 +77,6 @@ void collectPuaClusters(const GridModel &grid, int gridId, int row, int cols,
         c = end;
     }
 }
-
-} // namespace
 
 GridRuns buildGridRuns(const GridModel &grid, const HighlightTable &hl, int gridId) {
     GridRuns out;

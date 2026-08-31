@@ -11,10 +11,9 @@
 
 namespace qvim {
 
-namespace {
 // The hub binds a fixed port on localhost (copilot-bridge/README.md). The
 // reference client honours COPILOT_BRIDGE_URL to point elsewhere.
-QString defaultUrl() {
+static QString defaultUrl() {
     return qEnvironmentVariable("COPILOT_BRIDGE_URL", QStringLiteral("ws://127.0.0.1:47823"));
 }
 
@@ -22,17 +21,17 @@ QString defaultUrl() {
 // active so the panel reconnects once a session (re)spawns it.
 constexpr int kReconnectMs = 2000;
 
-QString serialise(const QJsonObject &frame) {
+static QString serialise(const QJsonObject &frame) {
     return QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact));
 }
 
-QString truncate(const QString &text, int max) {
+static QString truncate(const QString &text, int max) {
     const QString flat = text.simplified();
     return flat.size() > max ? flat.left(max) + QStringLiteral("\u2026") : flat;
 }
 
 // First non-empty string value among the candidate keys.
-QString firstString(const QJsonObject &obj, std::initializer_list<QStringView> keys) {
+static QString firstString(const QJsonObject &obj, std::initializer_list<QStringView> keys) {
     for(QStringView key: keys) {
         const QJsonValue v = obj.value(key);
         if(v.isString() && !v.toString().isEmpty()) return v.toString();
@@ -42,7 +41,7 @@ QString firstString(const QJsonObject &obj, std::initializer_list<QStringView> k
 
 // The selectable options an ask_user-style tool offers, pulled from its JSON
 // Schema (enum / oneOf.title / items.enum / items.anyOf.title across fields).
-QStringList schemaOptions(const QJsonObject &schema) {
+static QStringList schemaOptions(const QJsonObject &schema) {
     QStringList options;
     const QJsonObject props = schema.value(QStringLiteral("properties")).toObject();
     for(const QJsonValue &field: props) {
@@ -67,7 +66,7 @@ QStringList schemaOptions(const QJsonObject &schema) {
 
 // The hub encodes `toolArgs` / `result` as a JSON *string* (not a nested
 // object). Accept both: parse a string, pass an object through.
-QJsonObject asObject(const QJsonValue &value) {
+static QJsonObject asObject(const QJsonValue &value) {
     if(value.isObject()) return value.toObject();
     if(value.isString()) { return QJsonDocument::fromJson(value.toString().toUtf8()).object(); }
     return {};
@@ -76,7 +75,7 @@ QJsonObject asObject(const QJsonValue &value) {
 // A one-line summary of what a tool call is actually doing, so the panel shows
 // the file / command / question instead of the bare tool name. Falls back to
 // compact JSON so an unrecognised tool still surfaces its arguments.
-QString formatToolArgs(const QJsonObject &args) {
+static QString formatToolArgs(const QJsonObject &args) {
     if(args.isEmpty()) return {};
     const QString question = firstString(args, { u"message", u"question", u"prompt", u"query" });
     if(!question.isEmpty()) {
@@ -100,7 +99,7 @@ QString formatToolArgs(const QJsonObject &args) {
 
 // A tool's textual result. Like toolArgs it may be a JSON string wrapping a
 // richer payload; pull the human-readable text out when so, else use it raw.
-QString formatToolResult(const QJsonValue &value) {
+static QString formatToolResult(const QJsonValue &value) {
     if(!value.isString()) return {};
     const QString raw = value.toString();
     const QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8());
@@ -111,7 +110,6 @@ QString formatToolResult(const QJsonValue &value) {
     }
     return truncate(raw, 200);
 }
-} // namespace
 
 CopilotBridgeClient::CopilotBridgeClient(QObject *parent) :
     QObject(parent), m_socket(new QWebSocket(QString(), QWebSocketProtocol::VersionLatest, this)),

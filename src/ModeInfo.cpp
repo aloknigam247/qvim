@@ -2,8 +2,7 @@
 
 namespace qvim {
 
-namespace {
-QString mapKeyStr(const msgpack::object &mapObj, const char *key) {
+static QString mapKeyStr(const msgpack::object &mapObj, const char *key) {
     if(mapObj.type != msgpack::type::MAP) return {};
     const auto &m = mapObj.via.map;
     for(uint32_t i = 0; i < m.size; ++i) {
@@ -17,7 +16,7 @@ QString mapKeyStr(const msgpack::object &mapObj, const char *key) {
     return {};
 }
 
-int mapKeyInt(const msgpack::object &mapObj, const char *key, int def = 0) {
+static int mapKeyInt(const msgpack::object &mapObj, const char *key, int def = 0) {
     if(mapObj.type != msgpack::type::MAP) return def;
     const auto &m = mapObj.via.map;
     for(uint32_t i = 0; i < m.size; ++i) {
@@ -32,12 +31,11 @@ int mapKeyInt(const msgpack::object &mapObj, const char *key, int def = 0) {
     return def;
 }
 
-CursorShape parseShape(const QString &s) {
+static CursorShape parseShape(const QString &s) {
     if(s == QStringLiteral("horizontal")) return CursorShape::Horizontal;
     if(s == QStringLiteral("vertical")) return CursorShape::Vertical;
     return CursorShape::Block;
 }
-} // namespace
 
 ModeInfo::ModeInfo(QObject *parent) : QObject(parent) {}
 

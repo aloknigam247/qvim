@@ -29,13 +29,13 @@
 #include "SessionCache.h"
 #include "WindowChrome.h"
 
-namespace {
-
-QString locateNvim() {
+static QString locateNvim() {
     const QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
     if(!fromPath.isEmpty()) return fromPath;
     return QStringLiteral("nvim");
 }
+
+namespace {
 
 struct BootProfile {
     const bool enabled;

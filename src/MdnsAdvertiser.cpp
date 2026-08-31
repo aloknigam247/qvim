@@ -21,9 +21,11 @@ public:
     void registerService(const MdnsService &) override {}
     void unregisterService() override {}
 };
+} // namespace
 
 #ifdef Q_OS_WIN
 
+namespace {
 // One live advertisement. Heap-owned and self-cleaning: it outlives the backend
 // so an async register/deregister completion callback (which runs on an OS
 // thread) never dereferences a destroyed backend. The main thread detaches it
@@ -33,20 +35,22 @@ struct Win32Registration {
     DNS_SERVICE_REGISTER_REQUEST request{};
     PDNS_SERVICE_INSTANCE instance = nullptr;
 };
+} // namespace
 
-void CALLBACK onRegisterComplete(DWORD /*status*/, PVOID /*context*/,
-                                 PDNS_SERVICE_INSTANCE /*instance*/) {
+static void CALLBACK onRegisterComplete(DWORD /*status*/, PVOID /*context*/,
+                                        PDNS_SERVICE_INSTANCE /*instance*/) {
     // The advertisement lives until it is withdrawn; nothing to free here. The
     // registration object is owned by the backend until unregisterService()
     // detaches it, then by onDeregisterComplete().
 }
 
-void CALLBACK onDeregisterComplete(DWORD /*status*/, PVOID context,
-                                   PDNS_SERVICE_INSTANCE instance) {
+static void CALLBACK onDeregisterComplete(DWORD /*status*/, PVOID context,
+                                          PDNS_SERVICE_INSTANCE instance) {
     if(instance) { DnsServiceFreeInstance(instance); }
     delete static_cast<Win32Registration *>(context);
 }
 
+namespace {
 class Win32MdnsBackend : public MdnsBackend {
 public:
     ~Win32MdnsBackend() override { unregisterService(); }
@@ -125,18 +129,17 @@ public:
 private:
     Win32Registration *m_reg = nullptr;
 };
+} // namespace
 
 #endif // Q_OS_WIN
 
-std::unique_ptr<MdnsBackend> makeDefaultBackend() {
+static std::unique_ptr<MdnsBackend> makeDefaultBackend() {
 #ifdef Q_OS_WIN
     return std::make_unique<Win32MdnsBackend>();
 #else
     return std::make_unique<NullMdnsBackend>();
 #endif
 }
-
-} // namespace
 
 MdnsAdvertiser::MdnsAdvertiser(QObject *parent) :
     QObject(parent), m_backend(makeDefaultBackend()) {}

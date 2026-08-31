@@ -8,11 +8,9 @@
 
 namespace qvim {
 
-namespace {
-
 constexpr auto kPrefix = "--qvim-";
 
-std::optional<bool> parseBool(const QString &s) {
+static std::optional<bool> parseBool(const QString &s) {
     const QString v = s.trimmed().toLower();
     if(v == QStringLiteral("1") || v == QStringLiteral("true") || v == QStringLiteral("yes") ||
        v == QStringLiteral("on"))
@@ -23,7 +21,7 @@ std::optional<bool> parseBool(const QString &s) {
     return std::nullopt;
 }
 
-std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
+static std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
     switch(type) {
         case ConfigType::Bool: {
             auto b = parseBool(raw);
@@ -51,8 +49,6 @@ std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
     }
     return std::nullopt;
 }
-
-} // namespace
 
 QStringList ConfigCliReader::extract(QStringList &args, Config &cfg) {
     QStringList kept;

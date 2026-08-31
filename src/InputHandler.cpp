@@ -4,8 +4,7 @@
 
 namespace qvim {
 
-namespace {
-const QHash<int, QString> &specialKeyMap() {
+static const QHash<int, QString> &specialKeyMap() {
     static const QHash<int, QString> m = {
         { Qt::Key_Escape, "Esc" },
         { Qt::Key_Tab, "Tab" },
@@ -39,7 +38,6 @@ const QHash<int, QString> &specialKeyMap() {
     };
     return m;
 }
-} // namespace
 
 QString InputHandler::modString(Qt::KeyboardModifiers mods) {
     QString s;

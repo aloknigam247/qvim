@@ -2,12 +2,10 @@
 
 namespace qvim {
 
-namespace {
-QString asQString(const msgpack::object &o) {
+static QString asQString(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
-} // namespace
 
 MessagesModel::MessagesModel(QObject *parent) : QAbstractListModel(parent) {}
 
