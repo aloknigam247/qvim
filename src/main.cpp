@@ -146,8 +146,8 @@ int main(int argc, char *argv[]) {
 #endif
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("qvim"));
-    app.setOrganizationName(QStringLiteral("qvim"));
+    QGuiApplication::setApplicationName(QStringLiteral("qvim"));
+    QGuiApplication::setOrganizationName(QStringLiteral("qvim"));
     qvim::setupApplicationIcon(app);
     qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
@@ -273,5 +273,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    return app.exec();
+    return QGuiApplication::exec();
 }
