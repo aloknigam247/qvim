@@ -230,8 +230,9 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     }
     for(const CellRun &run: runs.runs) {
         if(!run.undercurl) continue;
-        bbox = bbox.united(QRectF(run.c0 * m_cellWidth, run.row * m_cellHeight + m_cellHeight - 4.0,
-                                  (run.c1 - run.c0) * m_cellWidth, 4.0));
+        bbox =
+            bbox.united(QRectF(run.c0 * m_cellWidth, (run.row * m_cellHeight) + m_cellHeight - 4.0,
+                               (run.c1 - run.c0) * m_cellWidth, 4.0));
     }
 
     if(bbox.isEmpty()) {
@@ -340,7 +341,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
             if(!run.undercurl) continue;
             const qreal left = run.c0 * m_cellWidth;
             const qreal right = run.c1 * m_cellWidth;
-            const qreal yy = run.row * m_cellHeight + m_cellHeight - 1.5;
+            const qreal yy = (run.row * m_cellHeight) + m_cellHeight - 1.5;
             QPainterPath path;
             path.moveTo(left, yy);
             for(qreal x = left; x < right; x += 4.0) {
@@ -501,7 +502,7 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         int rr = 0;
         for(const QString &line: dump.split(QLatin1Char('\n'))) {
             m_textPool.addText(INT_MIN, line, overlayFont, QColor(255, 0, 0, 200),
-                               QPointF(0, rr * m_cellHeight + m_baseline));
+                               QPointF(0, (rr * m_cellHeight) + m_baseline));
             ++rr;
         }
     }

@@ -20,7 +20,7 @@ CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr
     const qreal extra = static_cast<qreal>(std::max(0, linespace));
     int unit = 1;
     for(int q = 1; q <= 16; ++q) {
-        if(std::abs(safeDpr * q - std::round(safeDpr * q)) < 1e-3) {
+        if(std::abs((safeDpr * q) - std::round(safeDpr * q)) < 1e-3) {
             unit = q;
             break;
         }
@@ -31,7 +31,7 @@ CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr
     };
     const qreal width = snapUnit(fm.horizontalAdvance(QLatin1Char('M')));
     const qreal height = snapUnit(fm.height() + extra);
-    qreal baseline = std::round(fm.ascent() + extra / 2.0);
+    qreal baseline = std::round(fm.ascent() + (extra / 2.0));
     if(baseline < 0.0) baseline = 0.0;
     if(baseline > height) baseline = height;
     return CellMetrics{ width, height, baseline };
