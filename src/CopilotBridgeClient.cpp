@@ -44,19 +44,19 @@ static QString firstString(const QJsonObject &obj, std::initializer_list<QString
 static QStringList schemaOptions(const QJsonObject &schema) {
     QStringList options;
     const QJsonObject props = schema.value(QStringLiteral("properties")).toObject();
-    for(const QJsonValue &field: props) {
+    for(const auto &field: props) {
         const QJsonObject f = field.toObject();
-        for(const QJsonValue &e: f.value(QStringLiteral("enum")).toArray()) {
+        for(const auto &e: f.value(QStringLiteral("enum")).toArray()) {
             options << e.toVariant().toString();
         }
-        for(const QJsonValue &o: f.value(QStringLiteral("oneOf")).toArray()) {
+        for(const auto &o: f.value(QStringLiteral("oneOf")).toArray()) {
             options << o.toObject().value(QStringLiteral("title")).toString();
         }
         const QJsonObject items = f.value(QStringLiteral("items")).toObject();
-        for(const QJsonValue &e: items.value(QStringLiteral("enum")).toArray()) {
+        for(const auto &e: items.value(QStringLiteral("enum")).toArray()) {
             options << e.toVariant().toString();
         }
-        for(const QJsonValue &o: items.value(QStringLiteral("anyOf")).toArray()) {
+        for(const auto &o: items.value(QStringLiteral("anyOf")).toArray()) {
             options << o.toObject().value(QStringLiteral("title")).toString();
         }
     }
