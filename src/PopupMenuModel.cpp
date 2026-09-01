@@ -53,7 +53,7 @@ void PopupMenuModel::hide() {
 }
 
 int PopupMenuModel::rowCount(const QModelIndex &parent) const {
-    return parent.isValid() ? 0 : m_items.size();
+    return parent.isValid() ? 0 : static_cast<int>(m_items.size());
 }
 
 QVariant PopupMenuModel::data(const QModelIndex &index, int role) const {

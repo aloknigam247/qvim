@@ -9,6 +9,7 @@
 namespace qvim {
 
 constexpr auto kPrefix = "--qvim-";
+constexpr qsizetype kPrefixLen = 7;
 
 static std::optional<bool> parseBool(const QString &s) {
     const QString v = s.trimmed().toLower();
@@ -58,8 +59,8 @@ QStringList ConfigCliReader::extract(QStringList &args, Config &cfg) {
             kept.push_back(arg);
             continue;
         }
-        const QString body = arg.mid(static_cast<int>(qstrlen(kPrefix)));
-        const int eq = body.indexOf(QLatin1Char('='));
+        const QString body = arg.mid(kPrefixLen);
+        const qsizetype eq = body.indexOf(QLatin1Char('='));
         QString name;
         std::optional<QString> rawValue;
         if(eq < 0) {

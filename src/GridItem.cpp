@@ -271,7 +271,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
                                        h->resolved(pb.hlId).bg == h->resolved(pa.hlId).bg;
                 if(!sameGroup) groupStart.push_back(i);
             }
-            groupStart.push_back(spans.size());
+            groupStart.push_back(static_cast<int>(spans.size()));
 
             for(int gi = 0; gi + 1 < groupStart.size(); ++gi) {
                 const int gs = groupStart[gi];
@@ -314,7 +314,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
                 // adjacent edge length so short spans don't produce arcs that
                 // overlap each other.
                 QPainterPath path;
-                const int nv = verts.size();
+                const int nv = static_cast<int>(verts.size());
                 for(int i = 0; i < nv; ++i) {
                     const QPointF &prev = verts[(i + nv - 1) % nv];
                     const QPointF &curr = verts[i];

@@ -520,16 +520,18 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "default_colors_set") {
         if(a.size >= 4) {
-            m_hl->setDefaultColors(asInt(a.ptr[0], -1), asInt(a.ptr[1], -1), asInt(a.ptr[2], -1));
+            m_hl->setDefaultColors(static_cast<int>(asInt(a.ptr[0], -1)),
+                                   static_cast<int>(asInt(a.ptr[1], -1)),
+                                   static_cast<int>(asInt(a.ptr[2], -1)));
             emit defaultBackgroundChanged();
         }
         return;
     }
     if(name == "hl_attr_define") {
         if(a.size >= 4) {
-            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1], &a.ptr[3]);
+            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1], &a.ptr[3]);
         } else if(a.size >= 2) {
-            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1]);
+            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1]);
         }
         return;
     }
@@ -538,7 +540,9 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
         return;
     }
     if(name == "mode_change") {
-        if(a.size >= 2) m_mode->setCurrentMode(asQString(a.ptr[0]), asInt(a.ptr[1]));
+        if(a.size >= 2) {
+            m_mode->setCurrentMode(asQString(a.ptr[0]), static_cast<int>(asInt(a.ptr[1])));
+        }
         return;
     }
     if(name == "tabline_update") {
@@ -547,12 +551,13 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "popupmenu_show") {
         if(a.size >= 4) {
-            m_popupmenu->show(a.ptr[0], asInt(a.ptr[1]), asInt(a.ptr[2]), asInt(a.ptr[3]));
+            m_popupmenu->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])),
+                              static_cast<int>(asInt(a.ptr[2])), static_cast<int>(asInt(a.ptr[3])));
         }
         return;
     }
     if(name == "popupmenu_select") {
-        if(a.size >= 1) m_popupmenu->select(asInt(a.ptr[0]));
+        if(a.size >= 1) m_popupmenu->select(static_cast<int>(asInt(a.ptr[0])));
         return;
     }
     if(name == "popupmenu_hide") {
@@ -561,18 +566,22 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "cmdline_show") {
         if(a.size >= 6) {
-            m_cmdline->show(a.ptr[0], asInt(a.ptr[1]), asQString(a.ptr[2]), asQString(a.ptr[3]),
-                            asInt(a.ptr[4]), asInt(a.ptr[5]));
+            m_cmdline->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])), asQString(a.ptr[2]),
+                            asQString(a.ptr[3]), static_cast<int>(asInt(a.ptr[4])),
+                            static_cast<int>(asInt(a.ptr[5])));
         }
         return;
     }
     if(name == "cmdline_pos") {
-        if(a.size >= 2) m_cmdline->setPos(asInt(a.ptr[0]), asInt(a.ptr[1]));
+        if(a.size >= 2) {
+            m_cmdline->setPos(static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[1])));
+        }
         return;
     }
     if(name == "cmdline_special_char") {
         if(a.size >= 3) {
-            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]), asInt(a.ptr[2]));
+            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]),
+                                      static_cast<int>(asInt(a.ptr[2])));
         }
         return;
     }

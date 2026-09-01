@@ -57,13 +57,13 @@ void MessagesModel::msgShow(const msgpack::object &kindObj, const msgpack::objec
     const int attr = dominantAttr(content);
 
     if(replaceLast && !m_items.isEmpty()) {
-        const int last = m_items.size() - 1;
+        const int last = static_cast<int>(m_items.size()) - 1;
         beginRemoveRows({}, last, last);
         m_items.pop_back();
         endRemoveRows();
     }
 
-    const int row = m_items.size();
+    const int row = static_cast<int>(m_items.size());
     beginInsertRows({}, row, row);
     m_items.push_back(Item{ kind, text, attr });
     endInsertRows();

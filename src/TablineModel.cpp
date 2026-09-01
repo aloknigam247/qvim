@@ -39,7 +39,7 @@ void TablineModel::update(const msgpack::object &current, const msgpack::object 
                     t.handle = extInt(kv.val);
                 }
             }
-            if(t.handle == m_currentHandle) m_currentIndex = m_tabs.size();
+            if(t.handle == m_currentHandle) m_currentIndex = static_cast<int>(m_tabs.size());
             m_tabs.push_back(t);
         }
     }
@@ -48,7 +48,7 @@ void TablineModel::update(const msgpack::object &current, const msgpack::object 
 }
 
 int TablineModel::rowCount(const QModelIndex &parent) const {
-    return parent.isValid() ? 0 : m_tabs.size();
+    return parent.isValid() ? 0 : static_cast<int>(m_tabs.size());
 }
 
 QVariant TablineModel::data(const QModelIndex &index, int role) const {
