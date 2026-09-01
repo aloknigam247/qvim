@@ -64,8 +64,7 @@ void ChatModel::submit(const QString &text) {
     const QVector<QString> parts = chunkify(reply, kEchoChunks);
     for(int i = 0; i < parts.size(); ++i) {
         const bool last = (i == parts.size() - 1);
-        m_pending.enqueue(
-            Chunk{ .row = assistantRow, .id = assistantId, .text = parts[i], .last = last });
+        m_pending.enqueue(Chunk{ assistantRow, assistantId, parts[i], last });
     }
     if(!m_pending.isEmpty() && !m_streamTimer->isActive()) { m_streamTimer->start(); }
 }
@@ -107,7 +106,7 @@ QString ChatModel::authorAt(int row) const {
 void ChatModel::appendMessage(Author author, const QString &text) {
     const int row = static_cast<int>(m_msgs.size());
     beginInsertRows({}, row, row);
-    m_msgs.push_back(Message{ .author = author, .text = text });
+    m_msgs.push_back(Message{ author, text });
     endInsertRows();
     emit countChanged();
 }

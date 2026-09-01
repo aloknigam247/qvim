@@ -34,7 +34,7 @@ CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr
     qreal baseline = std::round(fm.ascent() + extra / 2.0);
     if(baseline < 0.0) baseline = 0.0;
     if(baseline > height) baseline = height;
-    return CellMetrics{ .cellWidth = width, .cellHeight = height, .baseline = baseline };
+    return CellMetrics{ width, height, baseline };
 }
 
 } // namespace qvim
