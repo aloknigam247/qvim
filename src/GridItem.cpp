@@ -392,7 +392,7 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         root->appendChildNode(m_lineRoot);
     }
 
-    GridModel *g = grid();
+    const GridModel *g = grid();
     HighlightTable *h = hl();
 
     m_bgPool.beginFrame(m_bgRoot, window());

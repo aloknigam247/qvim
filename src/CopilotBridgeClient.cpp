@@ -32,7 +32,7 @@ static QString truncate(const QString &text, int max) {
 
 // First non-empty string value among the candidate keys.
 static QString firstString(const QJsonObject &obj, std::initializer_list<QStringView> keys) {
-    for(QStringView key: keys) {
+    for(const QStringView key: keys) {
         const QJsonValue v = obj.value(key);
         if(v.isString() && !v.toString().isEmpty()) return v.toString();
     }

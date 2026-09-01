@@ -61,7 +61,7 @@ QString InputHandler::escapeLiteral(QChar c) {
 
 QString InputHandler::keyToNvim(QKeyEvent *ev) {
     const int key = ev->key();
-    Qt::KeyboardModifiers mods = ev->modifiers();
+    const Qt::KeyboardModifiers mods = ev->modifiers();
 
     // Ignore bare modifier presses.
     if(key == Qt::Key_Shift || key == Qt::Key_Control || key == Qt::Key_Alt ||
@@ -173,7 +173,7 @@ InputHandler::MouseInput InputHandler::mouseFor(QMouseEvent *ev, QEvent::Type ty
             return m;
     }
     QString mod;
-    Qt::KeyboardModifiers mods = ev->modifiers();
+    const Qt::KeyboardModifiers mods = ev->modifiers();
     if(mods & Qt::ShiftModifier) mod += QStringLiteral("S-");
     if(mods & Qt::ControlModifier) mod += QStringLiteral("C-");
     if(mods & Qt::AltModifier) mod += QStringLiteral("M-");
