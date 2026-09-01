@@ -72,8 +72,8 @@ void WindowChrome::activateNow([[maybe_unused]] QQuickWindow *window) {
     const HWND fg = GetForegroundWindow();
     const DWORD fgThread = fg ? GetWindowThreadProcessId(fg, nullptr) : 0;
     const DWORD selfThread = GetCurrentThreadId();
-    const bool attached = fgThread && fgThread != selfThread &&
-                          AttachThreadInput(selfThread, fgThread, TRUE);
+    const bool attached =
+        fgThread && fgThread != selfThread && AttachThreadInput(selfThread, fgThread, TRUE);
 
     ShowWindow(hwnd, SW_SHOW);
     BringWindowToTop(hwnd);
