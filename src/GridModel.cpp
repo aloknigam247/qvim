@@ -313,7 +313,7 @@ QList<int> GridModel::gridIds() const {
 QRect GridModel::gridGeometry(int gridId) const {
     const GridSurface *s = surface(gridId);
     if(!s) return {};
-    return QRect(s->x, s->y, s->cols, s->rows);
+    return { s->x, s->y, s->cols, s->rows };
 }
 
 int GridModel::gridCols(int gridId) const {

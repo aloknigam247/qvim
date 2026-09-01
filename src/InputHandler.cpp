@@ -56,7 +56,7 @@ QString InputHandler::modPrefix(Qt::KeyboardModifiers mods) {
 QString InputHandler::escapeLiteral(QChar c) {
     if(c == QChar('<')) return QStringLiteral("<lt>");
     if(c == QChar('\\')) return QStringLiteral("\\");
-    return QString(c);
+    return { c };
 }
 
 QString InputHandler::keyToNvim(QKeyEvent *ev) {

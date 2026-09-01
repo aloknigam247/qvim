@@ -167,16 +167,16 @@ static QVariant msgpackToVariant(const msgpack::object &o) {
         case msgpack::type::NIL:
             return {};
         case msgpack::type::BOOLEAN:
-            return QVariant(o.via.boolean);
+            return { o.via.boolean };
         case msgpack::type::POSITIVE_INTEGER:
-            return QVariant(static_cast<qulonglong>(o.via.u64));
+            return { static_cast<qulonglong>(o.via.u64) };
         case msgpack::type::NEGATIVE_INTEGER:
-            return QVariant(static_cast<qlonglong>(o.via.i64));
+            return { static_cast<qlonglong>(o.via.i64) };
         case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT64:
-            return QVariant(o.via.f64);
+            return { o.via.f64 };
         case msgpack::type::STR:
-            return QVariant(QString::fromUtf8(o.via.str.ptr, o.via.str.size));
+            return { QString::fromUtf8(o.via.str.ptr, o.via.str.size) };
         case msgpack::type::ARRAY: {
             QVariantList list;
             list.reserve(static_cast<int>(o.via.array.size));
@@ -186,7 +186,7 @@ static QVariant msgpackToVariant(const msgpack::object &o) {
             return list;
         }
         case msgpack::type::BIN:
-            return QVariant(QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)));
+            return { QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)) };
         default:
             return {};
     }
