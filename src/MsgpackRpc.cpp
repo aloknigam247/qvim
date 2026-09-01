@@ -55,7 +55,9 @@ bool MsgpackRpc::isRunning() const { return m_process && m_process->state() == Q
 
 void MsgpackRpc::request(const QString &method, PackFn packArgs, RpcCallback cb) {
     if(!isRunning()) {
-        if(cb) cb(std::unexpected(RpcError{ -1, QStringLiteral("nvim not running") }));
+        if(cb)
+            cb(std::unexpected(
+                RpcError{ .code = -1, .message = QStringLiteral("nvim not running") }));
         return;
     }
     const uint32_t msgid = m_nextMsgId++;
@@ -141,7 +143,7 @@ void MsgpackRpc::dispatchUnpacked(ObjectHandlePtr handle) {
         QString method = QString::fromStdString(arr.ptr[1].as<std::string>());
         // The handle keeps the msgpack arena alive; Notification::params()
         // extracts the params object lazily on demand.
-        emit notification(Notification{ std::move(method), std::move(handle) });
+        emit notification(Notification{ .method = std::move(method), .handle = std::move(handle) });
         return;
     }
 

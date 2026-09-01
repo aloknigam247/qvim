@@ -43,7 +43,7 @@ static void collectPills(const GridModel &grid, const HighlightTable &hl, int gr
                 const int rightHl = grid.cell(gridId, r, c).hlId;
                 if(!hl.isRounded(rightHl)) backBg = hl.resolved(rightHl).bg;
             }
-            out.push_back({ r, c0, c, spanHl, backBg });
+            out.push_back({ .row = r, .c0 = c0, .c1 = c, .hlId = spanHl, .backBg = backBg });
         }
     }
 }
@@ -73,7 +73,7 @@ static void collectPuaClusters(const GridModel &grid, int gridId, int row, int c
             if(next.text.isEmpty() || !isPuaChar(next.text[0])) break;
             ++end;
         }
-        out.push_back({ row, c, end, clusterHl });
+        out.push_back({ .row = row, .c0 = c, .c1 = end, .hlId = clusterHl });
         c = end;
     }
 }

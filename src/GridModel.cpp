@@ -89,7 +89,9 @@ void GridModel::resize(int gridId, int cols, int rows) {
     s.cols = cols;
     s.rows = rows;
     s.cellRows.resize(rows);
-    for(auto &row: s.cellRows) { row.assign(cols, Cell{ QStringLiteral(" "), 0, false }); }
+    for(auto &row: s.cellRows) {
+        row.assign(cols, Cell{ .text = QStringLiteral(" "), .hlId = 0, .doubleWidth = false });
+    }
     s.dirty = true;
     ensureProxy(gridId)->setSize(cols, rows);
     emit sizeChanged();
@@ -99,7 +101,7 @@ void GridModel::clear(int gridId) {
     GridSurface *s = surface(gridId);
     if(!s) return;
     for(auto &row: s->cellRows) {
-        for(auto &c: row) c = Cell{ QStringLiteral(" "), 0, false };
+        for(auto &c: row) c = Cell{ .text = QStringLiteral(" "), .hlId = 0, .doubleWidth = false };
     }
     s->dirty = true;
 }
@@ -148,14 +150,16 @@ void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::obje
             if(entryEmpty) {
                 if(prevWasNonEmpty) {
                     // Right half of a double-width glyph emitted by the previous cell.
-                    rowCells[col] = Cell{ QStringLiteral(""), hl, true };
+                    rowCells[col] =
+                        Cell{ .text = QStringLiteral(""), .hlId = hl, .doubleWidth = true };
                     prevWasNonEmpty = false;
                 } else {
                     // Standalone empty cell -> render as a real blank.
-                    rowCells[col] = Cell{ QStringLiteral(" "), hl, false };
+                    rowCells[col] =
+                        Cell{ .text = QStringLiteral(" "), .hlId = hl, .doubleWidth = false };
                 }
             } else {
-                rowCells[col] = Cell{ text, hl, false };
+                rowCells[col] = Cell{ .text = text, .hlId = hl, .doubleWidth = false };
                 prevWasNonEmpty = true;
             }
             ++col;
@@ -245,7 +249,9 @@ void GridModel::setPos(int gridId, int x, int y, int w, int h) {
         s.cols = w;
         s.rows = h;
         s.cellRows.resize(h);
-        for(auto &row: s.cellRows) { row.assign(w, Cell{ QStringLiteral(" "), 0, false }); }
+        for(auto &row: s.cellRows) {
+            row.assign(w, Cell{ .text = QStringLiteral(" "), .hlId = 0, .doubleWidth = false });
+        }
         s.dirty = true;
         emit sizeChanged();
     }
@@ -342,7 +348,7 @@ int GridModel::gridZindex(int gridId) const {
 }
 
 const Cell &GridModel::cell(int gridId, int row, int col) const {
-    static const Cell empty{ QStringLiteral(" "), 0, false };
+    static const Cell empty{ .text = QStringLiteral(" "), .hlId = 0, .doubleWidth = false };
     const GridSurface *s = surface(gridId);
     if(!s) return empty;
     if(row < 0 || row >= s->rows || col < 0 || col >= s->cols) return empty;

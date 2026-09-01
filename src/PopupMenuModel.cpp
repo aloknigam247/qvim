@@ -19,10 +19,10 @@ void PopupMenuModel::show(const msgpack::object &items, int selected, int row, i
             const auto &e = arr.ptr[i];
             if(e.type != msgpack::type::ARRAY || e.via.array.size < 4) continue;
             Item it{
-                strOrEmpty(e.via.array.ptr[0]),
-                strOrEmpty(e.via.array.ptr[1]),
-                strOrEmpty(e.via.array.ptr[2]),
-                strOrEmpty(e.via.array.ptr[3]),
+                .word = strOrEmpty(e.via.array.ptr[0]),
+                .kind = strOrEmpty(e.via.array.ptr[1]),
+                .menu = strOrEmpty(e.via.array.ptr[2]),
+                .info = strOrEmpty(e.via.array.ptr[3]),
             };
             m_items.push_back(it);
         }

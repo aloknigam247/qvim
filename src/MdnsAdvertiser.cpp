@@ -175,19 +175,19 @@ void MdnsAdvertiser::setBackend(std::unique_ptr<MdnsBackend> backend) {
 MdnsService MdnsAdvertiser::currentService() const {
     const QString host = QHostInfo::localHostName();
     return MdnsService{
-        QString::fromLatin1(kMirrorServiceType),
-        QStringLiteral("qvim on %1").arg(host),
-        host,
-        static_cast<quint16>(m_port),
-        { { QStringLiteral("proto"), QStringLiteral("1") } },
+        .type = QString::fromLatin1(kMirrorServiceType),
+        .instanceName = QStringLiteral("qvim on %1").arg(host),
+        .hostName = host,
+        .port = static_cast<quint16>(m_port),
+        .txt = { { QStringLiteral("proto"), QStringLiteral("1") } },
     };
 }
 
 MdnsWireForm MdnsAdvertiser::toWireForm(const MdnsService &service) {
     return MdnsWireForm{
-        QStringLiteral("%1.%2.local").arg(service.instanceName, service.type),
-        QStringLiteral("%1.local").arg(service.hostName),
-        service.port,
+        .serviceName = QStringLiteral("%1.%2.local").arg(service.instanceName, service.type),
+        .hostName = QStringLiteral("%1.local").arg(service.hostName),
+        .wPort = service.port,
     };
 }
 

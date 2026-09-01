@@ -65,7 +65,7 @@ void MessagesModel::msgShow(const msgpack::object &kindObj, const msgpack::objec
 
     const int row = static_cast<int>(m_items.size());
     beginInsertRows({}, row, row);
-    m_items.push_back(Item{ kind, text, attr });
+    m_items.push_back(Item{ .kind = kind, .text = text, .attrId = attr });
     endInsertRows();
     emit countChanged();
 }
@@ -90,7 +90,7 @@ void MessagesModel::msgHistoryShow(const msgpack::object &entries) {
         const QString kind = asQString(entry.via.array.ptr[0]);
         const QString text = joinText(entry.via.array.ptr[1]);
         const int attr = dominantAttr(entry.via.array.ptr[1]);
-        m_items.push_back(Item{ kind, text, attr });
+        m_items.push_back(Item{ .kind = kind, .text = text, .attrId = attr });
     }
     endResetModel();
     emit countChanged();
