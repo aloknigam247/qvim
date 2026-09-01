@@ -8,6 +8,7 @@
 #include "PopupMenuModel.h"
 #include "TablineModel.h"
 
+
 #include <QDebug>
 #include <QFontDatabase>
 #include <QVariant>
@@ -30,15 +31,49 @@ int64_t asInt(const msgpack::object &o, int64_t def = 0) {
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     return def;
 }
+
+// The single source of truth for the nvim_ui_attach option map. Initial attach
+// and the :restart re-attach both pack through here so their UI options can never
+// diverge. Diagnostic mode: every non-core extension is disabled to bisect the
+// residual focus-loss-after-':' bug — flip a bool back to true once the offending
+// feature is found. The C++ handlers, QML overlays, and models stay wired; nvim
+// simply won't emit the events that drive them.
+void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows) {
+    pk.pack_array(3);
+    pk.pack(static_cast<int64_t>(cols));
+    pk.pack(static_cast<int64_t>(rows));
+    pk.pack_map(8);
+    pk.pack("rgb");
+    pk.pack(true);
+    pk.pack("ext_linegrid");
+    pk.pack(true);
+    pk.pack("ext_hlstate");
+    pk.pack(true);
+    pk.pack("ext_multigrid");
+    pk.pack(false);
+    pk.pack("ext_tabline");
+    pk.pack(false);
+    pk.pack("ext_popupmenu");
+    pk.pack(false);
+    pk.pack("ext_cmdline");
+    pk.pack(false);
+    pk.pack("ext_messages");
+    pk.pack(false);
+}
 } // namespace
 
 NvimConnector::NvimConnector(QObject *parent) :
     QObject(parent), m_rpc(new MsgpackRpc(this)), m_grid(new GridModel(this)),
     m_hl(new HighlightTable(this)), m_messages(new MessagesModel(this)), m_mode(new ModeInfo(this)),
     m_tabline(new TablineModel(this)), m_popupmenu(new PopupMenuModel(this)),
-    m_cmdline(new CmdlineModel(this)), m_resizeCoalescer(new ResizeCoalescer(this)) {
+    m_cmdline(new CmdlineModel(this)), m_resizeCoalescer(new ResizeCoalescer(this)),
+    m_restartTimer(new QTimer(this)) {
+    m_restartTimer->setSingleShot(true);
     connect(m_rpc, &MsgpackRpc::notification, this, &NvimConnector::onNotification);
-    connect(m_rpc, &MsgpackRpc::disconnected, this, &NvimConnector::onRpcDisconnected);
+    connect(m_rpc, &MsgpackRpc::transportClosed, this, &NvimConnector::onRpcDisconnected);
+    connect(m_rpc, &MsgpackRpc::connected, this, &NvimConnector::onRestartConnected);
+    connect(m_rpc, &MsgpackRpc::transportError, this, &NvimConnector::onRestartFailed);
+    connect(m_restartTimer, &QTimer::timeout, this, &NvimConnector::onRestartFailed);
     connect(m_resizeCoalescer, &ResizeCoalescer::resizeRequested, this, &NvimConnector::tryResize);
 }
 
@@ -95,33 +130,11 @@ qreal NvimConnector::guifontSize() const {
 }
 
 bool NvimConnector::attachUi(int cols, int rows) {
+    m_currentCols = cols;
+    m_currentRows = rows;
     m_rpc->request(QStringLiteral("nvim_ui_attach"),
                    [cols, rows](msgpack::packer<msgpack::sbuffer> &pk) {
-        pk.pack_array(3);
-        pk.pack(static_cast<int64_t>(cols));
-        pk.pack(static_cast<int64_t>(rows));
-        // Diagnostic mode: every non-core extension disabled to bisect the
-        // residual focus-loss-after-':' bug. Re-enable by flipping the
-        // matching bool back to true once the offending feature is found.
-        // The C++ dispatch handlers, QML overlays, and models all remain
-        // wired in — nvim simply won't emit the events that drive them.
-        pk.pack_map(8);
-        pk.pack("rgb");
-        pk.pack(true);
-        pk.pack("ext_linegrid");
-        pk.pack(true);
-        pk.pack("ext_hlstate");
-        pk.pack(true);
-        pk.pack("ext_multigrid");
-        pk.pack(false);
-        pk.pack("ext_tabline");
-        pk.pack(false);
-        pk.pack("ext_popupmenu");
-        pk.pack(false);
-        pk.pack("ext_cmdline");
-        pk.pack(false);
-        pk.pack("ext_messages");
-        pk.pack(false);
+        packAttachOptions(pk, cols, rows);
     }, [this](RpcResult res) {
         if(res) {
             m_attached = true;
@@ -243,6 +256,8 @@ void NvimConnector::inputMouse(const QString &button, const QString &action,
 }
 
 void NvimConnector::tryResize(int cols, int rows) {
+    m_currentCols = cols;
+    m_currentRows = rows;
     // Sync the coalescer so any stale pending request doesn't fire after
     // this direct resize and overwrite it with old dimensions.
     m_resizeCoalescer->syncAfterDirectResize(cols, rows);
@@ -414,9 +429,58 @@ void NvimConnector::onNotification(const qvim::Notification &note) {
 }
 
 void NvimConnector::onRpcDisconnected() {
+    // The active transport closed. A pending :restart means nvim spawned a new
+    // server on m_restartListenAddr and quit the old one — reconnect instead of
+    // quitting. Keep the old frame on screen; UI state is reset only once the new
+    // socket connects (onRestartConnected), so a failed reconnect doesn't flash an
+    // empty grid.
+    if(m_restartPending) {
+        m_restartPending = false;
+        m_restartInProgress = true;
+        m_attached = false;
+        emit attachedChanged();
+        m_restartTimer->start(kRestartTimeoutMs);
+        m_rpc->connectToAddress(m_restartListenAddr);
+        return;
+    }
     m_attached = false;
     emit attachedChanged();
     emit disconnected();
+}
+
+void NvimConnector::onRestartConnected() {
+    if(!m_restartInProgress) return;
+    m_restartInProgress = false;
+    m_restartTimer->stop();
+    m_restartedOverSocket = true;
+    // Reset immediately before consuming the new server's first redraw batch so no
+    // stale grid/highlight/mode/overlay state survives, then re-attach at the live
+    // grid size with the same UI options as the initial attach.
+    resetUiState();
+    attachUi(m_currentCols, m_currentRows);
+}
+
+void NvimConnector::onRestartFailed() {
+    // Connect timeout or socket error during a restart handoff. There is no server
+    // to fall back to, so surface the disconnect and let the app quit.
+    if(!m_restartInProgress) return;
+    m_restartInProgress = false;
+    m_restartTimer->stop();
+    m_attached = false;
+    emit attachedChanged();
+    emit disconnected();
+}
+
+void NvimConnector::resetUiState() {
+    m_grid->reset();
+    m_hl->clear();
+    m_mode->reset();
+    m_tabline->clear();
+    m_popupmenu->hide();
+    m_cmdline->hide();
+    m_cmdline->blockHide();
+    m_messages->reset();
+    emit defaultBackgroundChanged();
 }
 
 void NvimConnector::handleRedraw(const msgpack::object &events) {
@@ -636,6 +700,16 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "flush") {
         emit flush();
+        return;
+    }
+    if(name == "restart") {
+        // [listen_addr] — nvim spawned a new server and is about to quit the old
+        // channel. Record the address; the reconnect fires on the old-channel EOF
+        // (onRpcDisconnected), matching nvim's reference client sequence.
+        if(a.size >= 1) {
+            m_restartListenAddr = asQString(a.ptr[0]);
+            m_restartPending = true;
+        }
         return;
     }
     if(name == "msg_show") {

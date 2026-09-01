@@ -49,6 +49,16 @@ void TablineModel::update(const msgpack::object &current, const msgpack::object 
     emit currentChanged();
 }
 
+void TablineModel::clear() {
+    if(m_tabs.isEmpty() && m_currentIndex == -1) return;
+    beginResetModel();
+    m_tabs.clear();
+    m_currentHandle = 0;
+    m_currentIndex = -1;
+    endResetModel();
+    emit currentChanged();
+}
+
 int TablineModel::rowCount(const QModelIndex &parent) const {
     return parent.isValid() ? 0 : m_tabs.size();
 }

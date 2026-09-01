@@ -23,6 +23,8 @@ public:
     explicit TablineModel(QObject *parent = nullptr);
 
     void update(const msgpack::object &current, const msgpack::object &tabs);
+    // Clears all tabs and the current selection. Used on :restart.
+    void clear();
 
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;

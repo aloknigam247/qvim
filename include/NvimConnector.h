@@ -6,6 +6,7 @@
 #include <qqmlregistration.h>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QVariant>
 
 #include <functional>
@@ -147,10 +148,18 @@ signals:
 private slots:
     void onNotification(const qvim::Notification &note);
     void onRpcDisconnected();
+    void onRestartConnected();
+    void onRestartFailed();
 
 private:
     void handleRedraw(const msgpack::object &events);
     void dispatchEvent(const std::string &name, const msgpack::object &evt);
+    // Drops all grid/highlight/mode/overlay state back to a fresh-attach baseline.
+    // Called on :restart just before the new server's first redraw batch.
+    void resetUiState();
+
+    // Bounds the :restart reconnect so a dead listen_addr can't hang qvim open.
+    static constexpr int kRestartTimeoutMs = 5000;
 
     MsgpackRpc *m_rpc = nullptr;
     GridModel *m_grid = nullptr;
@@ -161,11 +170,22 @@ private:
     PopupMenuModel *m_popupmenu = nullptr;
     CmdlineModel *m_cmdline = nullptr;
     ResizeCoalescer *m_resizeCoalescer = nullptr;
+    QTimer *m_restartTimer = nullptr;
 
     QString m_title;
     QString m_guifont;
     bool m_attached = false;
     bool m_extMultigrid = false;
+
+    // :restart reconnect state. m_restartPending is set by the `restart` redraw
+    // event; m_restartInProgress spans the socket-connect handshake; the two size
+    // members feed the re-attach so it matches the live (possibly resized) grid.
+    bool m_restartPending = false;
+    bool m_restartInProgress = false;
+    bool m_restartedOverSocket = false;
+    QString m_restartListenAddr;
+    int m_currentCols = 0;
+    int m_currentRows = 0;
 
     // Defaults match the nvim ui-options defaults (see :h ui-options).
     bool m_arabicshape = true;

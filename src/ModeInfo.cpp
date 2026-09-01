@@ -62,14 +62,20 @@ void ModeInfo::setModes(const msgpack::object &info, bool cursorStyleEnabled) {
     }
 }
 
-void ModeInfo::setCurrentMode(const QString &name, int idx) {
-    if(idx >= 0 && idx < m_modes.size()) {
+void ModeInfo::setCurrentMode(const QString &name, int idx) {    if(idx >= 0 && idx < m_modes.size()) {
         m_current = m_modes[idx];
         if(m_current.name.isEmpty()) m_current.name = name;
     } else {
         m_current = {};
         m_current.name = name;
     }
+    emit currentChanged();
+}
+
+void ModeInfo::reset() {
+    m_modes.clear();
+    m_current = ModeDescriptor{};
+    m_cursorStyleEnabled = false;
     emit currentChanged();
 }
 
