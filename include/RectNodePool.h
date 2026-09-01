@@ -37,7 +37,9 @@ namespace qvim {
 // All methods must be called on the SceneGraph render thread.
 class RectNodePool {
 public:
+    RectNodePool() = default;
     ~RectNodePool();
+    Q_DISABLE_COPY_MOVE(RectNodePool)
 
     // parent and window must outlive the frame. Call once per updatePaintNode.
     void beginFrame(QSGNode *parent, QQuickWindow *window);

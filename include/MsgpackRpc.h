@@ -48,6 +48,7 @@ class MsgpackRpc : public QObject {
 public:
     explicit MsgpackRpc(QObject *parent = nullptr);
     ~MsgpackRpc() override;
+    Q_DISABLE_COPY_MOVE(MsgpackRpc)
 
     bool startEmbeddedNvim(const QString &nvimExe, const QStringList &extraArgs = {});
 

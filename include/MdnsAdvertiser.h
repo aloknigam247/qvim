@@ -42,7 +42,9 @@ struct MdnsWireForm {
 // tests inject a fake that records the descriptor.
 class MdnsBackend {
 public:
+    MdnsBackend() = default;
     virtual ~MdnsBackend() = default;
+    Q_DISABLE_COPY_MOVE(MdnsBackend)
     virtual void registerService(const MdnsService &service) = 0;
     virtual void unregisterService() = 0;
 };
@@ -64,6 +66,7 @@ class MdnsAdvertiser : public QObject {
 public:
     explicit MdnsAdvertiser(QObject *parent = nullptr);
     ~MdnsAdvertiser() override;
+    Q_DISABLE_COPY_MOVE(MdnsAdvertiser)
 
     bool isActive() const { return m_active; }
     void setActive(bool active);

@@ -53,7 +53,9 @@ static void CALLBACK onDeregisterComplete(DWORD /*status*/, PVOID context,
 namespace {
 class Win32MdnsBackend : public MdnsBackend {
 public:
+    Win32MdnsBackend() = default;
     ~Win32MdnsBackend() override { unregisterService(); }
+    Q_DISABLE_COPY_MOVE(Win32MdnsBackend)
 
     void registerService(const MdnsService &service) override {
         if(m_reg) { unregisterService(); }
