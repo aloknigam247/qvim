@@ -11,7 +11,6 @@
 
 #include <functional>
 #include <optional>
-#include <QVariant>
 
 #include "CmdlineModel.h"
 #include "GridModel.h"
