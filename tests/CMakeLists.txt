@@ -99,6 +99,8 @@ qvim_add_test(test_runtime_set_options           integration/test_runtime_set_op
 qvim_add_test(test_scroll_perf                   integration/test_scroll_perf.cpp)
 target_link_libraries(test_scroll_perf PRIVATE qvim_libplugin Qt6::Quick)
 qvim_add_test(test_session_mirror                integration/test_session_mirror.cpp)
+qvim_add_test(test_startup_activation            integration/test_startup_activation.cpp)
+target_link_libraries(test_startup_activation PRIVATE qvim_libplugin Qt6::Quick)
 qvim_add_test(test_tabline                       integration/test_tabline.cpp)
 qvim_add_test(test_title_updates                 integration/test_title_updates.cpp)
 qvim_add_test(test_titlebar_color                integration/test_titlebar_color.cpp)
@@ -130,7 +132,7 @@ target_link_libraries(test_click_skips_unfocusable_float PRIVATE qvim_libplugin 
 target_link_libraries(test_boot_no_resize_jump PRIVATE qvim_libplugin Qt6::Quick)
 target_link_libraries(test_boot_perf           PRIVATE qvim_libplugin Qt6::Quick)
 
-foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_chat_panel test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_session_mirror test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
+foreach(t test_attach_and_render test_boot_no_resize_jump test_boot_perf test_chat_panel test_click_focuses_float test_click_skips_unfocusable_float test_cmdline test_config_g_globals test_ctrl_shift_mapping test_insert_and_quit test_messages test_multigrid test_open_file_arg test_popupmenu test_resize test_resize_smoothness test_runtime_set_options test_scroll_perf test_session_mirror test_startup_activation test_tabline test_title_updates test_titlebar_color test_user_smoke test_visual_on_drag test_wheel_scroll test_window_snap)
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORM_PLUGIN_PATH=${QVIM_TEST_QPA_PLUGIN_DIR_NATIVE};QML_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QML2_IMPORT_PATH=${QVIM_TEST_QML_IMPORT_DIR_NATIVE};QT_SCALE_FACTOR=1;QT_AUTO_SCREEN_SCALE_FACTOR=0;QVIM_SESSION_MIRROR_ADDRESS=127.0.0.1"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QVIM_TEST_DLL_PATH_NATIVE}"
