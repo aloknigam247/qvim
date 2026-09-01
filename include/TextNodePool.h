@@ -55,7 +55,7 @@ public:
     // Node inspection for tests. NativeRendering is the entire point of the
     // scene-graph port (issue #15), and no pixel test can catch a silent flip
     // back to QtRendering because the suite runs on the software backend.
-    int nodeCount() const { return int(m_nodes.size()); }
+    int nodeCount() const { return static_cast<int>(m_nodes.size()); }
     QSGTextNode *nodeAt(int i) const { return m_nodes.value(i); }
 
 private:
