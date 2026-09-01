@@ -8,7 +8,6 @@
 #include "PopupMenuModel.h"
 #include "TablineModel.h"
 
-
 #include <QDebug>
 #include <QFontDatabase>
 #include <QVariant>

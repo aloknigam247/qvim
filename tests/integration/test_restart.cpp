@@ -63,8 +63,8 @@ private slots:
         // Re-attach reused the single-source-of-truth options: ext_hlstate on,
         // ext_multigrid off (see packAttachOptions). Query them as scalars — the
         // test's getVar round-trip can't represent the nvim_list_uis() dicts.
-        const auto extHl = evalSync(
-            conn, QStringLiteral("get(nvim_list_uis()[0], 'ext_hlstate', v:false)"), 5000);
+        const auto extHl =
+            evalSync(conn, QStringLiteral("get(nvim_list_uis()[0], 'ext_hlstate', v:false)"), 5000);
         QVERIFY(extHl);
         QCOMPARE(extHl->toBool(), true);
         const auto extMg = evalSync(

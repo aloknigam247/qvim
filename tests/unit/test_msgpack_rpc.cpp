@@ -45,7 +45,8 @@ private slots:
         QVERIFY(called);
     }
 
-    void responseRoutesByMsgid() {        // We exercise the dispatch path indirectly by hand-crafting a response
+    void responseRoutesByMsgid() { // We exercise the dispatch path indirectly by hand-crafting a
+                                   // response
         // packet — though MsgpackRpc::dispatchUnpacked is private, this serves
         // as a structural smoke check that our envelope layout is correct.
         msgpack::sbuffer buf;

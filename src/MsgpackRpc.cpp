@@ -64,7 +64,8 @@ bool MsgpackRpc::startEmbeddedNvim(const QString &nvimExe, const QStringList &ex
     args << QStringLiteral("--embed");
     args.append(extraArgs);
 
-    connect(m_process.get(), &QProcess::readyReadStandardOutput, this, &MsgpackRpc::onReadyReadProcess);
+    connect(m_process.get(), &QProcess::readyReadStandardOutput, this,
+            &MsgpackRpc::onReadyReadProcess);
     connect(m_process.get(), &QProcess::errorOccurred, this, &MsgpackRpc::onProcessError);
     connect(m_process.get(), QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
             &MsgpackRpc::onProcessFinished);
@@ -100,7 +101,8 @@ void MsgpackRpc::connectToAddress(const QString &listenAddr) {
         connect(sock, &QAbstractSocket::disconnected, this, [this, gen] {
             if(gen == m_generation) emit transportClosed();
         });
-        connect(sock, &QAbstractSocket::errorOccurred, this, [this, gen, sock](QAbstractSocket::SocketError) {
+        connect(sock, &QAbstractSocket::errorOccurred, this,
+                [this, gen, sock](QAbstractSocket::SocketError) {
             if(gen == m_generation) emit transportError(sock->errorString());
         });
         const int colon = listenAddr.lastIndexOf(QLatin1Char(':'));
@@ -118,7 +120,8 @@ void MsgpackRpc::connectToAddress(const QString &listenAddr) {
         connect(sock, &QLocalSocket::disconnected, this, [this, gen] {
             if(gen == m_generation) emit transportClosed();
         });
-        connect(sock, &QLocalSocket::errorOccurred, this, [this, gen, sock](QLocalSocket::LocalSocketError) {
+        connect(sock, &QLocalSocket::errorOccurred, this,
+                [this, gen, sock](QLocalSocket::LocalSocketError) {
             if(gen == m_generation) emit transportError(sock->errorString());
         });
         sock->connectToServer(canonicalizePipeAddress(listenAddr));
