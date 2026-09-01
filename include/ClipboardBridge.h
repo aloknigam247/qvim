@@ -20,13 +20,11 @@ public:
 
     void attachTo(NvimConnector *conn);
 
-public slots:
-    void pasteFromClipboard();
-
-private slots:
-    void onCustomNotification(const qvim::Notification &note);
+    Q_SLOT void pasteFromClipboard();
 
 private:
+    Q_SLOT void onCustomNotification(const qvim::Notification &note);
+
     void installYankAutocmd();
 
     NvimConnector *m_conn = nullptr;

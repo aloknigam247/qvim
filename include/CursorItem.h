@@ -83,13 +83,12 @@ signals:
     void metricsChanged();
     void fontChanged();
 
-private slots:
-    void onCursorActivity();   // GridModel::cursorChanged — restart blink + dirty old+new
-    void onModeBlinkChanged(); // ModeInfo::currentChanged — update blink params + repaint
-    void onBlinkTimeout();     // QTimer timeout — toggle visibility, dirty current rect
-    void onFlush();            // NvimConnector::flush — content under cursor may have changed
-
 private:
+    Q_SLOT void onCursorActivity();   // GridModel::cursorChanged — restart blink + dirty old+new
+    Q_SLOT void onModeBlinkChanged(); // ModeInfo::currentChanged — update blink params + repaint
+    Q_SLOT void onBlinkTimeout();     // QTimer timeout — toggle visibility, dirty current rect
+    Q_SLOT void onFlush(); // NvimConnector::flush — content under cursor may have changed
+
     GridModel *grid() const;
     HighlightTable *hl() const;
     ModeInfo *mode() const;

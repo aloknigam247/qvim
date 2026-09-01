@@ -82,12 +82,11 @@ protected:
     void wheelEvent(QWheelEvent *ev) override;
     void geometryChange(const QRectF &newGeom, const QRectF &oldGeom) override;
 
-private slots:
-    void onGuifontChanged();
-    void onLinespaceChanged();
-    void onFlush();
-
 private:
+    Q_SLOT void onGuifontChanged();
+    Q_SLOT void onLinespaceChanged();
+    Q_SLOT void onFlush();
+
     void recomputeMetrics();
     void maybeResizeUi();
     GridModel *grid() const;

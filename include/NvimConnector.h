@@ -145,11 +145,10 @@ signals:
     void showtablineChanged();
     void termguicolorsChanged();
 
-private slots:
-    void onNotification(const qvim::Notification &note);
-    void onRpcDisconnected();
-
 private:
+    Q_SLOT void onNotification(const qvim::Notification &note);
+    Q_SLOT void onRpcDisconnected();
+
     void handleRedraw(const msgpack::object &events);
     void dispatchEvent(const std::string &name, const msgpack::object &evt);
 

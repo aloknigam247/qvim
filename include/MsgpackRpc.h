@@ -64,12 +64,11 @@ signals:
     void disconnected();
     void error(const QString &message);
 
-private slots:
-    void onReadyRead();
-    void onProcessError(QProcess::ProcessError err);
-    void onProcessFinished(int exitCode, QProcess::ExitStatus status);
-
 private:
+    Q_SLOT void onReadyRead();
+    Q_SLOT void onProcessError(QProcess::ProcessError err);
+    Q_SLOT void onProcessFinished(int exitCode, QProcess::ExitStatus status);
+
     void dispatchUnpacked(ObjectHandlePtr handle);
     void writeMessage(const msgpack::sbuffer &buf);
 
