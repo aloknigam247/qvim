@@ -48,7 +48,6 @@ class CursorItem : public QQuickItem {
 public:
     explicit CursorItem(QQuickItem *parent = nullptr);
     ~CursorItem() override;
-    Q_DISABLE_COPY_MOVE(CursorItem)
 
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
 

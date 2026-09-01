@@ -7,3 +7,5 @@ WarningsAsErrors: ''
 HeaderFilterRegex: '.*[/\\](include|src)[/\\][^/\\]+\.h$'
 FormatStyle: 'file'
 SystemHeaders: false
+CheckOptions:
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true

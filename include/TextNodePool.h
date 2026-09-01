@@ -8,6 +8,8 @@
 #include <QString>
 #include <QVector>
 
+#include "QvimMacros.h"
+
 QT_BEGIN_NAMESPACE
 class QQuickWindow;
 class QSGNode;
@@ -32,7 +34,7 @@ class TextNodePool {
 public:
     TextNodePool() = default;
     ~TextNodePool();
-    Q_DISABLE_COPY_MOVE(TextNodePool)
+    QVIM_DISABLE_COPY_MOVE(TextNodePool)
 
     // parent and window must outlive the frame. Call once per updatePaintNode.
     void beginFrame(QSGNode *parent, QQuickWindow *window);

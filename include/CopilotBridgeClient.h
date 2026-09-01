@@ -7,6 +7,7 @@
 #include <QString>
 
 #include "ChatModel.h"
+#include "QvimMacros.h"
 
 class QTimer;
 class QWebSocket;
@@ -42,7 +43,7 @@ class CopilotBridgeClient : public QObject {
 public:
     explicit CopilotBridgeClient(QObject *parent = nullptr);
     ~CopilotBridgeClient() override;
-    Q_DISABLE_COPY_MOVE(CopilotBridgeClient)
+    QVIM_DISABLE_COPY_MOVE(CopilotBridgeClient)
 
     ChatModel *sink() const { return m_sink; }
     void setSink(ChatModel *sink);

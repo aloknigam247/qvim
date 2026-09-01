@@ -65,7 +65,6 @@ class NvimConnector : public QObject {
 public:
     explicit NvimConnector(QObject *parent = nullptr);
     ~NvimConnector() override;
-    Q_DISABLE_COPY_MOVE(NvimConnector)
 
     bool start(const QString &nvimExe = QStringLiteral("nvim"),
                const QStringList &nvimForwardArgs = {});

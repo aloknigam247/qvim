@@ -10,6 +10,7 @@
 #include <QString>
 
 #include "ChatModel.h"
+#include "QvimMacros.h"
 #include "SessionEventBuffer.h"
 
 class QWebSocket;
@@ -50,7 +51,7 @@ class SessionMirrorServer : public QObject {
 public:
     explicit SessionMirrorServer(QObject *parent = nullptr);
     ~SessionMirrorServer() override;
-    Q_DISABLE_COPY_MOVE(SessionMirrorServer)
+    QVIM_DISABLE_COPY_MOVE(SessionMirrorServer)
 
     ChatModel *source() const { return m_source; }
     void setSource(ChatModel *source);

@@ -38,7 +38,6 @@ class GridItem : public QQuickItem {
 public:
     explicit GridItem(QQuickItem *parent = nullptr);
     ~GridItem() override;
-    Q_DISABLE_COPY_MOVE(GridItem)
 
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
 
