@@ -35,7 +35,7 @@ static void parseGuifont(const QString &guifont, QString &family, qreal &size) {
     family = parts.first();
     family.replace(QLatin1Char('_'), QLatin1Char(' '));
     for(int i = 1; i < parts.size(); ++i) {
-        const QString p = parts.at(i);
+        const QString &p = parts.at(i);
         if(p.startsWith(QLatin1Char('h')) && p.size() > 1) {
             bool ok = false;
             const qreal v = p.mid(1).toDouble(&ok);

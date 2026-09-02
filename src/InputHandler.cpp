@@ -72,7 +72,7 @@ QString InputHandler::keyToNvim(QKeyEvent *ev) {
     const auto &special = specialKeyMap();
     auto it = special.find(key);
     if(it != special.end()) {
-        const QString name = it.value();
+        const QString &name = it.value();
         return QStringLiteral("<%1%2>").arg(modString(mods), name);
     }
 
