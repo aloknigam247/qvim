@@ -60,7 +60,7 @@ private:
         std::optional<QVariant> cli;
     };
 
-    QVariant resolve(const Entry &e) const;
+    static QVariant resolve(const Entry &e);
     void applyAndNotify(const QString &name, Entry &e, const QVariant &before);
 
     QHash<QString, Entry> m_entries;

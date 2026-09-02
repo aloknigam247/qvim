@@ -37,7 +37,7 @@ ConfigType Config::type(const QString &name) const {
     return it->type;
 }
 
-QVariant Config::resolve(const Entry &e) const {
+QVariant Config::resolve(const Entry &e) {
     if(e.cli.has_value()) return *e.cli;
     if(e.gGlobal.has_value()) return *e.gGlobal;
     return e.defaultValue;

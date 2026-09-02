@@ -32,6 +32,8 @@ void ClipboardBridge::installYankAutocmd() {
     m_conn->execLua(QString::fromUtf8(kLua));
 }
 
+// Q_SLOT: must stay a non-static member so moc can register it as a slot.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void ClipboardBridge::onCustomNotification(const qvim::Notification &note) {
     if(note.method != QStringLiteral("qvim_yank")) return;
     const msgpack::object &obj = note.params();

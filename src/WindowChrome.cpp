@@ -22,6 +22,8 @@ namespace qvim {
 
 WindowChrome::WindowChrome(QObject *parent) : QObject(parent) {}
 
+// Q_INVOKABLE: must stay a non-static member so moc can expose it to QML.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void WindowChrome::applyToWindow([[maybe_unused]] QQuickWindow *window,
                                  [[maybe_unused]] QColor background) {
 #ifdef Q_OS_WIN
