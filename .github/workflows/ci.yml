@@ -81,8 +81,11 @@ jobs:
 
       - name: Configure tidy preset (compile_commands.json)
         shell: pwsh
+        # Reuse the Qt that setup-qvim restored into build/dev/vcpkg_installed.
         run: |
-          cmake --preset tidy
+          cmake --preset tidy `
+            -DVCPKG_MANIFEST_INSTALL=OFF `
+            "-DVCPKG_INSTALLED_DIR=${{ github.workspace }}/build/dev/vcpkg_installed"
           if ($LASTEXITCODE -ne 0) { throw "tidy preset configure failed with exit code $LASTEXITCODE." }
           if (-not (Test-Path build/tidy/compile_commands.json)) {
             throw "build/tidy/compile_commands.json was not generated."
