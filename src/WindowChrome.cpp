@@ -5,17 +5,12 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dwmapi.h>
-// Older SDKs may not define these DWMWA attribute IDs; pin the values from the
-// Microsoft docs so the build doesn't depend on a recent Windows SDK header.
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-#endif
-#ifndef DWMWA_CAPTION_COLOR
-#define DWMWA_CAPTION_COLOR 35
-#endif
-#ifndef DWMWA_TEXT_COLOR
-#define DWMWA_TEXT_COLOR 36
-#endif
+// Pin the DWMWA attribute IDs from the Microsoft docs so the build doesn't
+// depend on a recent Windows SDK header. These values are stable Win32 API
+// contract constants.
+constexpr DWORD kDwmwaUseImmersiveDarkMode = 20;
+constexpr DWORD kDwmwaCaptionColor = 35;
+constexpr DWORD kDwmwaTextColor = 36;
 #endif
 
 namespace qvim {
@@ -32,14 +27,14 @@ void WindowChrome::applyToWindow([[maybe_unused]] QQuickWindow *window,
     if(!hwnd) return;
 
     const COLORREF caption = RGB(background.red(), background.green(), background.blue());
-    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption, sizeof(caption));
+    DwmSetWindowAttribute(hwnd, kDwmwaCaptionColor, &caption, sizeof(caption));
 
     const QColor text = background.lightness() < 128 ? Qt::white : Qt::black;
     const COLORREF textRef = RGB(text.red(), text.green(), text.blue());
-    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &textRef, sizeof(textRef));
+    DwmSetWindowAttribute(hwnd, kDwmwaTextColor, &textRef, sizeof(textRef));
 
     const BOOL dark = background.lightness() < 128 ? TRUE : FALSE;
-    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
+    DwmSetWindowAttribute(hwnd, kDwmwaUseImmersiveDarkMode, &dark, sizeof(dark));
 #endif
 }
 
