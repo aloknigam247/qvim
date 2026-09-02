@@ -20,20 +20,20 @@ CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr
     const qreal extra = static_cast<qreal>(std::max(0, linespace));
     int unit = 1;
     for(int q = 1; q <= 16; ++q) {
-        if(std::abs(safeDpr * q - std::round(safeDpr * q)) < 1e-3) {
+        if(std::abs((safeDpr * q) - std::round(safeDpr * q)) < 1e-3) {
             unit = q;
             break;
         }
     }
     auto snapUnit = [unit](qreal v) -> qreal {
-        const qreal u = static_cast<qreal>(unit);
+        const auto u = static_cast<qreal>(unit);
         return std::max(u, std::round(v / u) * u);
     };
     const qreal width = snapUnit(fm.horizontalAdvance(QLatin1Char('M')));
     const qreal height = snapUnit(fm.height() + extra);
-    qreal baseline = std::round(fm.ascent() + extra / 2.0);
-    if(baseline < 0.0) baseline = 0.0;
-    if(baseline > height) baseline = height;
+    qreal baseline = std::round(fm.ascent() + (extra / 2.0));
+    baseline = std::max(baseline, 0.0);
+    baseline = std::min(baseline, height);
     return CellMetrics{ width, height, baseline };
 }
 

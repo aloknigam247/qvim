@@ -1,4 +1,5 @@
-#pragma once
+#ifndef GRIDITEM_H
+#define GRIDITEM_H
 
 #include <QFont>
 #include <QFontMetricsF>
@@ -38,8 +39,6 @@ public:
     explicit GridItem(QQuickItem *parent = nullptr);
     ~GridItem() override;
 
-    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
-
     NvimConnector *connector() const { return m_conn; }
     void setConnector(NvimConnector *c);
 
@@ -74,6 +73,7 @@ signals:
     void debugOverlayChanged();
 
 protected:
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
     void keyPressEvent(QKeyEvent *ev) override;
     void mousePressEvent(QMouseEvent *ev) override;
     void mouseMoveEvent(QMouseEvent *ev) override;
@@ -81,12 +81,11 @@ protected:
     void wheelEvent(QWheelEvent *ev) override;
     void geometryChange(const QRectF &newGeom, const QRectF &oldGeom) override;
 
-private slots:
-    void onGuifontChanged();
-    void onLinespaceChanged();
-    void onFlush();
-
 private:
+    Q_SLOT void onGuifontChanged();
+    Q_SLOT void onLinespaceChanged();
+    Q_SLOT void onFlush();
+
     void recomputeMetrics();
     void maybeResizeUi();
     GridModel *grid() const;
@@ -130,3 +129,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

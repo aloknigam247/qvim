@@ -8,11 +8,10 @@
 
 namespace qvim {
 
-namespace {
-
 constexpr auto kPrefix = "--qvim-";
+constexpr qsizetype kPrefixLen = 7;
 
-std::optional<bool> parseBool(const QString &s) {
+static std::optional<bool> parseBool(const QString &s) {
     const QString v = s.trimmed().toLower();
     if(v == QStringLiteral("1") || v == QStringLiteral("true") || v == QStringLiteral("yes") ||
        v == QStringLiteral("on"))
@@ -23,7 +22,7 @@ std::optional<bool> parseBool(const QString &s) {
     return std::nullopt;
 }
 
-std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
+static std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
     switch(type) {
         case ConfigType::Bool: {
             auto b = parseBool(raw);
@@ -52,8 +51,6 @@ std::optional<QVariant> coerce(ConfigType type, const QString &raw) {
     return std::nullopt;
 }
 
-} // namespace
-
 QStringList ConfigCliReader::extract(QStringList &args, Config &cfg) {
     QStringList kept;
     kept.reserve(args.size());
@@ -62,8 +59,8 @@ QStringList ConfigCliReader::extract(QStringList &args, Config &cfg) {
             kept.push_back(arg);
             continue;
         }
-        const QString body = arg.mid(static_cast<int>(qstrlen(kPrefix)));
-        const int eq = body.indexOf(QLatin1Char('='));
+        const QString body = arg.mid(kPrefixLen);
+        const qsizetype eq = body.indexOf(QLatin1Char('='));
         QString name;
         std::optional<QString> rawValue;
         if(eq < 0) {

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MDNSADVERTISER_H
+#define MDNSADVERTISER_H
 
 #include <QMap>
 #include <QObject>
@@ -6,12 +7,15 @@
 #include <QString>
 
 #include <memory>
+#include <string_view>
+
+#include "QvimMacros.h"
 
 namespace qvim {
 
 // The DNS-SD service type qvim advertises the session mirror under. The Android
 // companion browses for exactly this type.
-inline constexpr char kMirrorServiceType[] = "_qvim-mirror._tcp";
+inline constexpr std::string_view kMirrorServiceType = "_qvim-mirror._tcp";
 
 // A resolved description of the service to advertise. Pure value type — no
 // platform state — so the advertising logic is testable without touching the
@@ -41,7 +45,9 @@ struct MdnsWireForm {
 // tests inject a fake that records the descriptor.
 class MdnsBackend {
 public:
+    MdnsBackend() = default;
     virtual ~MdnsBackend() = default;
+    QVIM_DISABLE_COPY_MOVE(MdnsBackend)
     virtual void registerService(const MdnsService &service) = 0;
     virtual void unregisterService() = 0;
 };
@@ -97,3 +103,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

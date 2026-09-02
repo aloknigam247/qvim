@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SESSIONMIRRORSERVER_H
+#define SESSIONMIRRORSERVER_H
 
 #include <QHostAddress>
 #include <QJsonObject>
@@ -9,6 +10,7 @@
 #include <QString>
 
 #include "ChatModel.h"
+#include "QvimMacros.h"
 #include "SessionEventBuffer.h"
 
 class QWebSocket;
@@ -49,6 +51,7 @@ class SessionMirrorServer : public QObject {
 public:
     explicit SessionMirrorServer(QObject *parent = nullptr);
     ~SessionMirrorServer() override;
+    QVIM_DISABLE_COPY_MOVE(SessionMirrorServer)
 
     ChatModel *source() const { return m_source; }
     void setSource(ChatModel *source);
@@ -108,3 +111,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

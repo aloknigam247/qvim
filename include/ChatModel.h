@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CHATMODEL_H
+#define CHATMODEL_H
 
 #include <QAbstractListModel>
 #include <qqmlregistration.h>
@@ -108,3 +109,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

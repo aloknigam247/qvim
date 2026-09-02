@@ -1,5 +1,7 @@
 #include "SessionEventBuffer.h"
 
+#include <utility>
+
 #include <QJsonDocument>
 
 namespace qvim {
@@ -12,7 +14,7 @@ BufferedEvent SessionEventBuffer::append(QJsonObject frame) {
 
     BufferedEvent event{ seq, QJsonDocument(frame).toJson(QJsonDocument::Compact) };
     m_events.push_back(event);
-    while(static_cast<int>(m_events.size()) > m_maxEntries) { m_events.pop_front(); }
+    while(std::cmp_greater(m_events.size(), m_maxEntries)) { m_events.pop_front(); }
     return event;
 }
 

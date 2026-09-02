@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WINDOWCHROME_H
+#define WINDOWCHROME_H
 
 #include <QColor>
 #include <QObject>
@@ -29,9 +30,11 @@ Q_SIGNALS:
     void activated();
 
 private:
-    void activateNow(QQuickWindow *window);
+    static void activateNow(QQuickWindow *window);
 
     bool m_activated = false;
 };
 
 } // namespace qvim
+
+#endif

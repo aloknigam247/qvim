@@ -1,4 +1,5 @@
-#pragma once
+#ifndef GRIDMODEL_H
+#define GRIDMODEL_H
 
 #include <msgpack.hpp>
 #include <QHash>
@@ -249,3 +250,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

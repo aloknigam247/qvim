@@ -1,5 +1,7 @@
 #include "GridModel.h"
 
+#include <algorithm>
+
 namespace qvim {
 
 void GridSurfaceProxy::setPosition(int x, int y) {
@@ -76,7 +78,10 @@ GridSurfaceProxy *GridModel::surfaceFor(int gridId) const {
         // before its first ensure()). Const-cast is fine: proxies are caches
         // tied to logical grid lifetime, not part of the const-observable model
         // state from QML's perspective.
-        if(m_grids.contains(gridId)) { return const_cast<GridModel *>(this)->ensureProxy(gridId); }
+        if(m_grids.contains(gridId)) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+            return const_cast<GridModel *>(this)->ensureProxy(gridId);
+        }
         return nullptr;
     }
     return it.value();
@@ -329,14 +334,14 @@ QList<int> GridModel::gridIds() const {
     QList<int> ids;
     ids.reserve(m_grids.size());
     for(auto it = m_grids.constBegin(); it != m_grids.constEnd(); ++it) { ids.push_back(it.key()); }
-    std::sort(ids.begin(), ids.end());
+    std::ranges::sort(ids);
     return ids;
 }
 
 QRect GridModel::gridGeometry(int gridId) const {
     const GridSurface *s = surface(gridId);
     if(!s) return {};
-    return QRect(s->x, s->y, s->cols, s->rows);
+    return { s->x, s->y, s->cols, s->rows };
 }
 
 int GridModel::gridCols(int gridId) const {

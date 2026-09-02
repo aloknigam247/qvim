@@ -4,8 +4,7 @@
 
 namespace qvim {
 
-namespace {
-const QHash<int, QString> &specialKeyMap() {
+static const QHash<int, QString> &specialKeyMap() {
     static const QHash<int, QString> m = {
         { Qt::Key_Escape, "Esc" },
         { Qt::Key_Tab, "Tab" },
@@ -39,7 +38,6 @@ const QHash<int, QString> &specialKeyMap() {
     };
     return m;
 }
-} // namespace
 
 QString InputHandler::modString(Qt::KeyboardModifiers mods) {
     QString s;
@@ -58,12 +56,12 @@ QString InputHandler::modPrefix(Qt::KeyboardModifiers mods) {
 QString InputHandler::escapeLiteral(QChar c) {
     if(c == QChar('<')) return QStringLiteral("<lt>");
     if(c == QChar('\\')) return QStringLiteral("\\");
-    return QString(c);
+    return { c };
 }
 
 QString InputHandler::keyToNvim(QKeyEvent *ev) {
     const int key = ev->key();
-    Qt::KeyboardModifiers mods = ev->modifiers();
+    const Qt::KeyboardModifiers mods = ev->modifiers();
 
     // Ignore bare modifier presses.
     if(key == Qt::Key_Shift || key == Qt::Key_Control || key == Qt::Key_Alt ||
@@ -74,7 +72,7 @@ QString InputHandler::keyToNvim(QKeyEvent *ev) {
     const auto &special = specialKeyMap();
     auto it = special.find(key);
     if(it != special.end()) {
-        const QString name = it.value();
+        const QString &name = it.value();
         return QStringLiteral("<%1%2>").arg(modString(mods), name);
     }
 
@@ -175,7 +173,7 @@ InputHandler::MouseInput InputHandler::mouseFor(QMouseEvent *ev, QEvent::Type ty
             return m;
     }
     QString mod;
-    Qt::KeyboardModifiers mods = ev->modifiers();
+    const Qt::KeyboardModifiers mods = ev->modifiers();
     if(mods & Qt::ShiftModifier) mod += QStringLiteral("S-");
     if(mods & Qt::ControlModifier) mod += QStringLiteral("C-");
     if(mods & Qt::AltModifier) mod += QStringLiteral("M-");

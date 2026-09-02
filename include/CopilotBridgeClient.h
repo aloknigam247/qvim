@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COPILOTBRIDGECLIENT_H
+#define COPILOTBRIDGECLIENT_H
 
 #include <QObject>
 #include <QPointer>
@@ -6,6 +7,7 @@
 #include <QString>
 
 #include "ChatModel.h"
+#include "QvimMacros.h"
 
 class QTimer;
 class QWebSocket;
@@ -41,6 +43,7 @@ class CopilotBridgeClient : public QObject {
 public:
     explicit CopilotBridgeClient(QObject *parent = nullptr);
     ~CopilotBridgeClient() override;
+    QVIM_DISABLE_COPY_MOVE(CopilotBridgeClient)
 
     ChatModel *sink() const { return m_sink; }
     void setSink(ChatModel *sink);
@@ -90,3 +93,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

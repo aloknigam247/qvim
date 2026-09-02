@@ -28,15 +28,14 @@
 
 namespace qvim {
 
-namespace {
-void parseGuifont(const QString &guifont, QString &family, qreal &size) {
+static void parseGuifont(const QString &guifont, QString &family, qreal &size) {
     if(guifont.isEmpty()) return;
     const auto parts = guifont.split(QLatin1Char(':'));
     if(parts.isEmpty()) return;
     family = parts.first();
     family.replace(QLatin1Char('_'), QLatin1Char(' '));
     for(int i = 1; i < parts.size(); ++i) {
-        const QString p = parts.at(i);
+        const QString &p = parts.at(i);
         if(p.startsWith(QLatin1Char('h')) && p.size() > 1) {
             bool ok = false;
             const qreal v = p.mid(1).toDouble(&ok);
@@ -44,7 +43,6 @@ void parseGuifont(const QString &guifont, QString &family, qreal &size) {
         }
     }
 }
-} // namespace
 
 GridItem::~GridItem() = default;
 
@@ -232,8 +230,9 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     }
     for(const CellRun &run: runs.runs) {
         if(!run.undercurl) continue;
-        bbox = bbox.united(QRectF(run.c0 * m_cellWidth, run.row * m_cellHeight + m_cellHeight - 4.0,
-                                  (run.c1 - run.c0) * m_cellWidth, 4.0));
+        bbox =
+            bbox.united(QRectF(run.c0 * m_cellWidth, (run.row * m_cellHeight) + m_cellHeight - 4.0,
+                               (run.c1 - run.c0) * m_cellWidth, 4.0));
     }
 
     if(bbox.isEmpty()) {
@@ -273,7 +272,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
                                        h->resolved(pb.hlId).bg == h->resolved(pa.hlId).bg;
                 if(!sameGroup) groupStart.push_back(i);
             }
-            groupStart.push_back(spans.size());
+            groupStart.push_back(static_cast<int>(spans.size()));
 
             for(int gi = 0; gi + 1 < groupStart.size(); ++gi) {
                 const int gs = groupStart[gi];
@@ -316,7 +315,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
                 // adjacent edge length so short spans don't produce arcs that
                 // overlap each other.
                 QPainterPath path;
-                const int nv = verts.size();
+                const int nv = static_cast<int>(verts.size());
                 for(int i = 0; i < nv; ++i) {
                     const QPointF &prev = verts[(i + nv - 1) % nv];
                     const QPointF &curr = verts[i];
@@ -342,10 +341,12 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
             if(!run.undercurl) continue;
             const qreal left = run.c0 * m_cellWidth;
             const qreal right = run.c1 * m_cellWidth;
-            const qreal yy = run.row * m_cellHeight + m_cellHeight - 1.5;
+            const qreal yy = (run.row * m_cellHeight) + m_cellHeight - 1.5;
             QPainterPath path;
             path.moveTo(left, yy);
-            for(qreal x = left; x < right; x += 4.0) {
+            for(int i = 0;; ++i) {
+                const qreal x = left + (i * 4.0);
+                if(x >= right) break;
                 path.quadTo(x + 1.0, yy + 2.0, x + 2.0, yy);
                 path.quadTo(x + 3.0, yy - 2.0, x + 4.0, yy);
             }
@@ -355,7 +356,10 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     }
 
     auto *tex = window()->createTextureFromImage(img, QQuickWindow::TextureHasAlphaChannel);
-    QSGSimpleTextureNode *node = static_cast<QSGSimpleTextureNode *>(m_decoNode);
+    // QSGNode is not polymorphic (it dispatches on type() rather than a vtable), so dynamic_cast
+    // is unavailable; m_decoNode is one we created as a QSGSimpleTextureNode.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+    auto *node = static_cast<QSGSimpleTextureNode *>(m_decoNode);
     if(!node) {
         node = new QSGSimpleTextureNode;
         node->setOwnsTexture(true);
@@ -368,7 +372,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     node->markDirty(QSGNode::DirtyMaterial);
 }
 
-QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
+QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*data*/) {
     // A null oldNode means the scene graph threw the previous tree away, so the
     // cached slot pointers are dangling. Drop them without deleting.
     if(!oldNode) {
@@ -394,7 +398,7 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         root->appendChildNode(m_lineRoot);
     }
 
-    GridModel *g = grid();
+    const GridModel *g = grid();
     HighlightTable *h = hl();
 
     m_bgPool.beginFrame(m_bgRoot, window());
@@ -503,7 +507,7 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         int rr = 0;
         for(const QString &line: dump.split(QLatin1Char('\n'))) {
             m_textPool.addText(INT_MIN, line, overlayFont, QColor(255, 0, 0, 200),
-                               QPointF(0, rr * m_cellHeight + m_baseline));
+                               QPointF(0, (rr * m_cellHeight) + m_baseline));
             ++rr;
         }
     }

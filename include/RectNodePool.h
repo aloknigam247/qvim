@@ -1,8 +1,11 @@
-#pragma once
+#ifndef RECTNODEPOOL_H
+#define RECTNODEPOOL_H
 
 #include <QColor>
 #include <QRectF>
 #include <QVector>
+
+#include "QvimMacros.h"
 
 QT_BEGIN_NAMESPACE
 class QQuickWindow;
@@ -36,7 +39,9 @@ namespace qvim {
 // All methods must be called on the SceneGraph render thread.
 class RectNodePool {
 public:
+    RectNodePool() = default;
     ~RectNodePool();
+    QVIM_DISABLE_COPY_MOVE(RectNodePool)
 
     // parent and window must outlive the frame. Call once per updatePaintNode.
     void beginFrame(QSGNode *parent, QQuickWindow *window);
@@ -58,3 +63,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

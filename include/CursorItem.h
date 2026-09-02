@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CURSORITEM_H
+#define CURSORITEM_H
 
 #include <utility>
 #include <QElapsedTimer>
@@ -48,8 +49,6 @@ public:
     explicit CursorItem(QQuickItem *parent = nullptr);
     ~CursorItem() override;
 
-    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
-
     NvimConnector *connector() const { return m_conn; }
     void setConnector(NvimConnector *c);
 
@@ -77,18 +76,20 @@ public:
     static QRectF cursorRectAtPixel(QPointF cellTopLeft, qreal cellWidth, qreal cellHeight,
                                     CursorShape shape);
 
+protected:
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
+
 signals:
     void connectorChanged();
     void metricsChanged();
     void fontChanged();
 
-private slots:
-    void onCursorActivity();   // GridModel::cursorChanged — restart blink + dirty old+new
-    void onModeBlinkChanged(); // ModeInfo::currentChanged — update blink params + repaint
-    void onBlinkTimeout();     // QTimer timeout — toggle visibility, dirty current rect
-    void onFlush();            // NvimConnector::flush — content under cursor may have changed
-
 private:
+    Q_SLOT void onCursorActivity();   // GridModel::cursorChanged — restart blink + dirty old+new
+    Q_SLOT void onModeBlinkChanged(); // ModeInfo::currentChanged — update blink params + repaint
+    Q_SLOT void onBlinkTimeout();     // QTimer timeout — toggle visibility, dirty current rect
+    Q_SLOT void onFlush(); // NvimConnector::flush — content under cursor may have changed
+
     GridModel *grid() const;
     HighlightTable *hl() const;
     ModeInfo *mode() const;
@@ -160,3 +161,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

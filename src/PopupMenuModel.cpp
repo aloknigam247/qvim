@@ -2,12 +2,10 @@
 
 namespace qvim {
 
-namespace {
-QString strOrEmpty(const msgpack::object &o) {
+static QString strOrEmpty(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
-} // namespace
 
 PopupMenuModel::PopupMenuModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -20,7 +18,7 @@ void PopupMenuModel::show(const msgpack::object &items, int selected, int row, i
         for(uint32_t i = 0; i < arr.size; ++i) {
             const auto &e = arr.ptr[i];
             if(e.type != msgpack::type::ARRAY || e.via.array.size < 4) continue;
-            Item it{
+            const Item it{
                 strOrEmpty(e.via.array.ptr[0]),
                 strOrEmpty(e.via.array.ptr[1]),
                 strOrEmpty(e.via.array.ptr[2]),
@@ -55,7 +53,7 @@ void PopupMenuModel::hide() {
 }
 
 int PopupMenuModel::rowCount(const QModelIndex &parent) const {
-    return parent.isValid() ? 0 : m_items.size();
+    return parent.isValid() ? 0 : static_cast<int>(m_items.size());
 }
 
 QVariant PopupMenuModel::data(const QModelIndex &index, int role) const {

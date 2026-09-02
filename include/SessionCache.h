@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SESSIONCACHE_H
+#define SESSIONCACHE_H
 
 #include <QString>
 
@@ -28,3 +29,5 @@ struct SessionCache {
 };
 
 } // namespace qvim
+
+#endif

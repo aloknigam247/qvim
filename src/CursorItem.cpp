@@ -18,17 +18,6 @@
 
 namespace qvim {
 
-namespace {
-// Same PUA detection used by GridItem. Qt 6's text shaper drops Private Use
-// Area codepoints (QTBUG-116417), so block-mode cursor glyphs in PUA need the
-// QRawFont + drawGlyphRun bypass below.
-bool isPua(QChar c) {
-    const ushort u = c.unicode();
-    if(u >= 0xE000 && u <= 0xF8FF) return true;
-    return c.isHighSurrogate() && u >= 0xDB80;
-}
-} // namespace
-
 CursorItem::CursorItem(QQuickItem *parent) : QQuickItem(parent) {
     setFlag(ItemHasContents, true);
     // Cursor item must never take focus — qml/AGENTS.md mandates focus stay
@@ -153,7 +142,7 @@ QRectF CursorItem::cursorRectAtPixel(QPointF cellTopLeft, qreal cellWidth, qreal
 }
 
 std::pair<bool, QPointF> CursorItem::targetCellTopLeft() const {
-    GridModel *g = grid();
+    const GridModel *g = grid();
     if(!g) return { false, {} };
     const int active = g->activeGrid();
     auto *surface = g->surfaceFor(active);
@@ -200,7 +189,7 @@ void CursorItem::onCursorActivity() {
     // Compute absolute target row/col (same math targetCellTopLeft() uses,
     // re-derived here so we can compare against m_prevRow/m_prevCol). Safe:
     // targetCellTopLeft() already verified surface + bounds.
-    GridModel *g = grid();
+    const GridModel *g = grid();
     const int active = g->activeGrid();
     auto *surface = g->surfaceFor(active);
     const int newRow = surface->y() + g->cursorRowOf(active);
@@ -283,7 +272,7 @@ void CursorItem::rescheduleBlink() {
     m_blinkTimer.start(static_cast<int>(delay));
 }
 
-QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
+QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*data*/) {
     // A null oldNode means the scene graph destroyed the previous tree, so the
     // cached slot pointers are dangling. Drop them without deleting.
     if(!oldNode) {
@@ -321,13 +310,13 @@ QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         return root;
     };
 
-    GridModel *g = grid();
-    HighlightTable *h = hl();
+    const GridModel *g = grid();
+    const HighlightTable *h = hl();
     if(!g || !h) {
         m_lastRect = {};
         return commit();
     }
-    ModeInfo *m = mode();
+    const ModeInfo *m = mode();
 
     const int active = g->activeGrid();
     auto *surface = g->surfaceFor(active);
@@ -349,7 +338,7 @@ QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         return commit();
     }
 
-    HlAttr a = h->resolved(m ? m->attrId() : 0);
+    const HlAttr a = h->resolved(m ? m->attrId() : 0);
     QColor curColor = a.bg.isValid() ? a.bg : h->defaultFg();
     if(curColor == h->defaultBg()) curColor = h->defaultFg();
 

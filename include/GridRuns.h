@@ -1,4 +1,5 @@
-#pragma once
+#ifndef GRIDRUNS_H
+#define GRIDRUNS_H
 
 #include <QColor>
 #include <QString>
@@ -79,3 +80,5 @@ bool isPuaChar(QChar c);
 GridRuns buildGridRuns(const GridModel &grid, const HighlightTable &hl, int gridId);
 
 } // namespace qvim
+
+#endif

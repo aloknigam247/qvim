@@ -64,7 +64,7 @@ void TextNodePool::addText(int key, const QString &text, const QFont &font, cons
         layout.endLayout();
         return;
     }
-    line.setLineWidth(qreal(1 << 20));
+    line.setLineWidth(static_cast<qreal>(1 << 20));
     line.setPosition(QPointF(0, 0));
     layout.endLayout();
 

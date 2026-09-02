@@ -14,7 +14,7 @@ void Config::registerOption(const QString &name, ConfigType type, QVariant defau
     Entry e;
     e.type = type;
     e.defaultValue = std::move(defaultValue);
-    m_entries.insert(name, std::move(e));
+    m_entries[name] = std::move(e);
 }
 
 bool Config::has(const QString &name) const { return m_entries.contains(name); }
@@ -37,13 +37,13 @@ ConfigType Config::type(const QString &name) const {
     return it->type;
 }
 
-QVariant Config::resolve(const Entry &e) const {
+QVariant Config::resolve(const Entry &e) {
     if(e.cli.has_value()) return *e.cli;
     if(e.gGlobal.has_value()) return *e.gGlobal;
     return e.defaultValue;
 }
 
-void Config::applyAndNotify(const QString &name, Entry &e, QVariant before) {
+void Config::applyAndNotify(const QString &name, Entry &e, const QVariant &before) {
     const QVariant after = resolve(e);
     if(after != before) { emit changed(name); }
     Q_UNUSED(e);

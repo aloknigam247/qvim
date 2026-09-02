@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MESSAGESMODEL_H
+#define MESSAGESMODEL_H
 
 #include <msgpack.hpp>
 #include <QAbstractListModel>
@@ -71,3 +72,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

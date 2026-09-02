@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdio>
 #include <future>
 #include <QByteArray>
@@ -29,24 +30,24 @@
 #include "SessionCache.h"
 #include "WindowChrome.h"
 
-namespace {
-
-QString locateNvim() {
-    const QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
+static QString locateNvim() {
+    QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
     if(!fromPath.isEmpty()) return fromPath;
     return QStringLiteral("nvim");
 }
 
+namespace {
+
 struct BootProfile {
-    const bool enabled;
-    const QString outFile;
+    bool enabled;
+    QString outFile;
     QElapsedTimer timer;
     BootProfile() :
         enabled(qEnvironmentVariableIntValue("QVIM_BOOT_PROFILE") != 0),
         outFile(qEnvironmentVariable("QVIM_BOOT_PROFILE_FILE")) {
         if(enabled) timer.start();
     }
-    void mark(const char *phase) {
+    void mark(const char *phase) const {
         if(!enabled) return;
         const qint64 ms = timer.elapsed();
         qDebug().noquote() << "[boot]" << phase << ms << "ms";
@@ -58,7 +59,9 @@ struct BootProfile {
             fp = std::fopen(outFile.toLocal8Bit().constData(), "a");
 #endif
             if(fp) {
-                std::fprintf(fp, "[boot] %s %lld ms\n", phase, static_cast<long long>(ms));
+                const QByteArray line =
+                    QByteArray("[boot] ") + phase + ' ' + QByteArray::number(ms) + " ms\n";
+                std::fputs(line.constData(), fp);
                 std::fclose(fp);
             }
         }
@@ -67,33 +70,37 @@ struct BootProfile {
 
 } // namespace
 
+// An exception escaping main() terminates the process anyway; the Qt entry point does not wrap its
+// body in a catch-all.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char *argv[]) {
     BootProfile boot;
     const qvim::QvimArgs cli = qvim::parseArgv(argc, argv);
     boot.mark("argv parsed");
     if(cli.helpRequested) {
-        std::printf("Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
-                    "\n"
-                    "qvim is a Neovim GUI client. All arguments not in qvim's own\n"
-                    "namespace are forwarded to the embedded `nvim --embed` process.\n"
-                    "\n"
-                    "qvim options:\n"
-                    "  -h, --help       Show this help and exit.\n"
-                    "  -v, --version    Show qvim version and exit.\n"
-                    "\n"
-                    "Everything else (e.g. `foo.txt`, `-O a.txt b.txt`, `+10 foo.txt`,\n"
-                    "`-c \"set number\" foo.txt`) is forwarded to nvim.\n"
-                    "\n"
-                    "Reading stdin (`qvim -`):\n"
-                    "  PowerShell intercepts the literal `-` token for its own pipeline\n"
-                    "  handling, which delays spawning qvim by several seconds. Use cmd\n"
-                    "  or Start-Process to avoid the delay:\n"
-                    "    cmd /c \"echo hello | qvim -\"\n"
-                    "    Start-Process qvim '-' -RedirectStandardInput in.txt\n");
+        std::fputs("Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
+                   "\n"
+                   "qvim is a Neovim GUI client. All arguments not in qvim's own\n"
+                   "namespace are forwarded to the embedded `nvim --embed` process.\n"
+                   "\n"
+                   "qvim options:\n"
+                   "  -h, --help       Show this help and exit.\n"
+                   "  -v, --version    Show qvim version and exit.\n"
+                   "\n"
+                   "Everything else (e.g. `foo.txt`, `-O a.txt b.txt`, `+10 foo.txt`,\n"
+                   "`-c \"set number\" foo.txt`) is forwarded to nvim.\n"
+                   "\n"
+                   "Reading stdin (`qvim -`):\n"
+                   "  PowerShell intercepts the literal `-` token for its own pipeline\n"
+                   "  handling, which delays spawning qvim by several seconds. Use cmd\n"
+                   "  or Start-Process to avoid the delay:\n"
+                   "    cmd /c \"echo hello | qvim -\"\n"
+                   "    Start-Process qvim '-' -RedirectStandardInput in.txt\n",
+                   stdout);
         return 0;
     }
     if(cli.versionRequested) {
-        std::printf("qvim 0.1.0\n");
+        std::fputs("qvim 0.1.0\n", stdout);
         return 0;
     }
 
@@ -127,9 +134,9 @@ int main(int argc, char *argv[]) {
     if(cli.stdinAsBuffer && stdinIsRedirected) {
         stdinFuture = std::async(std::launch::async, []() {
             QByteArray buf;
-            char chunk[4096];
-            while(std::size_t n = std::fread(chunk, 1, sizeof(chunk), stdin)) {
-                buf.append(chunk, static_cast<qsizetype>(n));
+            std::array<char, 4096> chunk{};
+            while(std::size_t n = std::fread(chunk.data(), 1, chunk.size(), stdin)) {
+                buf.append(chunk.data(), static_cast<qsizetype>(n));
             }
             return buf;
         });
@@ -146,8 +153,8 @@ int main(int argc, char *argv[]) {
 #endif
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("qvim"));
-    app.setOrganizationName(QStringLiteral("qvim"));
+    QGuiApplication::setApplicationName(QStringLiteral("qvim"));
+    QGuiApplication::setOrganizationName(QStringLiteral("qvim"));
     qvim::setupApplicationIcon(app);
     qRegisterMetaType<qvim::Notification>("qvim::Notification");
     qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
@@ -278,5 +285,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    return app.exec();
+    return QGuiApplication::exec();
 }

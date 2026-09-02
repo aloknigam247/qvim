@@ -8,16 +8,14 @@
 
 namespace qvim {
 
-namespace {
 constexpr int kProtocolVersion = 1;
 // Cap on a single client input so one frame can't make a buffered event
 // arbitrarily large from untrusted LAN input.
 constexpr int kMaxInputChars = 4096;
 
-QByteArray serialise(const QJsonObject &frame) {
+static QByteArray serialise(const QJsonObject &frame) {
     return QJsonDocument(frame).toJson(QJsonDocument::Compact);
 }
-} // namespace
 
 SessionMirrorServer::SessionMirrorServer(QObject *parent) :
     QObject(parent), m_server(new QWebSocketServer(QStringLiteral("qvim-session-mirror"),

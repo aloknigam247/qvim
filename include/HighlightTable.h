@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HIGHLIGHTTABLE_H
+#define HIGHLIGHTTABLE_H
 
 #include <msgpack.hpp>
 #include <unordered_map>
@@ -60,3 +61,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

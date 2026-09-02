@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include <optional>
 #include <QHash>
@@ -53,16 +54,18 @@ signals:
 
 private:
     struct Entry {
-        ConfigType type;
+        ConfigType type{};
         QVariant defaultValue;
         std::optional<QVariant> gGlobal;
         std::optional<QVariant> cli;
     };
 
-    QVariant resolve(const Entry &e) const;
-    void applyAndNotify(const QString &name, Entry &e, QVariant before);
+    static QVariant resolve(const Entry &e);
+    void applyAndNotify(const QString &name, Entry &e, const QVariant &before);
 
     QHash<QString, Entry> m_entries;
 };
 
 } // namespace qvim
+
+#endif

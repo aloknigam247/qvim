@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ARGVPARSER_H
+#define ARGVPARSER_H
 
 #include <QStringList>
 
@@ -22,3 +23,5 @@ struct QvimArgs {
 QvimArgs parseArgv(int argc, char **argv);
 
 } // namespace qvim
+
+#endif

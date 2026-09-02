@@ -55,6 +55,59 @@ jobs:
             throw "clang-format found unformatted code. Run: clang-format -i --style=file:.clang-format <files>"
           }
 
+  # Enforce the clang-tidy check set (.clang-tidy) over the first-party translation
+  # units (src/ + include/). clang-tidy needs the real compile flags, so this restores
+  # Qt and configures the Ninja `tidy` preset to emit compile_commands.json, then runs
+  # clang-tidy per TU. Diagnostics are path-scoped to src/ + include/ so the vendored
+  # msgpack analyzer note (out of our tree, not fixable here) can never gate the build.
+  tidy:
+    name: tidy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-qvim
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # The Ninja `tidy` preset drives cl directly (unlike the VS-generator dev
+      # preset, which locates the toolset itself), so cl + the MSVC env must be on
+      # PATH before configure.
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install clang-tidy
+        run: pip install clang-tidy
+
+      - name: Configure tidy preset (compile_commands.json)
+        shell: pwsh
+        # Reuse the Qt that setup-qvim restored into build/dev/vcpkg_installed.
+        run: |
+          cmake --preset tidy `
+            -DVCPKG_MANIFEST_INSTALL=OFF `
+            "-DVCPKG_INSTALLED_DIR=${{ github.workspace }}/build/dev/vcpkg_installed"
+          if ($LASTEXITCODE -ne 0) { throw "tidy preset configure failed with exit code $LASTEXITCODE." }
+          if (-not (Test-Path build/tidy/compile_commands.json)) {
+            throw "build/tidy/compile_commands.json was not generated."
+          }
+
+      - name: Run clang-tidy
+        shell: pwsh
+        # Analyze the first-party TUs in one pass and fail on any finding under src/ or
+        # include/. The vendored msgpack analyzer note is dropped by path — clang-tidy
+        # header filters don't suppress analyzer diagnostics.
+        run: |
+          $tus = git ls-files 'src/*.cpp'
+          if (-not $tus) { throw "no src/*.cpp translation units matched." }
+          $out = clang-tidy -p build/tidy --quiet @tus 2>&1 | Out-String
+          Write-Host $out
+          $hits = $out -split "`n" | Where-Object {
+            $_ -match ':\d+:\d+:\s+(warning|error):' -and $_ -match '\\(src|include)\\' -and $_ -notmatch 'vcpkg_installed'
+          }
+          if ($hits) {
+            throw "clang-tidy reported $($hits.Count) first-party finding(s); the .clang-tidy set must stay baseline-clean."
+          }
+
   # Seed the vcpkg binary cache AND compile qvim exactly once. On a cold cache
   # the setup-qvim configure cold-builds Qt (~1-3 h) and pushes it to the NuGet
   # feed; every later job then RESTORES Qt in minutes. Compiling here (not in

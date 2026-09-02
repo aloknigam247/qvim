@@ -14,18 +14,17 @@
 
 namespace qvim {
 
-namespace {
-QString asQString(const msgpack::object &o) {
+static QString asQString(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
 
-bool asBool(const msgpack::object &o, bool def = false) {
+static bool asBool(const msgpack::object &o, bool def = false) {
     if(o.type == msgpack::type::BOOLEAN) return o.via.boolean;
     return def;
 }
 
-int64_t asInt(const msgpack::object &o, int64_t def = 0) {
+static int64_t asInt(const msgpack::object &o, int64_t def = 0) {
     if(o.type == msgpack::type::POSITIVE_INTEGER) return static_cast<int64_t>(o.via.u64);
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     return def;
@@ -37,7 +36,7 @@ int64_t asInt(const msgpack::object &o, int64_t def = 0) {
 // residual focus-loss-after-':' bug — flip a bool back to true once the offending
 // feature is found. The C++ handlers, QML overlays, and models stay wired; nvim
 // simply won't emit the events that drive them.
-void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows) {
+static void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows) {
     pk.pack_array(3);
     pk.pack(static_cast<int64_t>(cols));
     pk.pack(static_cast<int64_t>(rows));
@@ -59,7 +58,6 @@ void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows
     pk.pack("ext_messages");
     pk.pack(false);
 }
-} // namespace
 
 NvimConnector::NvimConnector(QObject *parent) :
     QObject(parent), m_rpc(new MsgpackRpc(this)), m_grid(new GridModel(this)),
@@ -82,7 +80,6 @@ bool NvimConnector::start(const QString &nvimExe, const QStringList &nvimForward
     return m_rpc->startEmbeddedNvim(nvimExe, nvimForwardArgs);
 }
 
-namespace {
 // Same parsing the GridItem uses for its own font selection. Centralised here
 // so QML overlays can bind via Q_PROPERTY without duplicating the regex.
 // Before nvim's first option_set arrives we defer to the OS-supplied fixed
@@ -90,21 +87,21 @@ namespace {
 // qvim doesn't impose its own font choice.
 constexpr qreal kDefaultGuifontSize = 14.0;
 
-QString systemFixedFontFamily() {
+static QString systemFixedFontFamily() {
     // Cached on first call so QFontDatabase isn't queried on every property
     // read. Safe because the platform's fixed font doesn't change at runtime.
     static const QString cached = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
     return cached;
 }
 
-void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
+static void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
     if(guifont.isEmpty()) return;
     const auto parts = guifont.split(QLatin1Char(':'));
     if(parts.isEmpty()) return;
     family = parts.first();
     family.replace(QLatin1Char('_'), QLatin1Char(' '));
     for(int i = 1; i < parts.size(); ++i) {
-        const QString p = parts.at(i);
+        const QString &p = parts.at(i);
         if(p.startsWith(QLatin1Char('h')) && p.size() > 1) {
             bool ok = false;
             const qreal v = p.mid(1).toDouble(&ok);
@@ -112,7 +109,6 @@ void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
         }
     }
 }
-} // namespace
 
 QString NvimConnector::guifontFamily() const {
     QString family = systemFixedFontFamily();
@@ -178,22 +174,21 @@ bool NvimConnector::attachUi(int cols, int rows) {
     return true;
 }
 
-namespace {
-QVariant msgpackToVariant(const msgpack::object &o) {
+static QVariant msgpackToVariant(const msgpack::object &o) {
     switch(o.type) {
         case msgpack::type::NIL:
             return {};
         case msgpack::type::BOOLEAN:
-            return QVariant(o.via.boolean);
+            return { o.via.boolean };
         case msgpack::type::POSITIVE_INTEGER:
-            return QVariant(static_cast<qulonglong>(o.via.u64));
+            return { static_cast<qulonglong>(o.via.u64) };
         case msgpack::type::NEGATIVE_INTEGER:
-            return QVariant(static_cast<qlonglong>(o.via.i64));
+            return { static_cast<qlonglong>(o.via.i64) };
         case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT64:
-            return QVariant(o.via.f64);
+            return { o.via.f64 };
         case msgpack::type::STR:
-            return QVariant(QString::fromUtf8(o.via.str.ptr, o.via.str.size));
+            return { QString::fromUtf8(o.via.str.ptr, o.via.str.size) };
         case msgpack::type::ARRAY: {
             QVariantList list;
             list.reserve(static_cast<int>(o.via.array.size));
@@ -203,12 +198,11 @@ QVariant msgpackToVariant(const msgpack::object &o) {
             return list;
         }
         case msgpack::type::BIN:
-            return QVariant(QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)));
+            return { QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)) };
         default:
             return {};
     }
 }
-} // namespace
 
 void NvimConnector::getVar(const QString &name, GetVarCallback cb) {
     m_rpc->request(QStringLiteral("nvim_get_var"), [&name](msgpack::packer<msgpack::sbuffer> &pk) {
@@ -589,16 +583,18 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "default_colors_set") {
         if(a.size >= 4) {
-            m_hl->setDefaultColors(asInt(a.ptr[0], -1), asInt(a.ptr[1], -1), asInt(a.ptr[2], -1));
+            m_hl->setDefaultColors(static_cast<int>(asInt(a.ptr[0], -1)),
+                                   static_cast<int>(asInt(a.ptr[1], -1)),
+                                   static_cast<int>(asInt(a.ptr[2], -1)));
             emit defaultBackgroundChanged();
         }
         return;
     }
     if(name == "hl_attr_define") {
         if(a.size >= 4) {
-            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1], &a.ptr[3]);
+            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1], &a.ptr[3]);
         } else if(a.size >= 2) {
-            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1]);
+            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1]);
         }
         return;
     }
@@ -607,7 +603,8 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
         return;
     }
     if(name == "mode_change") {
-        if(a.size >= 2) m_mode->setCurrentMode(asQString(a.ptr[0]), asInt(a.ptr[1]));
+        if(a.size >= 2)
+            m_mode->setCurrentMode(asQString(a.ptr[0]), static_cast<int>(asInt(a.ptr[1])));
         return;
     }
     if(name == "tabline_update") {
@@ -616,12 +613,13 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "popupmenu_show") {
         if(a.size >= 4) {
-            m_popupmenu->show(a.ptr[0], asInt(a.ptr[1]), asInt(a.ptr[2]), asInt(a.ptr[3]));
+            m_popupmenu->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])),
+                              static_cast<int>(asInt(a.ptr[2])), static_cast<int>(asInt(a.ptr[3])));
         }
         return;
     }
     if(name == "popupmenu_select") {
-        if(a.size >= 1) m_popupmenu->select(asInt(a.ptr[0]));
+        if(a.size >= 1) m_popupmenu->select(static_cast<int>(asInt(a.ptr[0])));
         return;
     }
     if(name == "popupmenu_hide") {
@@ -630,18 +628,21 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "cmdline_show") {
         if(a.size >= 6) {
-            m_cmdline->show(a.ptr[0], asInt(a.ptr[1]), asQString(a.ptr[2]), asQString(a.ptr[3]),
-                            asInt(a.ptr[4]), asInt(a.ptr[5]));
+            m_cmdline->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])), asQString(a.ptr[2]),
+                            asQString(a.ptr[3]), static_cast<int>(asInt(a.ptr[4])),
+                            static_cast<int>(asInt(a.ptr[5])));
         }
         return;
     }
     if(name == "cmdline_pos") {
-        if(a.size >= 2) m_cmdline->setPos(asInt(a.ptr[0]), asInt(a.ptr[1]));
+        if(a.size >= 2)
+            m_cmdline->setPos(static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[1])));
         return;
     }
     if(name == "cmdline_special_char") {
         if(a.size >= 3) {
-            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]), asInt(a.ptr[2]));
+            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]),
+                                      static_cast<int>(asInt(a.ptr[2])));
         }
         return;
     }

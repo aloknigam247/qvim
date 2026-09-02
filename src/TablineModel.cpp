@@ -2,8 +2,7 @@
 
 namespace qvim {
 
-namespace {
-int64_t extInt(const msgpack::object &o) {
+static int64_t extInt(const msgpack::object &o) {
     if(o.type == msgpack::type::POSITIVE_INTEGER) return static_cast<int64_t>(o.via.u64);
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     if(o.type == msgpack::type::EXT) {
@@ -13,7 +12,6 @@ int64_t extInt(const msgpack::object &o) {
     }
     return 0;
 }
-} // namespace
 
 TablineModel::TablineModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -41,7 +39,7 @@ void TablineModel::update(const msgpack::object &current, const msgpack::object 
                     t.handle = extInt(kv.val);
                 }
             }
-            if(t.handle == m_currentHandle) m_currentIndex = m_tabs.size();
+            if(t.handle == m_currentHandle) m_currentIndex = static_cast<int>(m_tabs.size());
             m_tabs.push_back(t);
         }
     }
@@ -60,7 +58,7 @@ void TablineModel::clear() {
 }
 
 int TablineModel::rowCount(const QModelIndex &parent) const {
-    return parent.isValid() ? 0 : m_tabs.size();
+    return parent.isValid() ? 0 : static_cast<int>(m_tabs.size());
 }
 
 QVariant TablineModel::data(const QModelIndex &index, int role) const {

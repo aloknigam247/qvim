@@ -118,6 +118,20 @@ winget install --id Neovim.Neovim --accept-package-agreements --accept-source-ag
 nvim --version   # confirm it resolves on PATH (open a new shell if winget just added it)
 ```
 
+### clang-tidy static analysis
+
+The `tidy` CI job fails on any clang-tidy finding under `src/` or `include/`. `.clang-tidy` is the
+source of truth for the enabled check set. To run the same gate locally you need `clang-tidy` on
+`PATH` (`pip install clang-tidy`) and the Ninja-based compile database:
+
+```pwsh
+cmake --preset tidy                       # generates build/tidy/compile_commands.json
+clang-tidy -p build/tidy --quiet (git ls-files 'src/*.cpp')
+```
+
+The `tidy` preset uses Ninja + `cl`, so run it from a Developer PowerShell (or after `vcvars64.bat`)
+so `cl` is on `PATH`.
+
 ### Native code coverage
 
 Coverage uses **`Microsoft.CodeCoverage.Console`**, which ships with the VS 2026 "Code coverage

@@ -4,13 +4,12 @@
 
 namespace qvim {
 
-namespace {
-QColor fromRgb24(int rgb) {
+static QColor fromRgb24(int rgb) {
     if(rgb < 0) return {};
     return QColor::fromRgb((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
 }
 
-int findKey(const msgpack::object &mapObj, const char *key) {
+static int findKey(const msgpack::object &mapObj, const char *key) {
     if(mapObj.type != msgpack::type::MAP) return -1;
     const auto &m = mapObj.via.map;
     for(uint32_t i = 0; i < m.size; ++i) {
@@ -24,14 +23,14 @@ int findKey(const msgpack::object &mapObj, const char *key) {
     return -1;
 }
 
-bool getBool(const msgpack::object &mapObj, const char *key) {
+static bool getBool(const msgpack::object &mapObj, const char *key) {
     const int i = findKey(mapObj, key);
     if(i < 0) return false;
     const auto &v = mapObj.via.map.ptr[i].val;
     return v.type == msgpack::type::BOOLEAN && v.via.boolean;
 }
 
-int getInt(const msgpack::object &mapObj, const char *key, int def = -1) {
+static int getInt(const msgpack::object &mapObj, const char *key, int def = -1) {
     const int i = findKey(mapObj, key);
     if(i < 0) return def;
     const auto &v = mapObj.via.map.ptr[i].val;
@@ -41,7 +40,7 @@ int getInt(const msgpack::object &mapObj, const char *key, int def = -1) {
 }
 
 // Returns the STR value at `key` if present, or an empty QString.
-QString getString(const msgpack::object &mapObj, const char *key) {
+static QString getString(const msgpack::object &mapObj, const char *key) {
     const int i = findKey(mapObj, key);
     if(i < 0) return {};
     const auto &v = mapObj.via.map.ptr[i].val;
@@ -53,7 +52,7 @@ QString getString(const msgpack::object &mapObj, const char *key) {
 // ext_hlstate gives us an `info` array of dicts describing how the resolved
 // attribute was composed (kind/ui_name/hi_name). Collect every named entry
 // (preferring `ui_name`, falling back to `hi_name`).
-QStringList namesFromInfo(const msgpack::object &info) {
+static QStringList namesFromInfo(const msgpack::object &info) {
     QStringList out;
     if(info.type != msgpack::type::ARRAY) return out;
     const auto &arr = info.via.array;
@@ -68,7 +67,6 @@ QStringList namesFromInfo(const msgpack::object &info) {
     }
     return out;
 }
-} // namespace
 
 HighlightTable::HighlightTable(QObject *parent) : QObject(parent) {}
 
@@ -96,8 +94,8 @@ void HighlightTable::defineAttr(int id, const msgpack::object &rgbAttr,
     a.reverse = getBool(rgbAttr, "reverse");
     a.blend = getInt(rgbAttr, "blend", 0);
     if(info) a.names = namesFromInfo(*info);
-    a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(),
-                              [this](const QString &n) { return m_roundedHighlights.contains(n); });
+    a.isRounded = std::ranges::any_of(
+        a.names, [this](const QString &n) { return m_roundedHighlights.contains(n); });
     m_attrs[id] = a;
     emit changed();
 }
@@ -113,9 +111,8 @@ void HighlightTable::setRoundedHighlights(const QStringList &names) {
     m_roundedHighlights = std::move(next);
     for(auto &kv: m_attrs) {
         HlAttr &a = kv.second;
-        a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(), [this](const QString &n) {
-            return m_roundedHighlights.contains(n);
-        });
+        a.isRounded = std::ranges::any_of(
+            a.names, [this](const QString &n) { return m_roundedHighlights.contains(n); });
     }
     emit changed();
 }

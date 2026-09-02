@@ -8,15 +8,11 @@
 
 namespace qvim {
 
-namespace {
-
-QString cacheFilePath() {
+static QString cacheFilePath() {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(dir);
     return QDir(dir).filePath(QStringLiteral("session.json"));
 }
-
-} // namespace
 
 SessionCache SessionCache::load() {
     SessionCache c;
