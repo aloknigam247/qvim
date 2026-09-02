@@ -367,7 +367,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     node->markDirty(QSGNode::DirtyMaterial);
 }
 
-QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
+QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*data*/) {
     // A null oldNode means the scene graph threw the previous tree away, so the
     // cached slot pointers are dangling. Drop them without deleting.
     if(!oldNode) {

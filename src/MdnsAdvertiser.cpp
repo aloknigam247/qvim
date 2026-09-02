@@ -18,7 +18,7 @@ namespace {
 // off Windows.
 class NullMdnsBackend : public MdnsBackend {
 public:
-    void registerService(const MdnsService &) override {}
+    void registerService(const MdnsService & /*service*/) override {}
     void unregisterService() override {}
 };
 } // namespace

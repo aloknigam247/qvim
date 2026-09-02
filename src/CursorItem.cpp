@@ -272,7 +272,7 @@ void CursorItem::rescheduleBlink() {
     m_blinkTimer.start(static_cast<int>(delay));
 }
 
-QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
+QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*data*/) {
     // A null oldNode means the scene graph destroyed the previous tree, so the
     // cached slot pointers are dangling. Drop them without deleting.
     if(!oldNode) {
