@@ -35,6 +35,8 @@ public:
     void msgShowMode(const msgpack::object &content);
     void msgShowCmd(const msgpack::object &content);
     void msgRuler(const msgpack::object &content);
+    // Full reset for :restart — clears items and the mode/cmd/ruler segments.
+    void reset();
 
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;

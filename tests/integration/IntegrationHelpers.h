@@ -1,9 +1,14 @@
 #pragma once
 
+#include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QString>
 #include <QtTest>
+#include <QVariant>
+
+#include <optional>
 
 #include "CmdlineModel.h"
 #include "GridModel.h"
@@ -41,6 +46,32 @@ inline bool waitForAttach(NvimConnector *conn, int timeoutMs = 5000) {
     if(conn->attached()) return true;
     QSignalSpy spy(conn, &NvimConnector::attachedChanged);
     return spy.wait(timeoutMs) && conn->attached();
+}
+
+// Reads a global via nvim_get_var, spinning the event loop until the async
+// callback fires. Returns nullopt on timeout or if the variable is unset.
+inline std::optional<QVariant> getVarSync(NvimConnector &conn, const QString &name,
+                                          int timeoutMs = 3000) {
+    std::optional<QVariant> result;
+    bool done = false;
+    conn.getVar(name, [&](std::optional<QVariant> v) {
+        result = std::move(v);
+        done = true;
+    });
+    QElapsedTimer t;
+    t.start();
+    while(!done && t.elapsed() < timeoutMs) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+    return done ? result : std::nullopt;
+}
+
+// Evaluates a vimscript expression by round-tripping it through a scratch global.
+// Avoids a dedicated nvim_eval path on NvimConnector for test-only needs.
+inline std::optional<QVariant> evalSync(NvimConnector &conn, const QString &expr,
+                                        int timeoutMs = 3000) {
+    conn.command(QStringLiteral("let g:__qvim_eval = %1").arg(expr));
+    return getVarSync(conn, QStringLiteral("__qvim_eval"), timeoutMs);
 }
 
 } // namespace qvim::test

@@ -45,8 +45,8 @@ private slots:
         QVERIFY(called);
     }
 
-    void responseRoutesByMsgid() {
-        // We exercise the dispatch path indirectly by hand-crafting a response
+    void responseRoutesByMsgid() { // We exercise the dispatch path indirectly by hand-crafting a
+                                   // response
         // packet — though MsgpackRpc::dispatchUnpacked is private, this serves
         // as a structural smoke check that our envelope layout is correct.
         msgpack::sbuffer buf;
@@ -60,6 +60,19 @@ private slots:
         msgpack::object_handle h;
         msgpack::unpack(h, buf.data(), buf.size());
         QCOMPARE(h.get().via.array.ptr[1].as<uint32_t>(), uint32_t(42));
+    }
+
+    void canonicalizePipeAddressForms() {
+        // nvim reports the Windows pipe as `//./pipe/<name>`; QLocalSocket needs the
+        // native `\\.\pipe\<name>`. Already-native and non-pipe addresses pass through.
+        QCOMPARE(canonicalizePipeAddress(QStringLiteral("//./pipe/nvim.1234.0")),
+                 QStringLiteral("\\\\.\\pipe\\nvim.1234.0"));
+        QCOMPARE(canonicalizePipeAddress(QStringLiteral("\\\\.\\pipe\\nvim.1234.0")),
+                 QStringLiteral("\\\\.\\pipe\\nvim.1234.0"));
+        QCOMPARE(canonicalizePipeAddress(QStringLiteral("/tmp/nvim.sock")),
+                 QStringLiteral("/tmp/nvim.sock"));
+        QCOMPARE(canonicalizePipeAddress(QStringLiteral("127.0.0.1:6666")),
+                 QStringLiteral("127.0.0.1:6666"));
     }
 };
 

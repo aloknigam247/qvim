@@ -13,7 +13,7 @@ option(QVIM_ENABLE_ASAN "Build with MSVC AddressSanitizer" OFF)
 option(QVIM_WERROR "Treat qvim's own compiler warnings as errors (CI gate)" OFF)
 option(BUILD_TESTING "Build the test suites" ON)
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickTest Test WebSockets)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickTest Test WebSockets)
 find_package(msgpack-cxx CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.10)
@@ -88,6 +88,7 @@ target_link_libraries(qvim_lib
     PUBLIC
         Qt6::Core
         Qt6::Gui
+        Qt6::Network
         Qt6::Qml
         Qt6::Quick
         Qt6::WebSockets

@@ -73,4 +73,11 @@ void ModeInfo::setCurrentMode(const QString &name, int idx) {
     emit currentChanged();
 }
 
+void ModeInfo::reset() {
+    m_modes.clear();
+    m_current = ModeDescriptor{};
+    m_cursorStyleEnabled = false;
+    emit currentChanged();
+}
+
 } // namespace qvim
