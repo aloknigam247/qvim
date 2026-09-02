@@ -54,8 +54,8 @@ public:
 
     bool startEmbeddedNvim(const QString &nvimExe, const QStringList &extraArgs = {});
 
-    void request(const QString &method, PackFn packArgs, RpcCallback cb);
-    void notify(const QString &method, PackFn packArgs);
+    void request(const QString &method, const PackFn &packArgs, RpcCallback cb);
+    void notify(const QString &method, const PackFn &packArgs);
 
     bool isRunning() const;
 

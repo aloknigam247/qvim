@@ -53,7 +53,9 @@ bool MsgpackRpc::startEmbeddedNvim(const QString &nvimExe, const QStringList &ex
 
 bool MsgpackRpc::isRunning() const { return m_process && m_process->state() == QProcess::Running; }
 
-void MsgpackRpc::request(const QString &method, PackFn packArgs, RpcCallback cb) {
+// cb is a sink moved into m_pending, so it stays by value to preserve the move.
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
+void MsgpackRpc::request(const QString &method, const PackFn &packArgs, RpcCallback cb) {
     if(!isRunning()) {
         if(cb) cb(std::unexpected(RpcError{ -1, QStringLiteral("nvim not running") }));
         return;
@@ -72,7 +74,7 @@ void MsgpackRpc::request(const QString &method, PackFn packArgs, RpcCallback cb)
     writeMessage(buf);
 }
 
-void MsgpackRpc::notify(const QString &method, PackFn packArgs) {
+void MsgpackRpc::notify(const QString &method, const PackFn &packArgs) {
     if(!isRunning()) return;
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);

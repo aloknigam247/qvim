@@ -43,7 +43,7 @@ QVariant Config::resolve(const Entry &e) const {
     return e.defaultValue;
 }
 
-void Config::applyAndNotify(const QString &name, Entry &e, QVariant before) {
+void Config::applyAndNotify(const QString &name, Entry &e, const QVariant &before) {
     const QVariant after = resolve(e);
     if(after != before) { emit changed(name); }
     Q_UNUSED(e);

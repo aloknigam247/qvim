@@ -61,7 +61,7 @@ private:
     };
 
     QVariant resolve(const Entry &e) const;
-    void applyAndNotify(const QString &name, Entry &e, QVariant before);
+    void applyAndNotify(const QString &name, Entry &e, const QVariant &before);
 
     QHash<QString, Entry> m_entries;
 };
