@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MSGPACKRPC_H
+#define MSGPACKRPC_H
 
 #include <expected>
 #include <functional>
@@ -14,6 +15,8 @@
 #include <QTcpSocket>
 
 #include <msgpack.hpp>
+
+#include "QvimMacros.h"
 
 namespace qvim {
 
@@ -55,6 +58,7 @@ class MsgpackRpc : public QObject {
 public:
     explicit MsgpackRpc(QObject *parent = nullptr);
     ~MsgpackRpc() override;
+    QVIM_DISABLE_COPY_MOVE(MsgpackRpc)
 
     bool startEmbeddedNvim(const QString &nvimExe, const QStringList &extraArgs = {});
     // Connects to an already-running nvim server's listen address (Windows named
@@ -64,8 +68,8 @@ public:
     // Emits connected() once the socket is ready, or transportError() on failure.
     void connectToAddress(const QString &listenAddr);
 
-    void request(const QString &method, PackFn packArgs, RpcCallback cb);
-    void notify(const QString &method, PackFn packArgs);
+    void request(const QString &method, const PackFn &packArgs, const RpcCallback &cb);
+    void notify(const QString &method, const PackFn &packArgs);
 
     bool isRunning() const;
 
@@ -81,12 +85,11 @@ signals:
     void transportError(const QString &message); // socket connect / runtime error
     void error(const QString &message);
 
-private slots:
-    void onReadyReadProcess();
-    void onProcessError(QProcess::ProcessError err);
-    void onProcessFinished(int exitCode, QProcess::ExitStatus status);
-
 private:
+    Q_SLOT void onReadyReadProcess();
+    Q_SLOT void onProcessError(QProcess::ProcessError err);
+    Q_SLOT void onProcessFinished(int exitCode, QProcess::ExitStatus status);
+
     void dispatchUnpacked(ObjectHandlePtr handle);
     void writeMessage(const msgpack::sbuffer &buf);
     void feed(const QByteArray &data);
@@ -109,3 +112,5 @@ inline std::string toStd(const QString &s) { return s.toStdString(); }
 
 Q_DECLARE_METATYPE(qvim::ObjectHandlePtr)
 Q_DECLARE_METATYPE(qvim::Notification)
+
+#endif

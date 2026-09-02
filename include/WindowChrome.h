@@ -30,7 +30,7 @@ Q_SIGNALS:
     void activated();
 
 private:
-    void activateNow(QQuickWindow *window);
+    static void activateNow(QQuickWindow *window);
 
     bool m_activated = false;
 };

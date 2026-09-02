@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NVIMCONNECTOR_H
+#define NVIMCONNECTOR_H
 
 #include <QColor>
 #include <QObject>
@@ -11,7 +12,6 @@
 
 #include <functional>
 #include <optional>
-#include <QVariant>
 
 #include "CmdlineModel.h"
 #include "GridModel.h"
@@ -145,13 +145,12 @@ signals:
     void showtablineChanged();
     void termguicolorsChanged();
 
-private slots:
-    void onNotification(const qvim::Notification &note);
-    void onRpcDisconnected();
-    void onRestartConnected();
-    void onRestartFailed();
-
 private:
+    Q_SLOT void onNotification(const qvim::Notification &note);
+    Q_SLOT void onRpcDisconnected();
+    Q_SLOT void onRestartConnected();
+    Q_SLOT void onRestartFailed();
+
     void handleRedraw(const msgpack::object &events);
     void dispatchEvent(const std::string &name, const msgpack::object &evt);
     // Drops all grid/highlight/mode/overlay state back to a fresh-attach baseline.
@@ -202,3 +201,5 @@ private:
 };
 
 } // namespace qvim
+
+#endif

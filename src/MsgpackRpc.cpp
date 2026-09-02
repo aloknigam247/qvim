@@ -5,16 +5,15 @@
 
 namespace qvim {
 
-namespace {
 constexpr int kMsgTypeRequest = 0;
 constexpr int kMsgTypeResponse = 1;
 constexpr int kMsgTypeNotification = 2;
-constexpr std::size_t kReadChunk = 64 * 1024;
+constexpr std::size_t kReadChunk = std::size_t{ 64 } * 1024;
 
 // A listen_addr is TCP when it ends in `:<port>` and the host part carries no
 // path separators (which would mark it as a pipe / filesystem socket instead).
-bool looksLikeTcpAddress(const QString &addr) {
-    const int colon = addr.lastIndexOf(QLatin1Char(':'));
+static bool looksLikeTcpAddress(const QString &addr) {
+    const qsizetype colon = addr.lastIndexOf(QLatin1Char(':'));
     if(colon <= 0 || colon == addr.size() - 1) return false;
     bool ok = false;
     addr.mid(colon + 1).toUShort(&ok);
@@ -22,7 +21,6 @@ bool looksLikeTcpAddress(const QString &addr) {
     const QStringView host = QStringView(addr).left(colon);
     return !host.contains(QLatin1Char('/')) && !host.contains(QLatin1Char('\\'));
 }
-} // namespace
 
 QString canonicalizePipeAddress(const QString &addr) {
     // nvim reports the Windows pipe as `//./pipe/<name>`; QLocalSocket expects the
@@ -38,6 +36,7 @@ QString canonicalizePipeAddress(const QString &addr) {
 MsgpackRpc::MsgpackRpc(QObject *parent) :
     QObject(parent), m_unpacker(nullptr, nullptr, kReadChunk) {}
 
+// NOLINTNEXTLINE(bugprone-exception-escape): Qt/msgpack teardown does not throw in practice.
 MsgpackRpc::~MsgpackRpc() {
     if(m_process && m_process->state() != QProcess::NotRunning) {
         m_process->kill();
@@ -73,7 +72,7 @@ bool MsgpackRpc::startEmbeddedNvim(const QString &nvimExe, const QStringList &ex
     m_process->start(nvimExe, args);
     if(!m_process->waitForStarted(5000)) {
         emit error(QStringLiteral("nvim failed to start: %1").arg(m_process->errorString()));
-        m_process.reset();
+        m_process = nullptr;
         return false;
     }
     m_io = m_process.get();
@@ -105,7 +104,7 @@ void MsgpackRpc::connectToAddress(const QString &listenAddr) {
                 [this, gen, sock](QAbstractSocket::SocketError) {
             if(gen == m_generation) emit transportError(sock->errorString());
         });
-        const int colon = listenAddr.lastIndexOf(QLatin1Char(':'));
+        const qsizetype colon = listenAddr.lastIndexOf(QLatin1Char(':'));
         sock->connectToHost(listenAddr.left(colon), listenAddr.mid(colon + 1).toUShort());
     } else {
         m_localSocket = std::make_unique<QLocalSocket>(this);
@@ -167,13 +166,13 @@ void MsgpackRpc::shutdownAndWait(int timeoutMs) {
     else if(m_process) m_process->waitForFinished(timeoutMs);
 }
 
-void MsgpackRpc::request(const QString &method, PackFn packArgs, RpcCallback cb) {
+void MsgpackRpc::request(const QString &method, const PackFn &packArgs, const RpcCallback &cb) {
     if(!isRunning()) {
         if(cb) cb(std::unexpected(RpcError{ -1, QStringLiteral("nvim not running") }));
         return;
     }
     const uint32_t msgid = m_nextMsgId++;
-    if(cb) m_pending.insert(msgid, std::move(cb));
+    if(cb) m_pending.insert(msgid, cb);
 
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
@@ -186,7 +185,7 @@ void MsgpackRpc::request(const QString &method, PackFn packArgs, RpcCallback cb)
     writeMessage(buf);
 }
 
-void MsgpackRpc::notify(const QString &method, PackFn packArgs) {
+void MsgpackRpc::notify(const QString &method, const PackFn &packArgs) {
     if(!isRunning()) return;
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);
@@ -241,7 +240,7 @@ void MsgpackRpc::dispatchUnpacked(ObjectHandlePtr handle) {
         const uint32_t msgid = arr.ptr[1].as<uint32_t>();
         auto it = m_pending.find(msgid);
         if(it == m_pending.end()) return;
-        RpcCallback cb = it.value();
+        const RpcCallback cb = it.value();
         m_pending.erase(it);
 
         const msgpack::object &err = arr.ptr[2];

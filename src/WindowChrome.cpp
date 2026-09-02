@@ -60,6 +60,7 @@ void WindowChrome::activateNow([[maybe_unused]] QQuickWindow *window) {
     window->raise();
     window->requestActivate();
 #ifdef Q_OS_WIN
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr,misc-misplaced-const)
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
     // Real native window only. Under the minimal QPA (used by tests) winId()
     // can return a nonzero non-HWND value; touching the foreground thread's
@@ -69,7 +70,7 @@ void WindowChrome::activateNow([[maybe_unused]] QQuickWindow *window) {
     // Windows denies SetForegroundWindow to a process that isn't the current
     // foreground process. Briefly attach to the foreground thread's input
     // queue so the activation is honoured, then detach.
-    const HWND fg = GetForegroundWindow();
+    HWND fg = GetForegroundWindow();
     const DWORD fgThread = fg ? GetWindowThreadProcessId(fg, nullptr) : 0;
     const DWORD selfThread = GetCurrentThreadId();
     const bool attached =
