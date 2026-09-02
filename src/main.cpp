@@ -70,6 +70,9 @@ struct BootProfile {
 
 } // namespace
 
+// An exception escaping main() terminates the process anyway; the Qt entry point does not wrap its
+// body in a catch-all.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char *argv[]) {
     BootProfile boot;
     const qvim::QvimArgs cli = qvim::parseArgv(argc, argv);
@@ -131,7 +134,7 @@ int main(int argc, char *argv[]) {
     if(cli.stdinAsBuffer && stdinIsRedirected) {
         stdinFuture = std::async(std::launch::async, []() {
             QByteArray buf;
-            std::array<char, 4096> chunk;
+            std::array<char, 4096> chunk{};
             while(std::size_t n = std::fread(chunk.data(), 1, chunk.size(), stdin)) {
                 buf.append(chunk.data(), static_cast<qsizetype>(n));
             }

@@ -23,6 +23,9 @@ void WindowChrome::applyToWindow([[maybe_unused]] QQuickWindow *window,
                                  [[maybe_unused]] QColor background) {
 #ifdef Q_OS_WIN
     if(!window || !background.isValid()) return;
+    // winId() is an integer handle; converting it to the Win32 HWND pointer type requires
+    // reinterpret_cast, and the const applies to the pointer itself.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr,misc-misplaced-const)
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
     if(!hwnd) return;
 

@@ -78,7 +78,10 @@ GridSurfaceProxy *GridModel::surfaceFor(int gridId) const {
         // before its first ensure()). Const-cast is fine: proxies are caches
         // tied to logical grid lifetime, not part of the const-observable model
         // state from QML's perspective.
-        if(m_grids.contains(gridId)) { return const_cast<GridModel *>(this)->ensureProxy(gridId); }
+        if(m_grids.contains(gridId)) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+            return const_cast<GridModel *>(this)->ensureProxy(gridId);
+        }
         return nullptr;
     }
     return it.value();

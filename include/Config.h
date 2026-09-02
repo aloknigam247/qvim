@@ -54,7 +54,7 @@ signals:
 
 private:
     struct Entry {
-        ConfigType type;
+        ConfigType type{};
         QVariant defaultValue;
         std::optional<QVariant> gGlobal;
         std::optional<QVariant> cli;

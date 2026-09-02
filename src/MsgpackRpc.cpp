@@ -46,7 +46,7 @@ bool MsgpackRpc::startEmbeddedNvim(const QString &nvimExe, const QStringList &ex
     m_process->start(nvimExe, args);
     if(!m_process->waitForStarted(5000)) {
         emit error(QStringLiteral("nvim failed to start: %1").arg(m_process->errorString()));
-        m_process.reset();
+        m_process = nullptr;
         return false;
     }
     return true;

@@ -54,7 +54,7 @@ namespace {
 class Win32MdnsBackend : public MdnsBackend {
 public:
     Win32MdnsBackend() = default;
-    ~Win32MdnsBackend() override { unregisterService(); }
+    ~Win32MdnsBackend() override { Win32MdnsBackend::unregisterService(); }
     QVIM_DISABLE_COPY_MOVE(Win32MdnsBackend)
 
     void registerService(const MdnsService &service) override {

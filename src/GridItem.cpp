@@ -344,7 +344,9 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
             const qreal yy = (run.row * m_cellHeight) + m_cellHeight - 1.5;
             QPainterPath path;
             path.moveTo(left, yy);
-            for(qreal x = left; x < right; x += 4.0) {
+            for(int i = 0;; ++i) {
+                const qreal x = left + i * 4.0;
+                if(x >= right) break;
                 path.quadTo(x + 1.0, yy + 2.0, x + 2.0, yy);
                 path.quadTo(x + 3.0, yy - 2.0, x + 4.0, yy);
             }
@@ -354,6 +356,9 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     }
 
     auto *tex = window()->createTextureFromImage(img, QQuickWindow::TextureHasAlphaChannel);
+    // QSGNode is not polymorphic (it dispatches on type() rather than a vtable), so dynamic_cast
+    // is unavailable; m_decoNode is one we created as a QSGSimpleTextureNode.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
     auto *node = static_cast<QSGSimpleTextureNode *>(m_decoNode);
     if(!node) {
         node = new QSGSimpleTextureNode;
