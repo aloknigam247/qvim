@@ -1,16 +1,20 @@
 #ifndef GRIDITEM_H
 #define GRIDITEM_H
 
+#include <QElapsedTimer>
 #include <QFont>
 #include <QFontMetricsF>
 #include <QPointer>
 #include <qqmlregistration.h>
 #include <QQuickItem>
 #include <QSGNode>
+#include <QTimer>
 
+#include "GridModel.h"
 #include "HighlightTable.h"
 #include "NvimConnector.h"
 #include "RectNodePool.h"
+#include "ScrollAnimator.h"
 #include "TextNodePool.h"
 
 namespace qvim {
@@ -61,6 +65,11 @@ public:
     Q_INVOKABLE int colAt(qreal x) const;
     Q_INVOKABLE int rowAt(qreal y) const;
 
+    // Live smooth-scroll offset in pixels (the animator's current eased value),
+    // 0 when no scroll is animating. Exposed so a tier-2 test can pin the real
+    // production animation state rather than re-deriving it.
+    Q_INVOKABLE qreal scrollAnimOffset() const { return m_scroll.offsetAt(m_animClock.elapsed()); }
+
     // Build the per-run QFont for a highlight attribute. Public for testing —
     // paint() uses this through a per-frame hl_id cache to avoid repeated
     // QFont detach/resolve. Pure function of m_font + attribute flags.
@@ -85,6 +94,9 @@ private:
     Q_SLOT void onGuifontChanged();
     Q_SLOT void onLinespaceChanged();
     Q_SLOT void onFlush();
+    // Frame driver for the smooth-scroll ease: ticks update() while the
+    // animator is active and stops itself once the offset has settled to 0.
+    Q_SLOT void onScrollFrame();
 
     void recomputeMetrics();
     void maybeResizeUi();
@@ -98,6 +110,13 @@ private:
     // QPainter avoids reimplementing bezier tessellation, and both features are
     // rare enough that the common frame pays nothing.
     void updateDecorations(const GridRuns &runs, HighlightTable *h);
+
+    // Point the smooth-scroll clip node at `band` (empty disables clipping) and
+    // set the strip transform to the animator's current eased offset. Both run
+    // on the render thread inside updatePaintNode.
+    void ensureScrollNodes(QSGNode *root);
+    void setScrollClip(const QRectF &band);
+    void applyScrollOffset();
 
     QPointer<NvimConnector> m_conn;
     int m_gridId = 1;
@@ -126,6 +145,32 @@ private:
     RectNodePool m_bgPool;
     RectNodePool m_linePool;
     TextNodePool m_textPool;
+
+    // Smooth-scroll compositing. The strip (outgoing snapshot rows + the moved
+    // region rows) is rendered into its own pools under a clip node (confining
+    // it to the scrolled band) wrapping a transform node (the eased offset).
+    // Static rows outside the band render in the pools above. Touched only on
+    // the render thread, like the pools above.
+    QSGNode *m_scrollClip = nullptr;
+    QSGNode *m_scrollXform = nullptr;
+    QSGNode *m_scrollBgRoot = nullptr;
+    QSGNode *m_scrollTextRoot = nullptr;
+    QSGNode *m_scrollLineRoot = nullptr;
+    RectNodePool m_scrollBgPool;
+    RectNodePool m_scrollLinePool;
+    TextNodePool m_scrollTextPool;
+
+    // Smooth-scroll animation state. m_scroll/m_stripSource are mutated only on
+    // the GUI thread (onFlush + onScrollFrame) and read on the render thread
+    // during sync while the GUI thread is blocked, so no lock is needed.
+    ScrollAnimator m_scroll;
+    QElapsedTimer m_animClock;
+    QTimer m_animTimer;
+    PendingScroll m_stripSource;
+    // True when the model changed since the last content frame, so the next
+    // updatePaintNode must rebuild runs/pools; false means an animation-only
+    // tick that just advances the strip transform.
+    bool m_contentDirty = true;
 };
 
 } // namespace qvim

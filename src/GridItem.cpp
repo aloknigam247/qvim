@@ -5,6 +5,7 @@
 #include "HighlightTable.h"
 #include "InputHandler.h"
 #include "NvimConnector.h"
+#include "StripComposition.h"
 
 #include <climits>
 #include <QElapsedTimer>
@@ -12,14 +13,18 @@
 #include <QGlyphRun>
 #include <QHash>
 #include <QKeyEvent>
+#include <QMatrix4x4>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QQuickWindow>
 #include <QRawFont>
 #include <QRegularExpression>
+#include <QSGClipNode>
+#include <QSGGeometry>
 #include <QSGSimpleTextureNode>
 #include <QSGTexture>
+#include <QSGTransformNode>
 #include <QtGlobal>
 #include <QtMath>
 #include <QVarLengthArray>
@@ -58,6 +63,12 @@ GridItem::GridItem(QQuickItem *parent) : QQuickItem(parent) {
     m_font.setHintingPreference(QFont::PreferFullHinting);
     m_fontName = m_font.family();
     recomputeMetrics();
+
+    // Drives the eased offset between content flushes. ~60 Hz is enough for an
+    // 80 ms ease; each tick only advances one matrix (see onScrollFrame).
+    m_animClock.start();
+    m_animTimer.setInterval(16);
+    connect(&m_animTimer, &QTimer::timeout, this, &GridItem::onScrollFrame);
 }
 
 void GridItem::setGridId(int id) {
@@ -183,7 +194,45 @@ void GridItem::onFlush() {
     // The CursorItem overlay handles its own cursor-rect repaint per flush;
     // without this guard, every keystroke at 300x100 fullscreen re-ran the
     // full rows*cols paint loop on this item.
-    if(auto *g = grid(); g && g->takeDirty(m_gridId)) { update(); }
+    auto *g = grid();
+    if(!g) return;
+
+    const bool dirty = g->takeDirty(m_gridId);
+    PendingScroll ps = g->takeScroll(m_gridId);
+    const qint64 now = m_animClock.elapsed();
+
+    if(ps.valid && ps.animatable && m_gridId == 1 && m_cellHeight > 0.0) {
+        // Snap-then-restart: reseed from this step's outgoing rows. Held j/k
+        // shows a rapid series of short eases; the snapshot backing the current
+        // animation is always the current step's rows.
+        m_stripSource = std::move(ps);
+        m_scroll.start(m_stripSource.delta * m_cellHeight, now);
+        m_contentDirty = true;
+        if(!m_animTimer.isActive()) m_animTimer.start();
+        update();
+        return;
+    }
+
+    // A scroll that isn't animatable (partial width, top!=0, whole-region jump,
+    // sub-grid, or a second scroll collapsed into the batch), or an unrelated
+    // content change mid-ease (paste / broad redraw), must not keep easing
+    // against rows that just moved — snap straight to the final image.
+    if(ps.valid || (dirty && m_scroll.active(now))) {
+        m_scroll.snap();
+        m_animTimer.stop();
+    }
+
+    if(dirty) {
+        m_contentDirty = true;
+        update();
+    }
+}
+
+void GridItem::onScrollFrame() {
+    // Advance the ease. active() goes false once the duration elapses; the
+    // final tick still runs update() so the offset settles to exactly 0.
+    if(!m_scroll.active(m_animClock.elapsed())) m_animTimer.stop();
+    update();
 }
 
 GridModel *GridItem::grid() const { return m_conn ? m_conn->grid() : nullptr; }
@@ -372,14 +421,132 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     node->markDirty(QSGNode::DirtyMaterial);
 }
 
+// Emit one block of already-resolved runs into the given pools. `yMap(row)`
+// gives a run's pixel top and `cellAt(row, col)` resolves a PUA cell's glyph,
+// so the same routine serves the normal grid (natural y, live cells) and the
+// smooth-scroll strip (placement y, snapshot cells). Only rows in [rowLo, rowHi)
+// are drawn. Submission order (pill backing, then run fills + glyphs, then
+// underlines) matches the pre-refactor single pass.
+template <class YMap, class CellAt>
+static void renderRuns(const GridRuns &runs, const HighlightTable &h, const GridItem &item,
+                       RectNodePool &bgPool, TextNodePool &textPool, RectNodePool &linePool,
+                       QHash<int, QFont> &fontCache, qreal cellWidth, qreal cellHeight,
+                       qreal baseline, qreal underlineThickness, const QColor &defaultBg, int rowLo,
+                       int rowHi, YMap yMap, CellAt cellAt) {
+    // Backing fill for rounded spans; see the note in the previous single-pass
+    // renderer. Kept first so run background fills paint over it.
+    for(const PillSpan &s: runs.pills) {
+        if(s.row < rowLo || s.row >= rowHi) continue;
+        if(!s.backBg.isValid() || s.backBg == defaultBg) continue;
+        const QColor pillBg = h.resolved(s.hlId).bg;
+        if(!pillBg.isValid() || pillBg == defaultBg) continue;
+        bgPool.add(QRectF(s.c0 * cellWidth, yMap(s.row), (s.c1 - s.c0) * cellWidth, cellHeight),
+                   s.backBg);
+    }
+
+    for(const CellRun &run: runs.runs) {
+        if(run.row < rowLo || run.row >= rowHi) continue;
+        const qreal y = yMap(run.row);
+        const QRectF runRect(run.c0 * cellWidth, y, (run.c1 - run.c0) * cellWidth, cellHeight);
+        if(run.fillBg) bgPool.add(runRect, run.bg);
+
+        auto it = fontCache.find(run.hlId);
+        if(it == fontCache.end())
+            it = fontCache.insert(run.hlId, item.buildRunFont(h.resolved(run.hlId)));
+
+        textPool.addText(run.hlId, run.text, it.value(), run.fg,
+                         QPointF(run.c0 * cellWidth, y + baseline));
+
+        if(run.underline) {
+            linePool.add(QRectF(runRect.left(), y + cellHeight - underlineThickness,
+                                runRect.width(), underlineThickness),
+                         run.fg);
+        }
+    }
+
+    // PUA pass. Qt's shaper gives Private Use Area codepoints a zero advance
+    // (QTBUG-116417), so a run containing several of them collapses into one
+    // spot. Laying out each PUA cell separately at its own x sidesteps the
+    // broken advance entirely — the grid supplies every position itself, so the
+    // shaper is never asked to place one PUA glyph relative to another.
+    for(const PuaCluster &cluster: runs.puaClusters) {
+        if(cluster.row < rowLo || cluster.row >= rowHi) continue;
+        auto it = fontCache.find(cluster.hlId);
+        if(it == fontCache.end())
+            it = fontCache.insert(cluster.hlId, item.buildRunFont(h.resolved(cluster.hlId)));
+        const QColor fg = h.resolved(cluster.hlId).fg;
+        const qreal y = yMap(cluster.row);
+        for(int c = cluster.c0; c < cluster.c1; ++c) {
+            const Cell &pcell = cellAt(cluster.row, c);
+            if(pcell.doubleWidth || pcell.text.isEmpty()) continue;
+            textPool.addText(cluster.hlId, pcell.text, it.value(), fg,
+                             QPointF(c * cellWidth, y + baseline));
+        }
+    }
+}
+
+void GridItem::ensureScrollNodes(QSGNode *root) {
+    if(m_scrollClip) return;
+
+    // clip (confines the strip to the scrolled band) -> transform (eased
+    // offset) -> bg/text/line roots. Appended last so the strip paints above
+    // the static rows, which never overlap it (the band excludes them).
+    auto *clip = new QSGClipNode;
+    clip->setIsRectangular(true);
+    auto *geo = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), 4);
+    QSGGeometry::updateRectGeometry(geo, boundingRect());
+    clip->setGeometry(geo);
+    clip->setFlag(QSGNode::OwnsGeometry, true);
+    clip->setClipRect(boundingRect());
+
+    auto *xform = new QSGTransformNode;
+    m_scrollBgRoot = new QSGNode;
+    m_scrollTextRoot = new QSGNode;
+    m_scrollLineRoot = new QSGNode;
+    xform->appendChildNode(m_scrollBgRoot);
+    xform->appendChildNode(m_scrollTextRoot);
+    xform->appendChildNode(m_scrollLineRoot);
+    clip->appendChildNode(xform);
+    root->appendChildNode(clip);
+
+    m_scrollClip = clip;
+    m_scrollXform = xform;
+}
+
+void GridItem::setScrollClip(const QRectF &band) {
+    if(!m_scrollClip) return;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+    auto *clip = static_cast<QSGClipNode *>(m_scrollClip);
+    const QRectF rect = band.isEmpty() ? boundingRect() : band;
+    clip->setClipRect(rect);
+    QSGGeometry::updateRectGeometry(clip->geometry(), rect);
+    clip->markDirty(QSGNode::DirtyGeometry);
+}
+
+void GridItem::applyScrollOffset() {
+    if(!m_scrollXform) return;
+    QMatrix4x4 m;
+    m.translate(0.0F, static_cast<float>(m_scroll.offsetAt(m_animClock.elapsed())));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+    static_cast<QSGTransformNode *>(m_scrollXform)->setMatrix(m);
+}
+
 QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*data*/) {
     // A null oldNode means the scene graph threw the previous tree away, so the
     // cached slot pointers are dangling. Drop them without deleting.
     if(!oldNode) {
         m_bgRoot = m_decoRoot = m_decoNode = m_textRoot = m_lineRoot = nullptr;
+        m_scrollClip = m_scrollXform = m_scrollBgRoot = m_scrollTextRoot = m_scrollLineRoot =
+            nullptr;
         m_bgPool.forget();
         m_linePool.forget();
         m_textPool.forget();
+        m_scrollBgPool.forget();
+        m_scrollLinePool.forget();
+        m_scrollTextPool.forget();
+        // The rebuilt tree starts with empty pools; a bare offset tick would
+        // leave the grid blank, so force a full content frame.
+        m_contentDirty = true;
     }
 
     QSGNode *root = oldNode;
@@ -397,6 +564,18 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*dat
         root->appendChildNode(m_textRoot);
         root->appendChildNode(m_lineRoot);
     }
+    ensureScrollNodes(root);
+
+    // Animation-only tick: no model change since the last content frame and an
+    // ease is in flight, so reuse every pooled node and just advance the strip
+    // transform. This is the perf gate — held j/k does not turn into a
+    // full-grid rebuild per animation frame.
+    const qint64 nowMs = m_animClock.elapsed();
+    if(!m_contentDirty && m_scroll.active(nowMs)) {
+        applyScrollOffset();
+        return root;
+    }
+    m_contentDirty = false;
 
     const GridModel *g = grid();
     HighlightTable *h = hl();
@@ -404,12 +583,20 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*dat
     m_bgPool.beginFrame(m_bgRoot, window());
     m_linePool.beginFrame(m_lineRoot, window());
     m_textPool.beginFrame(m_textRoot, window());
+    m_scrollBgPool.beginFrame(m_scrollBgRoot, window());
+    m_scrollLinePool.beginFrame(m_scrollLineRoot, window());
+    m_scrollTextPool.beginFrame(m_scrollTextRoot, window());
 
     if(!g || !h) {
         m_bgPool.add(boundingRect(), Qt::black);
         m_bgPool.endFrame();
         m_linePool.endFrame();
         m_textPool.endFrame();
+        m_scrollBgPool.endFrame();
+        m_scrollLinePool.endFrame();
+        m_scrollTextPool.endFrame();
+        setScrollClip(QRectF());
+        applyScrollOffset();
         if(m_decoNode) {
             m_decoRoot->removeChildNode(m_decoNode);
             delete m_decoNode;
@@ -434,88 +621,98 @@ QSGNode *GridItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*dat
     // Single traversal of the grid, resolved into draw-ready runs.
     const GridRuns runs = buildGridRuns(*g, *h, m_gridId);
 
+    // The default-background clear sits behind everything; the strip paints its
+    // own per-run fills over it inside the band.
     m_bgPool.add(boundingRect(), defaultBg);
-
-    // Backing fill for rounded spans. The pill outline in the decoration layer
-    // deliberately cuts its convex corners so something other than the pill
-    // shows through, and the run loop skips per-cell background fills for
-    // rounded cells. Without these quads a pill sitting on a CursorLine would
-    // show default-coloured notches at every corner. They must live here, below
-    // the decoration texture, because that texture's corner pixels are
-    // transparent by design.
-    for(const PillSpan &s: runs.pills) {
-        if(!s.backBg.isValid() || s.backBg == defaultBg) continue;
-        const QColor pillBg = h->resolved(s.hlId).bg;
-        if(!pillBg.isValid() || pillBg == defaultBg) continue;
-        m_bgPool.add(QRectF(s.c0 * m_cellWidth, s.row * m_cellHeight, (s.c1 - s.c0) * m_cellWidth,
-                            m_cellHeight),
-                     s.backBg);
-    }
 
     // Lazy cache of per-hl_id QFont. Building a QFont and calling
     // setBold/setItalic/setStrikeOut on every run is expensive (QFontPrivate
     // detach + re-resolve). Cache keyed by hl_id is safe because
-    // HighlightTable::changed() triggers a fresh frame.
+    // HighlightTable::changed() triggers a fresh frame. Shared across the
+    // static and strip passes — same fonts either way.
     QHash<int, QFont> fontCache;
     fontCache.reserve(32);
 
-    for(const CellRun &run: runs.runs) {
-        const qreal y = run.row * m_cellHeight;
-        const QRectF runRect(run.c0 * m_cellWidth, y, (run.c1 - run.c0) * m_cellWidth,
-                             m_cellHeight);
-        if(run.fillBg) m_bgPool.add(runRect, run.bg);
+    const auto natY = [this](int r) { return r * m_cellHeight; };
+    const auto modelCell = [g, this](int r, int c) -> const Cell & {
+        return g->cell(m_gridId, r, c);
+    };
 
-        auto it = fontCache.find(run.hlId);
-        if(it == fontCache.end())
-            it = fontCache.insert(run.hlId, buildRunFont(h->resolved(run.hlId)));
+    const bool composite =
+        m_scroll.active(nowMs) && m_stripSource.valid && m_stripSource.animatable;
+    if(composite) {
+        const int top = m_stripSource.top;
+        const int bot = m_stripSource.bot;
+        const int delta = m_stripSource.delta;
 
-        m_textPool.addText(run.hlId, run.text, it.value(), run.fg,
-                           QPointF(run.c0 * m_cellWidth, y + m_baseline));
+        // Static rows below the scrolled band (statusline / cmdline) render at
+        // their natural position in the untransformed pools.
+        renderRuns(runs, *h, *this, m_bgPool, m_textPool, m_linePool, fontCache, m_cellWidth,
+                   m_cellHeight, m_baseline, underlineThickness, defaultBg, bot, rows, natY,
+                   modelCell);
 
-        if(run.underline) {
-            m_linePool.add(QRectF(runRect.left(), y + m_cellHeight - underlineThickness,
-                                  runRect.width(), underlineThickness),
-                           run.fg);
+        // Moved region rows [top, bot) into the strip at natural y; the eased
+        // offset is applied by the transform node, not baked into y.
+        renderRuns(runs, *h, *this, m_scrollBgPool, m_scrollTextPool, m_scrollLinePool, fontCache,
+                   m_cellWidth, m_cellHeight, m_baseline, underlineThickness, defaultBg, top, bot,
+                   natY, modelCell);
+
+        // Outgoing snapshot rows at their strip placement (the rows that left
+        // the band; the model no longer holds them).
+        const GridRuns lostRuns = buildRowsRuns(m_stripSource.lost, *h);
+        const int n = static_cast<int>(m_stripSource.lost.size());
+        const QVector<StripRow> placements = stripRowPlacements(delta, top, bot, m_cellHeight);
+        QHash<int, qreal> lostY;
+        lostY.reserve(n);
+        for(const StripRow &p: placements)
+            if(p.fromLost) lostY.insert(p.index, p.baseY);
+        const auto lostYMap = [&lostY](int k) { return lostY.value(k); };
+        const auto lostCell = [this](int r, int c) -> const Cell & {
+            return m_stripSource.lost[r][c];
+        };
+        renderRuns(lostRuns, *h, *this, m_scrollBgPool, m_scrollTextPool, m_scrollLinePool,
+                   fontCache, m_cellWidth, m_cellHeight, m_baseline, underlineThickness, defaultBg,
+                   0, n, lostYMap, lostCell);
+
+        setScrollClip(QRectF(0, top * m_cellHeight, width(), (bot - top) * m_cellHeight));
+
+        // Decorations (rounded pills / undercurls) are skipped for the ~80 ms
+        // ease: they are rare and a static texture at final positions under the
+        // sliding strip would look wrong. They return on the next content frame.
+        if(m_decoNode) {
+            m_decoRoot->removeChildNode(m_decoNode);
+            delete m_decoNode;
+            m_decoNode = nullptr;
         }
+    } else {
+        renderRuns(runs, *h, *this, m_bgPool, m_textPool, m_linePool, fontCache, m_cellWidth,
+                   m_cellHeight, m_baseline, underlineThickness, defaultBg, 0, rows, natY,
+                   modelCell);
+
+        if(m_debugOverlay) {
+            QFont overlayFont = m_font;
+            overlayFont.setBold(true);
+            const QString dump = g->dumpAscii(m_gridId);
+            int rr = 0;
+            for(const QString &line: dump.split(QLatin1Char('\n'))) {
+                m_textPool.addText(INT_MIN, line, overlayFont, QColor(255, 0, 0, 200),
+                                   QPointF(0, (rr * m_cellHeight) + m_baseline));
+                ++rr;
+            }
+        }
+
+        setScrollClip(QRectF());
+        updateDecorations(runs, h);
     }
 
-    // PUA pass. Qt's shaper gives Private Use Area codepoints a zero advance
-    // (QTBUG-116417), so a run containing several of them collapses into one
-    // spot. Laying out each PUA cell separately at its own x sidesteps the
-    // broken advance entirely — the grid supplies every position itself, so the
-    // shaper is never asked to place one PUA glyph relative to another. Cells
-    // outside the PUA keep the whole-run path, and with it Qt's automatic font
-    // fallback (what makes U+1F600 resolve to the system emoji font).
-    for(const PuaCluster &cluster: runs.puaClusters) {
-        auto it = fontCache.find(cluster.hlId);
-        if(it == fontCache.end())
-            it = fontCache.insert(cluster.hlId, buildRunFont(h->resolved(cluster.hlId)));
-        const QColor fg = h->resolved(cluster.hlId).fg;
-        const qreal y = cluster.row * m_cellHeight;
-        for(int c = cluster.c0; c < cluster.c1; ++c) {
-            const Cell &pcell = g->cell(m_gridId, cluster.row, c);
-            if(pcell.doubleWidth || pcell.text.isEmpty()) continue;
-            m_textPool.addText(cluster.hlId, pcell.text, it.value(), fg,
-                               QPointF(c * m_cellWidth, y + m_baseline));
-        }
-    }
-
-    if(m_debugOverlay) {
-        QFont overlayFont = m_font;
-        overlayFont.setBold(true);
-        const QString dump = g->dumpAscii(m_gridId);
-        int rr = 0;
-        for(const QString &line: dump.split(QLatin1Char('\n'))) {
-            m_textPool.addText(INT_MIN, line, overlayFont, QColor(255, 0, 0, 200),
-                               QPointF(0, (rr * m_cellHeight) + m_baseline));
-            ++rr;
-        }
-    }
+    applyScrollOffset();
 
     m_bgPool.endFrame();
     m_linePool.endFrame();
     m_textPool.endFrame();
-    updateDecorations(runs, h);
+    m_scrollBgPool.endFrame();
+    m_scrollLinePool.endFrame();
+    m_scrollTextPool.endFrame();
 
     if(kProfilePaint) {
         const qint64 ns = paintTimer.nsecsElapsed();

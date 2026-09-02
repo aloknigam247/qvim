@@ -2,6 +2,7 @@
 #define GRIDMODEL_H
 
 #include <msgpack.hpp>
+#include <utility>
 #include <QHash>
 #include <QList>
 #include <QObject>
@@ -16,6 +17,23 @@ struct Cell {
     QString text;
     int hlId = 0;
     bool doubleWidth = false;
+};
+
+// Outgoing-row snapshot for the smooth-scroll animation, recorded by scroll()
+// and consumed once per flush by GridItem via takeScroll(). `lost` holds the
+// |delta| rows that left the region (cheap implicitly-shared QVector<Cell>
+// handles, captured before the rotate discards them). `animatable` is false
+// when a scroll happened but is not eligible for animation (partial width,
+// top != 0, whole-region jump, sub-grid) or when another content-changing op
+// (a second scroll, clear, resize) landed in the same flush batch — in which
+// case the animation must snap instead of ease.
+struct PendingScroll {
+    bool valid = false;
+    bool animatable = false;
+    int delta = 0;
+    int top = 0;
+    int bot = 0;
+    QVector<QVector<Cell>> lost;
 };
 
 // Per-grid surface state. With ext_multigrid every window has its own grid;
@@ -50,6 +68,10 @@ struct GridSurface {
     // paint loop. Initial value true to ensure the first paint after
     // construction runs.
     bool dirty = true;
+
+    // Consumed once per flush by GridItem to drive the smooth-scroll animation.
+    // Reset by takeScroll(); overwritten by the next scroll() in the batch.
+    PendingScroll pendingScroll;
 };
 
 // QObject wrapper exposing one grid's geometry as bindable properties. QML
@@ -226,6 +248,19 @@ public:
     bool isDirty(int gridId) const {
         const auto *s = surface(gridId);
         return s && s->dirty;
+    }
+
+    // Consume the pending scroll record for a grid (move out + reset), mirroring
+    // takeDirty. Called by GridItem::onFlush to decide whether to ease (a valid,
+    // animatable scroll) or snap (a scroll that isn't animatable, or a
+    // batch-level content change). Returns an invalid record when no scroll
+    // happened this batch.
+    PendingScroll takeScroll(int gridId) {
+        auto *s = surface(gridId);
+        if(!s) return {};
+        PendingScroll out = std::move(s->pendingScroll);
+        s->pendingScroll = PendingScroll{};
+        return out;
     }
 
     QString dumpAscii() const { return dumpAscii(m_active); }

@@ -7,6 +7,7 @@
 
 namespace qvim {
 
+struct Cell;
 class GridModel;
 class HighlightTable;
 
@@ -78,6 +79,12 @@ bool isPuaChar(QChar c);
 // (GridModel, HighlightTable, gridId) — no painter, no window, no font, which
 // is what makes it unit-testable headlessly.
 GridRuns buildGridRuns(const GridModel &grid, const HighlightTable &hl, int gridId);
+
+// Same resolution over an explicit block of rows (each exactly `cols` wide),
+// used to render the snapshotted outgoing rows of a smooth scroll. `row` on
+// every emitted run/cluster/span is the index into `cellRows`. Shares the
+// per-row logic with buildGridRuns so the two never drift.
+GridRuns buildRowsRuns(const QVector<QVector<Cell>> &cellRows, const HighlightTable &hl);
 
 } // namespace qvim
 

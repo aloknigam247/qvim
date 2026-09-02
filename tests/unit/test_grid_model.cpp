@@ -111,6 +111,99 @@ private slots:
         QCOMPARE(g.cursorCol(), 3);
     }
 
+    // Smooth-scroll snapshot — feeds GridItem's ease/snap decision via takeScroll.
+
+    void scrollRecordsAnimatableDown() {
+        // Full-width, top-anchored, sub-region scroll up by 1: the ordinary j
+        // motion. Records an animatable snapshot of the outgoing top row.
+        GridModel g;
+        g.resize(3, 3);
+        auto row0 = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
+        auto row1 = packGridLineCells({ { "d", 1, -1 }, { "e", 1, -1 }, { "f", 1, -1 } });
+        auto row2 = packGridLineCells({ { "g", 1, -1 }, { "h", 1, -1 }, { "i", 1, -1 } });
+        g.applyLine(0, 0, row0.get());
+        g.applyLine(1, 0, row1.get());
+        g.applyLine(2, 0, row2.get());
+        g.scroll(0, 3, 0, 3, 1);
+
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);
+        QVERIFY(ps.animatable);
+        QCOMPARE(ps.delta, 1);
+        QCOMPARE(ps.top, 0);
+        QCOMPARE(ps.bot, 3);
+        QCOMPARE(ps.lost.size(), 1);
+        QCOMPARE(ps.lost[0][0].text, QStringLiteral("a"));
+        QCOMPARE(ps.lost[0][2].text, QStringLiteral("c"));
+
+        // Consumed: a second take in the same batch is invalid.
+        QVERIFY(!g.takeScroll(1).valid);
+    }
+
+    void scrollRecordsAnimatableUpCapturesBottomRow() {
+        // Scroll down by 1 (rows == -1): the outgoing rows leave the bottom.
+        GridModel g;
+        g.resize(3, 3);
+        auto row0 = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
+        auto row1 = packGridLineCells({ { "d", 1, -1 }, { "e", 1, -1 }, { "f", 1, -1 } });
+        auto row2 = packGridLineCells({ { "g", 1, -1 }, { "h", 1, -1 }, { "i", 1, -1 } });
+        g.applyLine(0, 0, row0.get());
+        g.applyLine(1, 0, row1.get());
+        g.applyLine(2, 0, row2.get());
+        g.scroll(0, 3, 0, 3, -1);
+
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);
+        QVERIFY(ps.animatable);
+        QCOMPARE(ps.delta, -1);
+        QCOMPARE(ps.lost.size(), 1);
+        QCOMPARE(ps.lost[0][0].text, QStringLiteral("g"));
+        QCOMPARE(ps.lost[0][2].text, QStringLiteral("i"));
+    }
+
+    void partialWidthScrollNotAnimatable() {
+        // A split with sibling columns to the side (right < cols) is a valid
+        // scroll but must not ease.
+        GridModel g;
+        g.resize(4, 3);
+        g.scroll(0, 3, 0, 3, 1); // right == 3 != cols == 4
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);
+        QVERIFY(!ps.animatable);
+        QVERIFY(ps.lost.isEmpty());
+    }
+
+    void secondScrollInBatchDemotesToSnap() {
+        GridModel g;
+        g.resize(3, 3);
+        g.scroll(0, 3, 0, 3, 1);
+        g.scroll(0, 3, 0, 3, 1); // two scrolls collapsed into one flush = big jump
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);
+        QVERIFY(!ps.animatable);
+    }
+
+    void clearAfterScrollDemotesToSnap() {
+        GridModel g;
+        g.resize(3, 3);
+        g.scroll(0, 3, 0, 3, 1);
+        g.clear();
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);       // a scroll did happen
+        QVERIFY(!ps.animatable); // but the clear cancels the ease
+    }
+
+    void wholeRegionScrollNotAnimatable() {
+        // delta == region height: the whole band is replaced, nothing survives
+        // to slide, so it is a jump, not an ease.
+        GridModel g;
+        g.resize(3, 3);
+        g.scroll(0, 3, 0, 3, 3);
+        auto ps = g.takeScroll(1);
+        QVERIFY(ps.valid);
+        QVERIFY(!ps.animatable);
+    }
+
     void wideGlyphMarksRightHalf() {
         // A wide glyph (CJK) is emitted by Neovim as the glyph followed by an
         // entry with empty text marking the trailing half. The model should

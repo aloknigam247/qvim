@@ -96,6 +96,7 @@ void GridModel::resize(int gridId, int cols, int rows) {
     s.cellRows.resize(rows);
     for(auto &row: s.cellRows) { row.assign(cols, Cell{ QStringLiteral(" "), 0, false }); }
     s.dirty = true;
+    s.pendingScroll.animatable = false; // a resize in the batch cancels smooth scroll
     ensureProxy(gridId)->setSize(cols, rows);
     emit sizeChanged();
 }
@@ -107,6 +108,7 @@ void GridModel::clear(int gridId) {
         for(auto &c: row) c = Cell{ QStringLiteral(" "), 0, false };
     }
     s->dirty = true;
+    s->pendingScroll.animatable = false; // a clear in the batch cancels smooth scroll
 }
 
 void GridModel::applyLine(int gridId, int row, int colStart, const msgpack::object &cellsArr) {
@@ -174,6 +176,37 @@ void GridModel::scroll(int gridId, int top, int bot, int left, int right, int ro
     if(!s) return;
     s->dirty = true;
 
+    // Record the outgoing rows for the smooth-scroll animation. A record is
+    // animatable only for a full-width, top-anchored, sub-region scroll on the
+    // global grid — the case ordinary j/k text scrolling produces with
+    // ext_multigrid off. A second scroll in the same batch (or the non-
+    // animatable shapes) demotes the record to a snap: GridItem still sees a
+    // valid scroll happened, but must not ease it.
+    const int n = rows > 0 ? rows : -rows;
+    const bool animatableShape =
+        gridId == 1 && left == 0 && right == s->cols && top == 0 && n < (bot - top);
+    if(s->pendingScroll.valid) {
+        // Multiple scrolls collapsed into one flush = a large movement; snap.
+        s->pendingScroll.animatable = false;
+    } else if(animatableShape) {
+        s->pendingScroll.valid = true;
+        s->pendingScroll.animatable = true;
+        s->pendingScroll.delta = rows;
+        s->pendingScroll.top = top;
+        s->pendingScroll.bot = bot;
+        s->pendingScroll.lost.resize(n);
+        if(rows > 0) {
+            // Content moves up: the top n rows leave.
+            for(int k = 0; k < n; ++k) s->pendingScroll.lost[k] = s->cellRows[top + k];
+        } else {
+            // Content moves down: the bottom n rows leave.
+            for(int k = 0; k < n; ++k) s->pendingScroll.lost[k] = s->cellRows[bot - n + k];
+        }
+    } else {
+        s->pendingScroll.valid = true;
+        s->pendingScroll.animatable = false;
+    }
+
     // Fast path: a full-width scroll (left/right cover the whole grid) is what
     // j/k/Ctrl-D/Ctrl-U emit at 200x60. Rotating the QVector<Cell> row handles
     // is O(rows) implicit-share-pointer swaps regardless of cols, where the
@@ -185,7 +218,6 @@ void GridModel::scroll(int gridId, int top, int bot, int left, int right, int ro
             std::rotate(s->cellRows.begin() + top, s->cellRows.begin() + top + rows,
                         s->cellRows.begin() + bot);
         } else {
-            const int n = -rows;
             std::rotate(s->cellRows.begin() + top, s->cellRows.begin() + bot - n,
                         s->cellRows.begin() + bot);
         }
@@ -203,7 +235,6 @@ void GridModel::scroll(int gridId, int top, int bot, int left, int right, int ro
             std::copy(src.begin() + left, src.begin() + right, dst.begin() + left);
         }
     } else {
-        const int n = -rows;
         for(int r = bot - 1; r >= top + n; --r) {
             const QVector<Cell> &src = s->cellRows[r - n];
             QVector<Cell> &dst = s->cellRows[r];

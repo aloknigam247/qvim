@@ -85,6 +85,51 @@ private slots:
                  qPrintable(QStringLiteral("median scroll latency %1us exceeds 500us ceiling")
                                 .arg(medianNs / 1000)));
     }
+
+    void scrollThenApplyLine200x60() {
+        // The smooth-scroll path adds two things to a plain scroll: the outgoing
+        // rows are snapshotted (one implicitly-shared row-handle copy per moved
+        // row) and the revealed row, now sharing its storage with the snapshot,
+        // is detached on the following grid_line. This benchmark times the
+        // realistic per-scroll cost — scroll + one full-width applyLine on the
+        // revealed row — so a regression in the snapshot/detach cost is caught
+        // in tier-1 CI, not only as visible lag.
+        constexpr int kCols = 200;
+        constexpr int kRows = 60;
+        constexpr int kIters = 100;
+
+        GridModel g;
+        g.resize(kCols, kRows);
+        auto cells = packRepeatedCells("x", 1, kCols);
+        for(int r = 0; r < kRows; ++r) { g.applyLine(r, 0, cells.get()); }
+
+        for(int i = 0; i < 5; ++i) {
+            g.scroll(0, kRows, 0, kCols, 1);
+            g.applyLine(kRows - 1, 0, cells.get());
+        }
+
+        std::vector<qint64> samples;
+        samples.reserve(kIters);
+        QElapsedTimer t;
+        for(int i = 0; i < kIters; ++i) {
+            t.start();
+            g.scroll(0, kRows, 0, kCols, 1);        // snapshots the outgoing row
+            g.applyLine(kRows - 1, 0, cells.get()); // detaches the revealed row
+            samples.push_back(t.nsecsElapsed());
+        }
+
+        std::sort(samples.begin(), samples.end());
+        const qint64 medianNs = samples[samples.size() / 2];
+        const qint64 p95Ns = samples[(samples.size() * 95) / 100];
+
+        qDebug("GridModel::scroll+applyLine 200x60: median=%lld us  p95=%lld us  iters=%d",
+               medianNs / 1000, p95Ns / 1000, kIters);
+
+        QVERIFY2(
+            medianNs < 500'000,
+            qPrintable(QStringLiteral("median scroll+applyLine latency %1us exceeds 500us ceiling")
+                           .arg(medianNs / 1000)));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestScrollPerfMicro)
