@@ -55,6 +55,94 @@ jobs:
             throw "clang-format found unformatted code. Run: clang-format -i --style=file:.clang-format <files>"
           }
 
+  # Enforce the clang-tidy check set (.clang-tidy) over the first-party translation
+  # units (src/ + include/). clang-tidy needs the real compile flags, so this restores
+  # Qt and configures the Ninja `tidy` preset to emit compile_commands.json, then runs
+  # clang-tidy per TU. Diagnostics are path-scoped to src/ + include/ so the vendored
+  # msgpack analyzer note (out of our tree, not fixable here) can never gate the build.
+  # clang-tidy is version-pinned like clang-format: tidy diagnostics drift across major
+  # releases, so an unpinned newer default would flag or miss checks unpredictably.
+  tidy:
+    name: tidy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-qvim
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # The Ninja `tidy` preset drives cl directly (unlike the VS-generator dev
+      # preset, which locates the toolset itself), so cl + the MSVC env must be on
+      # PATH before configure.
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install clang-tidy
+        run: pip install clang-tidy==22.1.8
+
+      - name: Guard against /*unused*/ parameter placeholders
+        shell: pwsh
+        # readability-named-parameter wants an unused parameter documented with a
+        # descriptive /* name */ comment, not a bare /*unused*/ placeholder. clang-tidy
+        # accepts the latter, so guard it here to keep the intent readable.
+        run: |
+          $hits = git ls-files 'src/*.cpp' 'src/*.h' 'include/*.h' 'include/*.hpp' |
+            Select-String -Pattern '/\*\s*unused\s*\*/'
+          if ($hits) {
+            $hits | ForEach-Object { Write-Host $_.ToString() }
+            throw "Found /*unused*/ placeholder(s). Name the parameter in a /* descriptive */ comment instead."
+          }
+
+      - name: Configure tidy preset (compile_commands.json)
+        shell: pwsh
+        run: |
+          cmake --preset tidy
+          if ($LASTEXITCODE -ne 0) { throw "tidy preset configure failed with exit code $LASTEXITCODE." }
+          if (-not (Test-Path build/tidy/compile_commands.json)) {
+            throw "build/tidy/compile_commands.json was not generated."
+          }
+
+      - name: Run clang-tidy
+        shell: pwsh
+        # Assert every tracked src/ TU is in the compile DB (guards against clang-tidy
+        # silently analyzing nothing), then run it per TU and keep only diagnostics
+        # whose file resolves under src/ or include/ — vendored/build-tree paths (e.g.
+        # msgpack under build/tidy/vcpkg_installed) are dropped so they cannot gate.
+        run: |
+          $db = Get-Content build/tidy/compile_commands.json -Raw | ConvertFrom-Json
+          $dbFiles = $db | ForEach-Object { ($_.file -replace '/', '\').ToLower() }
+          $tus = git ls-files 'src/*.cpp'
+          if (-not $tus) { throw "no src/*.cpp translation units matched." }
+          $root = (git rev-parse --show-toplevel) -replace '/', '\'
+          foreach ($tu in $tus) {
+            $abs = (Join-Path $root ($tu -replace '/', '\')).ToLower()
+            if ($dbFiles -notcontains $abs) {
+              throw "TU '$tu' is missing from compile_commands.json — clang-tidy would not analyze it."
+            }
+          }
+          Write-Host "confirmed $($tus.Count) src/ TU(s) present in the compile DB"
+          $findings = [System.Collections.Generic.List[string]]::new()
+          foreach ($tu in $tus) {
+            Write-Host "== clang-tidy $tu =="
+            $out = clang-tidy -p build/tidy --quiet "$tu" 2>&1 | Out-String
+            Write-Host $out
+            foreach ($line in ($out -split "`n")) {
+              if ($line -match '^(.*?):\d+:\d+:\s+(warning|error):') {
+                $norm = $Matches[1] -replace '/', '\'
+                if ($norm -match '\\(src|include)\\' -and $norm -notmatch 'vcpkg_installed' -and $norm -notmatch '\\build\\') {
+                  $findings.Add($line.Trim())
+                }
+              }
+            }
+          }
+          if ($findings.Count -gt 0) {
+            Write-Host "`n=== first-party clang-tidy findings (src/ + include/) ==="
+            $findings | Sort-Object -Unique | ForEach-Object { Write-Host $_ }
+            throw "clang-tidy reported first-party finding(s); the .clang-tidy set must stay baseline-clean."
+          }
+          Write-Host "clang-tidy: 0 first-party findings across $($tus.Count) TU(s)."
+
   # Seed the vcpkg binary cache AND compile qvim exactly once. On a cold cache
   # the setup-qvim configure cold-builds Qt (~1-3 h) and pushes it to the NuGet
   # feed; every later job then RESTORES Qt in minutes. Compiling here (not in
