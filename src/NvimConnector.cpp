@@ -14,29 +14,65 @@
 
 namespace qvim {
 
-static QString asQString(const msgpack::object &o) {
+namespace {
+QString asQString(const msgpack::object &o) {
     if(o.type != msgpack::type::STR) return {};
     return QString::fromUtf8(o.via.str.ptr, o.via.str.size);
 }
 
-static bool asBool(const msgpack::object &o, bool def = false) {
+bool asBool(const msgpack::object &o, bool def = false) {
     if(o.type == msgpack::type::BOOLEAN) return o.via.boolean;
     return def;
 }
 
-static int64_t asInt(const msgpack::object &o, int64_t def = 0) {
+int64_t asInt(const msgpack::object &o, int64_t def = 0) {
     if(o.type == msgpack::type::POSITIVE_INTEGER) return static_cast<int64_t>(o.via.u64);
     if(o.type == msgpack::type::NEGATIVE_INTEGER) return o.via.i64;
     return def;
 }
 
+// The single source of truth for the nvim_ui_attach option map. Initial attach
+// and the :restart re-attach both pack through here so their UI options can never
+// diverge. Diagnostic mode: every non-core extension is disabled to bisect the
+// residual focus-loss-after-':' bug — flip a bool back to true once the offending
+// feature is found. The C++ handlers, QML overlays, and models stay wired; nvim
+// simply won't emit the events that drive them.
+void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows) {
+    pk.pack_array(3);
+    pk.pack(static_cast<int64_t>(cols));
+    pk.pack(static_cast<int64_t>(rows));
+    pk.pack_map(8);
+    pk.pack("rgb");
+    pk.pack(true);
+    pk.pack("ext_linegrid");
+    pk.pack(true);
+    pk.pack("ext_hlstate");
+    pk.pack(true);
+    pk.pack("ext_multigrid");
+    pk.pack(false);
+    pk.pack("ext_tabline");
+    pk.pack(false);
+    pk.pack("ext_popupmenu");
+    pk.pack(false);
+    pk.pack("ext_cmdline");
+    pk.pack(false);
+    pk.pack("ext_messages");
+    pk.pack(false);
+}
+} // namespace
+
 NvimConnector::NvimConnector(QObject *parent) :
     QObject(parent), m_rpc(new MsgpackRpc(this)), m_grid(new GridModel(this)),
     m_hl(new HighlightTable(this)), m_messages(new MessagesModel(this)), m_mode(new ModeInfo(this)),
     m_tabline(new TablineModel(this)), m_popupmenu(new PopupMenuModel(this)),
-    m_cmdline(new CmdlineModel(this)), m_resizeCoalescer(new ResizeCoalescer(this)) {
+    m_cmdline(new CmdlineModel(this)), m_resizeCoalescer(new ResizeCoalescer(this)),
+    m_restartTimer(new QTimer(this)) {
+    m_restartTimer->setSingleShot(true);
     connect(m_rpc, &MsgpackRpc::notification, this, &NvimConnector::onNotification);
-    connect(m_rpc, &MsgpackRpc::disconnected, this, &NvimConnector::onRpcDisconnected);
+    connect(m_rpc, &MsgpackRpc::transportClosed, this, &NvimConnector::onRpcDisconnected);
+    connect(m_rpc, &MsgpackRpc::connected, this, &NvimConnector::onRestartConnected);
+    connect(m_rpc, &MsgpackRpc::transportError, this, &NvimConnector::onRestartFailed);
+    connect(m_restartTimer, &QTimer::timeout, this, &NvimConnector::onRestartFailed);
     connect(m_resizeCoalescer, &ResizeCoalescer::resizeRequested, this, &NvimConnector::tryResize);
 }
 
@@ -46,6 +82,7 @@ bool NvimConnector::start(const QString &nvimExe, const QStringList &nvimForward
     return m_rpc->startEmbeddedNvim(nvimExe, nvimForwardArgs);
 }
 
+namespace {
 // Same parsing the GridItem uses for its own font selection. Centralised here
 // so QML overlays can bind via Q_PROPERTY without duplicating the regex.
 // Before nvim's first option_set arrives we defer to the OS-supplied fixed
@@ -53,21 +90,21 @@ bool NvimConnector::start(const QString &nvimExe, const QStringList &nvimForward
 // qvim doesn't impose its own font choice.
 constexpr qreal kDefaultGuifontSize = 14.0;
 
-static QString systemFixedFontFamily() {
+QString systemFixedFontFamily() {
     // Cached on first call so QFontDatabase isn't queried on every property
     // read. Safe because the platform's fixed font doesn't change at runtime.
     static const QString cached = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
     return cached;
 }
 
-static void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
+void parseGuifontImpl(const QString &guifont, QString &family, qreal &size) {
     if(guifont.isEmpty()) return;
     const auto parts = guifont.split(QLatin1Char(':'));
     if(parts.isEmpty()) return;
     family = parts.first();
     family.replace(QLatin1Char('_'), QLatin1Char(' '));
     for(int i = 1; i < parts.size(); ++i) {
-        const QString &p = parts.at(i);
+        const QString p = parts.at(i);
         if(p.startsWith(QLatin1Char('h')) && p.size() > 1) {
             bool ok = false;
             const qreal v = p.mid(1).toDouble(&ok);
@@ -75,6 +112,7 @@ static void parseGuifontImpl(const QString &guifont, QString &family, qreal &siz
         }
     }
 }
+} // namespace
 
 QString NvimConnector::guifontFamily() const {
     QString family = systemFixedFontFamily();
@@ -91,33 +129,11 @@ qreal NvimConnector::guifontSize() const {
 }
 
 bool NvimConnector::attachUi(int cols, int rows) {
+    m_currentCols = cols;
+    m_currentRows = rows;
     m_rpc->request(QStringLiteral("nvim_ui_attach"),
                    [cols, rows](msgpack::packer<msgpack::sbuffer> &pk) {
-        pk.pack_array(3);
-        pk.pack(static_cast<int64_t>(cols));
-        pk.pack(static_cast<int64_t>(rows));
-        // Diagnostic mode: every non-core extension disabled to bisect the
-        // residual focus-loss-after-':' bug. Re-enable by flipping the
-        // matching bool back to true once the offending feature is found.
-        // The C++ dispatch handlers, QML overlays, and models all remain
-        // wired in — nvim simply won't emit the events that drive them.
-        pk.pack_map(8);
-        pk.pack("rgb");
-        pk.pack(true);
-        pk.pack("ext_linegrid");
-        pk.pack(true);
-        pk.pack("ext_hlstate");
-        pk.pack(true);
-        pk.pack("ext_multigrid");
-        pk.pack(false);
-        pk.pack("ext_tabline");
-        pk.pack(false);
-        pk.pack("ext_popupmenu");
-        pk.pack(false);
-        pk.pack("ext_cmdline");
-        pk.pack(false);
-        pk.pack("ext_messages");
-        pk.pack(false);
+        packAttachOptions(pk, cols, rows);
     }, [this](RpcResult res) {
         if(res) {
             m_attached = true;
@@ -162,21 +178,22 @@ bool NvimConnector::attachUi(int cols, int rows) {
     return true;
 }
 
-static QVariant msgpackToVariant(const msgpack::object &o) {
+namespace {
+QVariant msgpackToVariant(const msgpack::object &o) {
     switch(o.type) {
         case msgpack::type::NIL:
             return {};
         case msgpack::type::BOOLEAN:
-            return { o.via.boolean };
+            return QVariant(o.via.boolean);
         case msgpack::type::POSITIVE_INTEGER:
-            return { static_cast<qulonglong>(o.via.u64) };
+            return QVariant(static_cast<qulonglong>(o.via.u64));
         case msgpack::type::NEGATIVE_INTEGER:
-            return { static_cast<qlonglong>(o.via.i64) };
+            return QVariant(static_cast<qlonglong>(o.via.i64));
         case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT64:
-            return { o.via.f64 };
+            return QVariant(o.via.f64);
         case msgpack::type::STR:
-            return { QString::fromUtf8(o.via.str.ptr, o.via.str.size) };
+            return QVariant(QString::fromUtf8(o.via.str.ptr, o.via.str.size));
         case msgpack::type::ARRAY: {
             QVariantList list;
             list.reserve(static_cast<int>(o.via.array.size));
@@ -186,11 +203,12 @@ static QVariant msgpackToVariant(const msgpack::object &o) {
             return list;
         }
         case msgpack::type::BIN:
-            return { QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)) };
+            return QVariant(QByteArray(o.via.bin.ptr, static_cast<int>(o.via.bin.size)));
         default:
             return {};
     }
 }
+} // namespace
 
 void NvimConnector::getVar(const QString &name, GetVarCallback cb) {
     m_rpc->request(QStringLiteral("nvim_get_var"), [&name](msgpack::packer<msgpack::sbuffer> &pk) {
@@ -237,6 +255,8 @@ void NvimConnector::inputMouse(const QString &button, const QString &action,
 }
 
 void NvimConnector::tryResize(int cols, int rows) {
+    m_currentCols = cols;
+    m_currentRows = rows;
     // Sync the coalescer so any stale pending request doesn't fire after
     // this direct resize and overwrite it with old dimensions.
     m_resizeCoalescer->syncAfterDirectResize(cols, rows);
@@ -408,9 +428,58 @@ void NvimConnector::onNotification(const qvim::Notification &note) {
 }
 
 void NvimConnector::onRpcDisconnected() {
+    // The active transport closed. A pending :restart means nvim spawned a new
+    // server on m_restartListenAddr and quit the old one — reconnect instead of
+    // quitting. Keep the old frame on screen; UI state is reset only once the new
+    // socket connects (onRestartConnected), so a failed reconnect doesn't flash an
+    // empty grid.
+    if(m_restartPending) {
+        m_restartPending = false;
+        m_restartInProgress = true;
+        m_attached = false;
+        emit attachedChanged();
+        m_restartTimer->start(kRestartTimeoutMs);
+        m_rpc->connectToAddress(m_restartListenAddr);
+        return;
+    }
     m_attached = false;
     emit attachedChanged();
     emit disconnected();
+}
+
+void NvimConnector::onRestartConnected() {
+    if(!m_restartInProgress) return;
+    m_restartInProgress = false;
+    m_restartTimer->stop();
+    m_restartedOverSocket = true;
+    // Reset immediately before consuming the new server's first redraw batch so no
+    // stale grid/highlight/mode/overlay state survives, then re-attach at the live
+    // grid size with the same UI options as the initial attach.
+    resetUiState();
+    attachUi(m_currentCols, m_currentRows);
+}
+
+void NvimConnector::onRestartFailed() {
+    // Connect timeout or socket error during a restart handoff. There is no server
+    // to fall back to, so surface the disconnect and let the app quit.
+    if(!m_restartInProgress) return;
+    m_restartInProgress = false;
+    m_restartTimer->stop();
+    m_attached = false;
+    emit attachedChanged();
+    emit disconnected();
+}
+
+void NvimConnector::resetUiState() {
+    m_grid->reset();
+    m_hl->clear();
+    m_mode->reset();
+    m_tabline->clear();
+    m_popupmenu->hide();
+    m_cmdline->hide();
+    m_cmdline->blockHide();
+    m_messages->reset();
+    emit defaultBackgroundChanged();
 }
 
 void NvimConnector::handleRedraw(const msgpack::object &events) {
@@ -520,18 +589,16 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "default_colors_set") {
         if(a.size >= 4) {
-            m_hl->setDefaultColors(static_cast<int>(asInt(a.ptr[0], -1)),
-                                   static_cast<int>(asInt(a.ptr[1], -1)),
-                                   static_cast<int>(asInt(a.ptr[2], -1)));
+            m_hl->setDefaultColors(asInt(a.ptr[0], -1), asInt(a.ptr[1], -1), asInt(a.ptr[2], -1));
             emit defaultBackgroundChanged();
         }
         return;
     }
     if(name == "hl_attr_define") {
         if(a.size >= 4) {
-            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1], &a.ptr[3]);
+            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1], &a.ptr[3]);
         } else if(a.size >= 2) {
-            m_hl->defineAttr(static_cast<int>(asInt(a.ptr[0])), a.ptr[1]);
+            m_hl->defineAttr(asInt(a.ptr[0]), a.ptr[1]);
         }
         return;
     }
@@ -540,9 +607,7 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
         return;
     }
     if(name == "mode_change") {
-        if(a.size >= 2) {
-            m_mode->setCurrentMode(asQString(a.ptr[0]), static_cast<int>(asInt(a.ptr[1])));
-        }
+        if(a.size >= 2) m_mode->setCurrentMode(asQString(a.ptr[0]), asInt(a.ptr[1]));
         return;
     }
     if(name == "tabline_update") {
@@ -551,13 +616,12 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "popupmenu_show") {
         if(a.size >= 4) {
-            m_popupmenu->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])),
-                              static_cast<int>(asInt(a.ptr[2])), static_cast<int>(asInt(a.ptr[3])));
+            m_popupmenu->show(a.ptr[0], asInt(a.ptr[1]), asInt(a.ptr[2]), asInt(a.ptr[3]));
         }
         return;
     }
     if(name == "popupmenu_select") {
-        if(a.size >= 1) m_popupmenu->select(static_cast<int>(asInt(a.ptr[0])));
+        if(a.size >= 1) m_popupmenu->select(asInt(a.ptr[0]));
         return;
     }
     if(name == "popupmenu_hide") {
@@ -566,22 +630,18 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "cmdline_show") {
         if(a.size >= 6) {
-            m_cmdline->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])), asQString(a.ptr[2]),
-                            asQString(a.ptr[3]), static_cast<int>(asInt(a.ptr[4])),
-                            static_cast<int>(asInt(a.ptr[5])));
+            m_cmdline->show(a.ptr[0], asInt(a.ptr[1]), asQString(a.ptr[2]), asQString(a.ptr[3]),
+                            asInt(a.ptr[4]), asInt(a.ptr[5]));
         }
         return;
     }
     if(name == "cmdline_pos") {
-        if(a.size >= 2) {
-            m_cmdline->setPos(static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[1])));
-        }
+        if(a.size >= 2) m_cmdline->setPos(asInt(a.ptr[0]), asInt(a.ptr[1]));
         return;
     }
     if(name == "cmdline_special_char") {
         if(a.size >= 3) {
-            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]),
-                                      static_cast<int>(asInt(a.ptr[2])));
+            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]), asInt(a.ptr[2]));
         }
         return;
     }
@@ -639,6 +699,16 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     }
     if(name == "flush") {
         emit flush();
+        return;
+    }
+    if(name == "restart") {
+        // [listen_addr] — nvim spawned a new server and is about to quit the old
+        // channel. Record the address; the reconnect fires on the old-channel EOF
+        // (onRpcDisconnected), matching nvim's reference client sequence.
+        if(a.size >= 1) {
+            m_restartListenAddr = asQString(a.ptr[0]);
+            m_restartPending = true;
+        }
         return;
     }
     if(name == "msg_show") {

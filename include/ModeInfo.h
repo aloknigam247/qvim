@@ -41,6 +41,9 @@ public:
 
     void setModes(const msgpack::object &info, bool cursorStyleEnabled);
     void setCurrentMode(const QString &name, int idx);
+    // Clears all mode descriptors and the current mode. Used on :restart so no
+    // stale cursor shape survives before the new server sends mode_info_set.
+    void reset();
 
     QString currentName() const { return m_current.name; }
     int cursorShapeInt() const { return static_cast<int>(m_current.shape); }

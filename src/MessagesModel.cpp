@@ -117,6 +117,27 @@ void MessagesModel::msgRuler(const msgpack::object &content) {
     emit rulerChanged();
 }
 
+void MessagesModel::reset() {
+    if(!m_items.isEmpty()) {
+        beginResetModel();
+        m_items.clear();
+        endResetModel();
+        emit countChanged();
+    }
+    if(!m_mode.isEmpty()) {
+        m_mode.clear();
+        emit modeChanged();
+    }
+    if(!m_cmd.isEmpty()) {
+        m_cmd.clear();
+        emit cmdChanged();
+    }
+    if(!m_ruler.isEmpty()) {
+        m_ruler.clear();
+        emit rulerChanged();
+    }
+}
+
 int MessagesModel::rowCount(const QModelIndex &parent) const {
     return parent.isValid() ? 0 : static_cast<int>(m_items.size());
 }

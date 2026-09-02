@@ -143,6 +143,11 @@ public:
     void setHidden(int gridId);
     void setViewport(int gridId, int topline, int botline, int curline, int curcol);
 
+    // Drops every grid except the global grid (1) and clears grid 1 back to a
+    // fresh-attach baseline. Used on :restart before the new server's first
+    // redraw batch so no stale window/float/cell state survives the reconnect.
+    void reset();
+
     // --- Single-grid API (kept for back-compat: delegates to grid 1) ---
     void resize(int cols, int rows) { resize(1, cols, rows); }
     void clear() { clear(1); }

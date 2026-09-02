@@ -224,6 +224,29 @@ void GridModel::setCursor(int gridId, int row, int col) {
     emit cursorChanged();
 }
 
+void GridModel::reset() {
+    // Retire every non-global grid and its proxy (mirrors destroyGrid so QML
+    // delegates unbind cleanly), then reset the global grid to an empty surface.
+    for(auto it = m_proxies.begin(); it != m_proxies.end();) {
+        if(it.key() != 1) {
+            it.value()->deleteLater();
+            it = m_proxies.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for(auto it = m_grids.begin(); it != m_grids.end();) {
+        if(it.key() != 1) it = m_grids.erase(it);
+        else ++it;
+    }
+    m_grids[1] = GridSurface{};
+    m_active = 1;
+    if(auto *p = surfaceFor(1)) p->setSize(0, 0);
+    emit gridsChanged();
+    emit sizeChanged();
+    emit cursorChanged();
+}
+
 void GridModel::destroyGrid(int gridId) {
     if(gridId == 1) return; // never destroy the global grid
     if(m_grids.remove(gridId)) {

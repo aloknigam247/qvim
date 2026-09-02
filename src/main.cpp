@@ -251,6 +251,11 @@ int main(int argc, char *argv[]) {
 
     if(!engine.rootObjects().isEmpty()) {
         if(auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+            // Bring the window to the foreground the first time it becomes
+            // visible. Main.qml shows asynchronously after the post-attach
+            // resize, by which point the launching shell has returned and
+            // another window may hold the foreground.
+            windowChrome.activateOnShow(w);
             QObject::connect(w, &QQuickWindow::frameSwapped, &app, [&boot]() {
                 static bool firstFrameSeen = false;
                 if(firstFrameSeen) return;
