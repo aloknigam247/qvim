@@ -47,7 +47,7 @@ struct BootProfile {
         outFile(qEnvironmentVariable("QVIM_BOOT_PROFILE_FILE")) {
         if(enabled) timer.start();
     }
-    void mark(const char *phase) {
+    void mark(const char *phase) const {
         if(!enabled) return;
         const qint64 ms = timer.elapsed();
         qDebug().noquote() << "[boot]" << phase << ms << "ms";

@@ -345,7 +345,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
             QPainterPath path;
             path.moveTo(left, yy);
             for(int i = 0;; ++i) {
-                const qreal x = left + i * 4.0;
+                const qreal x = left + (i * 4.0);
                 if(x >= right) break;
                 path.quadTo(x + 1.0, yy + 2.0, x + 2.0, yy);
                 path.quadTo(x + 3.0, yy - 2.0, x + 4.0, yy);
