@@ -90,7 +90,7 @@ static QString formatToolArgs(const QJsonObject &args) {
     }
     const QString command = firstString(args, { u"command", u"cmd", u"script" });
     if(!command.isEmpty()) return truncate(command, 200);
-    const QString path = firstString(args, { u"path", u"filePath", u"file", u"filename" });
+    QString path = firstString(args, { u"path", u"filePath", u"file", u"filename" });
     if(!path.isEmpty()) return path;
     const QString pattern = firstString(args, { u"pattern" });
     if(!pattern.isEmpty()) return truncate(pattern, 200);

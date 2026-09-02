@@ -26,14 +26,14 @@ CellMetrics computeCellMetrics(const QFontMetricsF &fm, int linespace, qreal dpr
         }
     }
     auto snapUnit = [unit](qreal v) -> qreal {
-        const qreal u = static_cast<qreal>(unit);
+        const auto u = static_cast<qreal>(unit);
         return std::max(u, std::round(v / u) * u);
     };
     const qreal width = snapUnit(fm.horizontalAdvance(QLatin1Char('M')));
     const qreal height = snapUnit(fm.height() + extra);
     qreal baseline = std::round(fm.ascent() + (extra / 2.0));
-    if(baseline < 0.0) baseline = 0.0;
-    if(baseline > height) baseline = height;
+    baseline = std::max(baseline, 0.0);
+    baseline = std::min(baseline, height);
     return CellMetrics{ width, height, baseline };
 }
 

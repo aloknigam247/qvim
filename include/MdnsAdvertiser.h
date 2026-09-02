@@ -7,6 +7,7 @@
 #include <QString>
 
 #include <memory>
+#include <string_view>
 
 #include "QvimMacros.h"
 
@@ -14,7 +15,7 @@ namespace qvim {
 
 // The DNS-SD service type qvim advertises the session mirror under. The Android
 // companion browses for exactly this type.
-inline constexpr char kMirrorServiceType[] = "_qvim-mirror._tcp";
+inline constexpr std::string_view kMirrorServiceType = "_qvim-mirror._tcp";
 
 // A resolved description of the service to advertise. Pure value type — no
 // platform state — so the advertising logic is testable without touching the

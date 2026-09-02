@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdio>
 #include <future>
 #include <QByteArray>
@@ -30,7 +31,7 @@
 #include "WindowChrome.h"
 
 static QString locateNvim() {
-    const QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
+    QString fromPath = QStandardPaths::findExecutable(QStringLiteral("nvim"));
     if(!fromPath.isEmpty()) return fromPath;
     return QStringLiteral("nvim");
 }
@@ -38,8 +39,8 @@ static QString locateNvim() {
 namespace {
 
 struct BootProfile {
-    const bool enabled;
-    const QString outFile;
+    bool enabled;
+    QString outFile;
     QElapsedTimer timer;
     BootProfile() :
         enabled(qEnvironmentVariableIntValue("QVIM_BOOT_PROFILE") != 0),
@@ -130,9 +131,9 @@ int main(int argc, char *argv[]) {
     if(cli.stdinAsBuffer && stdinIsRedirected) {
         stdinFuture = std::async(std::launch::async, []() {
             QByteArray buf;
-            char chunk[4096];
-            while(std::size_t n = std::fread(chunk, 1, sizeof(chunk), stdin)) {
-                buf.append(chunk, static_cast<qsizetype>(n));
+            std::array<char, 4096> chunk;
+            while(std::size_t n = std::fread(chunk.data(), 1, chunk.size(), stdin)) {
+                buf.append(chunk.data(), static_cast<qsizetype>(n));
             }
             return buf;
         });

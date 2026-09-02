@@ -49,8 +49,6 @@ public:
     explicit CursorItem(QQuickItem *parent = nullptr);
     ~CursorItem() override;
 
-    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
-
     NvimConnector *connector() const { return m_conn; }
     void setConnector(NvimConnector *c);
 
@@ -77,6 +75,9 @@ public:
     // top-left corner in the same coord space as cursorRectFor's output.
     static QRectF cursorRectAtPixel(QPointF cellTopLeft, qreal cellWidth, qreal cellHeight,
                                     CursorShape shape);
+
+protected:
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
 
 signals:
     void connectorChanged();

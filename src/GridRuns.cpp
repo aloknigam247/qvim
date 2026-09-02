@@ -90,7 +90,7 @@ GridRuns buildGridRuns(const GridModel &grid, const HighlightTable &hl, int grid
 
     // Worst case is one run per cell; reserving the row width keeps the common
     // case (a handful of runs per row) allocation-free after the first row.
-    out.runs.reserve(rows * 4);
+    out.runs.reserve(static_cast<qsizetype>(rows) * 4);
 
     for(int r = 0; r < rows; ++r) {
         // Set while building this row's runs, so the cluster scan is skipped

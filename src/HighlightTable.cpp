@@ -94,8 +94,8 @@ void HighlightTable::defineAttr(int id, const msgpack::object &rgbAttr,
     a.reverse = getBool(rgbAttr, "reverse");
     a.blend = getInt(rgbAttr, "blend", 0);
     if(info) a.names = namesFromInfo(*info);
-    a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(),
-                              [this](const QString &n) { return m_roundedHighlights.contains(n); });
+    a.isRounded = std::ranges::any_of(
+        a.names, [this](const QString &n) { return m_roundedHighlights.contains(n); });
     m_attrs[id] = a;
     emit changed();
 }
@@ -111,9 +111,8 @@ void HighlightTable::setRoundedHighlights(const QStringList &names) {
     m_roundedHighlights = std::move(next);
     for(auto &kv: m_attrs) {
         HlAttr &a = kv.second;
-        a.isRounded = std::any_of(a.names.cbegin(), a.names.cend(), [this](const QString &n) {
-            return m_roundedHighlights.contains(n);
-        });
+        a.isRounded = std::ranges::any_of(
+            a.names, [this](const QString &n) { return m_roundedHighlights.contains(n); });
     }
     emit changed();
 }

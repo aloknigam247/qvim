@@ -39,8 +39,6 @@ public:
     explicit GridItem(QQuickItem *parent = nullptr);
     ~GridItem() override;
 
-    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
-
     NvimConnector *connector() const { return m_conn; }
     void setConnector(NvimConnector *c);
 
@@ -75,6 +73,7 @@ signals:
     void debugOverlayChanged();
 
 protected:
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
     void keyPressEvent(QKeyEvent *ev) override;
     void mousePressEvent(QMouseEvent *ev) override;
     void mouseMoveEvent(QMouseEvent *ev) override;

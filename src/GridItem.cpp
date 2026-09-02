@@ -354,7 +354,7 @@ void GridItem::updateDecorations(const GridRuns &runs, HighlightTable *h) {
     }
 
     auto *tex = window()->createTextureFromImage(img, QQuickWindow::TextureHasAlphaChannel);
-    QSGSimpleTextureNode *node = static_cast<QSGSimpleTextureNode *>(m_decoNode);
+    auto *node = static_cast<QSGSimpleTextureNode *>(m_decoNode);
     if(!node) {
         node = new QSGSimpleTextureNode;
         node->setOwnsTexture(true);

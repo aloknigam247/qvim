@@ -14,7 +14,7 @@ void Config::registerOption(const QString &name, ConfigType type, QVariant defau
     Entry e;
     e.type = type;
     e.defaultValue = std::move(defaultValue);
-    m_entries.insert(name, std::move(e));
+    m_entries[name] = std::move(e);
 }
 
 bool Config::has(const QString &name) const { return m_entries.contains(name); }

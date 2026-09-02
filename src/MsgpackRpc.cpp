@@ -1,5 +1,6 @@
 #include "MsgpackRpc.h"
 
+#include <cstddef>
 #include <cstring>
 #include <QDebug>
 
@@ -9,7 +10,7 @@ namespace {
 constexpr int kMsgTypeRequest = 0;
 constexpr int kMsgTypeResponse = 1;
 constexpr int kMsgTypeNotification = 2;
-constexpr std::size_t kReadChunk = 64 * 1024;
+constexpr std::size_t kReadChunk = std::size_t{ 64 } * 1024;
 } // namespace
 
 MsgpackRpc::MsgpackRpc(QObject *parent) :
@@ -61,7 +62,7 @@ void MsgpackRpc::request(const QString &method, const PackFn &packArgs, RpcCallb
         return;
     }
     const uint32_t msgid = m_nextMsgId++;
-    if(cb) m_pending.insert(msgid, std::move(cb));
+    if(cb) m_pending[msgid] = std::move(cb);
 
     msgpack::sbuffer buf;
     msgpack::packer<msgpack::sbuffer> pk(&buf);

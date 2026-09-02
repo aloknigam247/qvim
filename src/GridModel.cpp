@@ -1,5 +1,7 @@
 #include "GridModel.h"
 
+#include <algorithm>
+
 namespace qvim {
 
 void GridSurfaceProxy::setPosition(int x, int y) {
@@ -306,7 +308,7 @@ QList<int> GridModel::gridIds() const {
     QList<int> ids;
     ids.reserve(m_grids.size());
     for(auto it = m_grids.constBegin(); it != m_grids.constEnd(); ++it) { ids.push_back(it.key()); }
-    std::sort(ids.begin(), ids.end());
+    std::ranges::sort(ids);
     return ids;
 }
 
