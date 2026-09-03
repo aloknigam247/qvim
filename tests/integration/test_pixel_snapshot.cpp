@@ -1,54 +1,48 @@
-// Tier 3 pixel-snapshot test.
+// Tier 3 structural render test.
 //
-// Renders a deterministically-seeded GridItem into a QImage and compares the
-// result against a golden image stored in tests/golden/. The first run will
-// produce the golden image and pass with a warning; subsequent runs assert
-// the rendered output is pixel-identical (within a tiny tolerance to absorb
-// font-rasterizer AA jitter across builds).
+// Renders a deterministically-seeded GridItem into a QImage through the real
+// software scene graph and asserts machine-portable structural properties of
+// the result: the exact background fill, per-row glyph "ink" coverage and
+// horizontal extent, and the colour family of each row's glyphs (which proves
+// the highlight-attr -> colour mapping actually painted).
 //
-// Golden format note: the vcpkg-built Qt 6.10 in this repo ships only the
-// built-in BMP/PBM/PGM/PPM/XBM/XPM image writers (no qpng plugin, libpng
-// disabled). BMP is lossless and trivially deterministic so we use it as
-// the golden format. If the Qt build later gains PNG support, switching
-// the goldenPath suffix and writer format string is a one-line change.
+// Why not a pixel golden: a committed full-image golden is not portable across
+// machines. Cell metrics are portable once the font is pinned (see below), but
+// glyph anti-aliasing is not — the same grid rasterised via DirectWrite differs
+// by ~12% of pixels between hosts, far past any tolerance that still catches a
+// real regression. The structural assertions below survive AA (they classify
+// glyph pixels by channel-mean ordering, which is preserved when AA blends a
+// fixed foreground toward the dark background) while still failing if the grid
+// is not painted or the highlight colours are wrong.
 //
 // Determinism knobs:
-//   - QGuiApplication is constructed with QT_QPA_PLATFORM=minimal (set by
-//     CTest), QT_SCALE_FACTOR=1, QT_AUTO_SCREEN_SCALE_FACTOR=0.
+//   - QGuiApplication runs under the software scene-graph backend, with
+//     QT_SCALE_FACTOR=1 and QT_AUTO_SCREEN_SCALE_FACTOR=0 (set by CTest and
+//     belt-and-braces here) so one logical pixel is one device pixel.
 //   - The QImage backing store is created at DPR=1.0 explicitly.
 //   - The font family is fixed and the point size is fixed.
 //   - HighlightTable default colors and a small attr table are seeded by hand.
 //
-// Font tradeoff
-// =============
-// Ideally we would bundle a permissively-licensed monospace TTF under
-// tests/fonts/Test-Regular.ttf and load it with QFontDatabase. That would
-// make the golden image stable across every Windows host. The agent
-// executing this change had no network access to fetch such a font, and the
-// monospace fonts shipping in C:\Windows\Fonts (Consolas, Cascadia Mono,
-// Courier New, etc.) are not redistributable from a project repo.
-//
-// As a fallback we use "Courier New", which is present on every supported
-// version of Windows. The minor cost is that the golden may need to be
-// regenerated if the OS-shipped Courier New ever changes its metrics or
-// rasterizer output. Delete tests/golden/grid_basic.bmp to regenerate.
-//
-// If a bundled TTF is later placed at tests/fonts/Test-Regular.ttf, this
-// test will load it preferentially and prefer that family name.
+// Font
+// ====
+// The grid is rasterised from a bundled, permissively-licensed monospace TTF at
+// tests/fonts/Test-Regular.ttf (JetBrains Mono, SIL OFL 1.1 — see
+// tests/fonts/OFL.txt) loaded via QFontDatabase. Pinning the font bytes keeps
+// glyph metrics identical across hosts, so the image size and per-cell extents
+// asserted below are stable regardless of which fonts the host has installed.
 
 #include <msgpack.hpp>
 #include <QCoreApplication>
-#include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QImage>
-#include <QImageReader>
-#include <QImageWriter>
 #include <QString>
 #include <QtTest>
+
+#include <algorithm>
+#include <cmath>
 
 #include "support/QuickRasterizer.h"
 
@@ -119,27 +113,42 @@ msgpack::object_handle packAttr(int fgRgb, int bgRgb, bool bold, bool italic) {
     return h;
 }
 
-// Per-channel absolute difference between two same-sized images.
-// Returns the count of pixels whose max RGB delta exceeds tol.
-qsizetype pixelDiffCount(const QImage &a, const QImage &b, int tol) {
-    if(a.size() != b.size()) return std::numeric_limits<qsizetype>::max();
-    QImage ax = a.convertToFormat(QImage::Format_ARGB32);
-    QImage bx = b.convertToFormat(QImage::Format_ARGB32);
-    qsizetype bad = 0;
-    for(int y = 0; y < ax.height(); ++y) {
-        const QRgb *ar = reinterpret_cast<const QRgb *>(ax.constScanLine(y));
-        const QRgb *br = reinterpret_cast<const QRgb *>(bx.constScanLine(y));
-        for(int x = 0; x < ax.width(); ++x) {
-            const QRgb p = ar[x];
-            const QRgb q = br[x];
-            const int dr = std::abs(qRed(p) - qRed(q));
-            const int dg = std::abs(qGreen(p) - qGreen(q));
-            const int db = std::abs(qBlue(p) - qBlue(q));
-            const int da = std::abs(qAlpha(p) - qAlpha(q));
-            if(std::max({ dr, dg, db, da }) > tol) ++bad;
+// Aggregate stats over the "ink" pixels (glyph coverage) inside one horizontal
+// band of the image. A pixel counts as ink when its max-channel distance from
+// the background exceeds inkTol; edge/AA pixels near the background are ignored
+// so the colour means below reflect glyph cores, not blended edges.
+struct BandStats {
+    qsizetype ink = 0;
+    double meanR = 0.0, meanG = 0.0, meanB = 0.0;
+    int minInkX = -1, maxInkX = -1;
+};
+
+BandStats analyzeBand(const QImage &img, int y0, int y1, QRgb bg, int inkTol) {
+    BandStats s;
+    const int br = qRed(bg), bgc = qGreen(bg), bb = qBlue(bg);
+    double sumR = 0.0, sumG = 0.0, sumB = 0.0;
+    for(int y = y0; y < y1; ++y) {
+        const QRgb *row = reinterpret_cast<const QRgb *>(img.constScanLine(y));
+        for(int x = 0; x < img.width(); ++x) {
+            const QRgb p = row[x];
+            const int dr = std::abs(qRed(p) - br);
+            const int dg = std::abs(qGreen(p) - bgc);
+            const int db = std::abs(qBlue(p) - bb);
+            if(std::max({ dr, dg, db }) <= inkTol) continue;
+            ++s.ink;
+            sumR += qRed(p);
+            sumG += qGreen(p);
+            sumB += qBlue(p);
+            if(s.minInkX < 0 || x < s.minInkX) s.minInkX = x;
+            if(x > s.maxInkX) s.maxInkX = x;
         }
     }
-    return bad;
+    if(s.ink > 0) {
+        s.meanR = sumR / static_cast<double>(s.ink);
+        s.meanG = sumG / static_cast<double>(s.ink);
+        s.meanB = sumB / static_cast<double>(s.ink);
+    }
+    return s;
 }
 
 } // namespace
@@ -172,18 +181,18 @@ private slots:
             QCoreApplication::addLibraryPath(pluginsRoot);
         }
 
-        // Prefer a bundled TTF if present; fall back to Courier New otherwise.
-        // The test's WORKING_DIRECTORY is tests/, so paths are relative there.
+        // The golden is authored from the bundled font; a missing font must fail
+        // loud, not silently fall back to a host font and reintroduce
+        // machine-dependent metrics. WORKING_DIRECTORY is tests/, so the path is
+        // relative there.
         const QString bundled = QStringLiteral("fonts/Test-Regular.ttf");
-        if(QFileInfo::exists(bundled)) {
-            const int id = QFontDatabase::addApplicationFont(bundled);
-            QVERIFY2(id >= 0, "Failed to load bundled test font");
-            const QStringList families = QFontDatabase::applicationFontFamilies(id);
-            QVERIFY(!families.isEmpty());
-            m_fontFamily = families.first();
-        } else {
-            m_fontFamily = QStringLiteral("Courier New");
-        }
+        QVERIFY2(QFileInfo::exists(bundled),
+                 "Bundled test font tests/fonts/Test-Regular.ttf is missing");
+        const int id = QFontDatabase::addApplicationFont(bundled);
+        QVERIFY2(id >= 0, "Failed to load bundled test font");
+        const QStringList families = QFontDatabase::applicationFontFamilies(id);
+        QVERIFY(!families.isEmpty());
+        m_fontFamily = families.first();
     }
 
     void rendersDeterministicGrid() {
@@ -251,57 +260,100 @@ private slots:
         // QQuickRenderControl with the software adaptation. QQuickWindow::
         // grabWindow() is not usable here (it returns null under the minimal
         // QPA platform), and a test-only QPainter path would defeat the point
-        // of a golden: it could stay stable while the shipping renderer broke.
+        // of the check: it could stay stable while the shipping renderer broke.
         QuickRasterizer raster;
         QImage image = raster.render(&item).convertToFormat(QImage::Format_ARGB32);
         QVERIFY2(!image.isNull(), "scene graph produced no image");
-        QVERIFY2(raster.isUnscaled(), "render surface is scaled; the golden is stored at 1:1");
+        QVERIFY2(raster.isUnscaled(), "render surface is scaled; the checks assume 1:1");
         QCOMPARE(image.width(), pxW);
         QCOMPARE(image.height(), pxH);
 
-        // Compare against the golden image; on first run, create it.
-        const QString goldenPath = QStringLiteral("golden/grid_basic.bmp");
-        QDir().mkpath(QStringLiteral("golden"));
+        // Structural assertions. These are portable across machines because they
+        // pin the fixed colours we seeded (bg fill and per-attr fg) rather than
+        // exact glyph anti-aliasing, which is host-dependent.
+        const QRgb bg = qRgb(0x10, 0x18, 0x20);
 
-        if(!QFile::exists(goldenPath)) {
-            QImageWriter writer(goldenPath, "BMP");
-            const bool ok = writer.write(image);
-            QVERIFY2(ok, qPrintable(QStringLiteral(
-                                        "Failed to write golden to %1: %2 (supported writers: %3)")
-                                        .arg(goldenPath)
-                                        .arg(writer.errorString())
-                                        .arg(QString::fromLatin1(
-                                            QImageWriter::supportedImageFormats().join(',')))));
-            qWarning("Golden did not exist; wrote it now. Re-run the test to verify stability.");
-            return;
+        // 1. Background dominates. Cell interiors are a solid default-bg fill, so
+        //    most of the image must sit within a couple of channel-steps of bg.
+        {
+            qsizetype nearBg = 0;
+            const qsizetype total = static_cast<qsizetype>(pxW) * pxH;
+            for(int y = 0; y < pxH; ++y) {
+                const QRgb *row = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+                for(int x = 0; x < pxW; ++x) {
+                    const QRgb p = row[x];
+                    const int d =
+                        std::max({ std::abs(qRed(p) - qRed(bg)), std::abs(qGreen(p) - qGreen(bg)),
+                                   std::abs(qBlue(p) - qBlue(bg)) });
+                    if(d <= 6) ++nearBg;
+                }
+            }
+            QVERIFY2(nearBg * 2 > total,
+                     qPrintable(QStringLiteral("background does not dominate: %1 / %2 px near bg")
+                                    .arg(nearBg)
+                                    .arg(total)));
         }
 
-        QImage golden(goldenPath);
-        QVERIFY2(!golden.isNull(),
-                 qPrintable(QStringLiteral("Failed to load golden image %1").arg(goldenPath)));
-        QCOMPARE(golden.size(), image.size());
-
-        // Allow ≤2% of pixels to differ by up to 1 channel-step. This absorbs
-        // the small amount of font-hinting jitter that QFontMetricsF cannot
-        // promise to be byte-identical across Qt patch releases, while still
-        // catching real regressions (which typically move thousands of pixels).
-        constexpr int kChannelTol = 1;
-        const qsizetype total = static_cast<qsizetype>(image.width()) * image.height();
-        const qsizetype budget = (total * 2 + 99) / 100; // 2% rounded up
-        const qsizetype bad = pixelDiffCount(image, golden, kChannelTol);
-
-        if(bad > budget) {
-            // Save the actual image alongside the golden for debugging.
-            const QString diffPath = QStringLiteral("golden/grid_basic.actual.bmp");
-            image.save(diffPath, "BMP");
-            QFAIL(qPrintable(
-                QStringLiteral("Pixel diff exceeded tolerance: %1 / %2 pixels differ (budget=%3). "
-                               "Actual image written to %4.")
-                    .arg(bad)
-                    .arg(total)
-                    .arg(budget)
-                    .arg(diffPath)));
+        // 2. Per-row glyph ink and colour family. Bands follow the exact cell
+        //    metrics; ink = pixels far enough from bg to be glyph cores.
+        constexpr int kInkTol = 40;
+        BandStats band[kRows];
+        for(int r = 0; r < kRows; ++r) {
+            const int y0 = std::clamp(qRound(r * ch), 0, pxH);
+            const int y1 = std::clamp(qRound((r + 1) * ch), y0, pxH);
+            band[r] = analyzeBand(image, y0, y1, bg, kInkTol);
+            QVERIFY2(band[r].ink > 0,
+                     qPrintable(QStringLiteral("row %1 painted no glyph ink").arg(r)));
         }
+
+        auto blueScore = [](const BandStats &b) { return b.meanB - std::max(b.meanR, b.meanG); };
+        auto greenScore = [](const BandStats &b) { return b.meanG - std::max(b.meanR, b.meanB); };
+        auto graySpread = [](const BandStats &b) {
+            return std::max({ b.meanR, b.meanG, b.meanB }) -
+                   std::min({ b.meanR, b.meanG, b.meanB });
+        };
+
+        // Row 0 is attr 1 (bold blue 0x80C7FF): blue channel dominates.
+        QVERIFY2(
+            blueScore(band[0]) > 20.0,
+            qPrintable(QStringLiteral("row 0 not blue: blueScore=%1").arg(blueScore(band[0]))));
+        // Row 3 is attr 2 (green 0x7CA982): green channel dominates.
+        QVERIFY2(
+            greenScore(band[3]) > 15.0,
+            qPrintable(QStringLiteral("row 3 not green: greenScore=%1").arg(greenScore(band[3]))));
+        // Rows 1 and 4 are the default gray fg (0xD0D0D0): near-neutral, and
+        // clearly neither the blue nor the green highlight.
+        for(int r: { 1, 4 }) {
+            QVERIFY2(graySpread(band[r]) < 35.0,
+                     qPrintable(QStringLiteral("row %1 not neutral: graySpread=%2")
+                                    .arg(r)
+                                    .arg(graySpread(band[r]))));
+            QVERIFY2(blueScore(band[r]) < 15.0 && greenScore(band[r]) < 12.0,
+                     qPrintable(QStringLiteral("row %1 mis-tinted: blue=%2 green=%3")
+                                    .arg(r)
+                                    .arg(blueScore(band[r]))
+                                    .arg(greenScore(band[r]))));
+        }
+
+        // 3. Horizontal extent distinguishes full-width rows from the sparse row.
+        //    Rows 0 and 3 fill most of the grid; row 2 is a single glyph at the
+        //    left, so its ink stays near the left edge and is far sparser.
+        QVERIFY2(band[0].maxInkX > pxW * 0.6,
+                 qPrintable(QStringLiteral("row 0 ink extent too short: maxInkX=%1 of %2")
+                                .arg(band[0].maxInkX)
+                                .arg(pxW)));
+        QVERIFY2(band[3].maxInkX > pxW * 0.6,
+                 qPrintable(QStringLiteral("row 3 ink extent too short: maxInkX=%1 of %2")
+                                .arg(band[3].maxInkX)
+                                .arg(pxW)));
+        QVERIFY2(band[2].maxInkX < pxW * 0.25,
+                 qPrintable(QStringLiteral("row 2 ink should hug the left: maxInkX=%1 of %2")
+                                .arg(band[2].maxInkX)
+                                .arg(pxW)));
+        QVERIFY2(band[2].ink * 3 < band[0].ink,
+                 qPrintable(QStringLiteral("row 2 not sparse vs row 0: %1 vs %2")
+                                .arg(band[2].ink)
+                                .arg(band[0].ink)));
     }
 
 private:
