@@ -68,10 +68,12 @@ struct BootProfile {
     }
 };
 
+} // namespace
+
 // qvim is /SUBSYSTEM:WINDOWS, so Windows attaches no console and stdout from the -h/-v path goes
 // nowhere. Attach to the invoking terminal's console so that output is visible. A non-terminal
 // launch (e.g. from Explorer) has no parent console; the attach fails and is ignored.
-void attachParentConsole() {
+static void attachParentConsole() {
 #ifdef _WIN32
     if(AttachConsole(ATTACH_PARENT_PROCESS)) {
         std::FILE *fp = nullptr;
@@ -79,8 +81,6 @@ void attachParentConsole() {
     }
 #endif
 }
-
-} // namespace
 
 // An exception escaping main() terminates the process anyway; the Qt entry point does not wrap its
 // body in a catch-all.
