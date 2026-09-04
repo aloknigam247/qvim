@@ -68,6 +68,18 @@ struct BootProfile {
     }
 };
 
+// qvim is /SUBSYSTEM:WINDOWS, so Windows attaches no console and stdout from the -h/-v path goes
+// nowhere. Attach to the invoking terminal's console so that output is visible. A non-terminal
+// launch (e.g. from Explorer) has no parent console; the attach fails and is ignored.
+void attachParentConsole() {
+#ifdef _WIN32
+    if(AttachConsole(ATTACH_PARENT_PROCESS)) {
+        std::FILE *fp = nullptr;
+        (void)freopen_s(&fp, "CONOUT$", "w", stdout);
+    }
+#endif
+}
+
 } // namespace
 
 // An exception escaping main() terminates the process anyway; the Qt entry point does not wrap its
@@ -78,6 +90,7 @@ int main(int argc, char *argv[]) {
     const qvim::QvimArgs cli = qvim::parseArgv(argc, argv);
     boot.mark("argv parsed");
     if(cli.helpRequested) {
+        attachParentConsole();
         std::fputs("Usage: qvim [qvim-options] [nvim-options] [file ...]\n"
                    "\n"
                    "qvim is a Neovim GUI client. All arguments not in qvim's own\n"
@@ -100,6 +113,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     if(cli.versionRequested) {
+        attachParentConsole();
         std::fputs("qvim 0.1.0\n", stdout);
         return 0;
     }
