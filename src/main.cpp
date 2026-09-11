@@ -81,9 +81,7 @@ static void attachParentConsole() {
     // reads it. Only borrow the parent terminal's console when stdout has no usable
     // redirected target — the case this function exists for under /SUBSYSTEM:WINDOWS.
     const DWORD stdoutType = GetFileType(GetStdHandle(STD_OUTPUT_HANDLE));
-    if(stdoutType == FILE_TYPE_PIPE || stdoutType == FILE_TYPE_DISK) {
-        return;
-    }
+    if(stdoutType == FILE_TYPE_PIPE || stdoutType == FILE_TYPE_DISK) { return; }
     if(AttachConsole(ATTACH_PARENT_PROCESS)) {
         std::FILE *fp = nullptr;
         (void)freopen_s(&fp, "CONOUT$", "w", stdout);

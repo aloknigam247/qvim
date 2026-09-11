@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QRegularExpression>
+#include <QtTest>
 
 #include "Version.h"
 #include "VersionString.h"
@@ -8,7 +8,7 @@
 // checked against an independently supplied expectation (not a sibling macro
 // from the same substitution, which would be tautological).
 #define QVIM_STR2(x) #x
-#define QVIM_STR(x) QVIM_STR2(x)
+#define QVIM_STR(x)  QVIM_STR2(x)
 
 class TestVersion : public QObject {
     Q_OBJECT
