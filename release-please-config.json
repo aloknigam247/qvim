@@ -4,6 +4,7 @@
   "versioning": "default",
   "include-v-in-tag": true,
   "include-component-in-tag": false,
+  "pull-request-title-pattern": "chore(release): release ${version}",
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
