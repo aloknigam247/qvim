@@ -1,0 +1,26 @@
+name: release-please
+
+# Once per day at 00:00 IST (18:30 UTC), reconcile main into the standing release PR:
+# accumulated conventional commits set the next version, and merging that PR bumps the
+# version files, updates CHANGELOG.md, tags v<x.y.z> and cuts the GitHub Release (cut on
+# the next scheduled run after the merge, or immediately via a manual workflow_dispatch).
+# main always carries the last released version between releases. The release-pipeline
+# (issue #36) uploads build assets onto that existing Release and must not create it.
+on:
+  schedule:
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

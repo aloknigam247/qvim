@@ -54,6 +54,8 @@ qvim_add_test(test_scroll_perf_micro   unit/test_scroll_perf_micro.cpp)
 qvim_add_test(test_session_cache       unit/test_session_cache.cpp)
 qvim_add_test(test_session_event_buffer unit/test_session_event_buffer.cpp)
 qvim_add_test(test_text_node_pool      unit/test_text_node_pool.cpp)
+qvim_add_test(test_version             unit/test_version.cpp)
+target_compile_definitions(test_version PRIVATE QVIM_EXPECTED_VERSION=${PROJECT_VERSION})
 
 # test_app_icon constructs QGuiApplication and needs the qico imageformat
 # plugin from vcpkg's debug Qt to decode :/icon.ico. The qvim post-build step
@@ -211,3 +213,22 @@ add_test(NAME test_deploy_manifest
         -QmlSourceDir "${CMAKE_SOURCE_DIR}/qml"
 )
 set_tests_properties(test_deploy_manifest PROPERTIES TIMEOUT 60 LABELS "unit")
+
+# End-to-end version gates — exercise the real product exe (not a test double), so they
+# depend on the qvim target + its POST_BUILD deploy. test_cli_version proves the wired
+# binary prints the canonical version on `--version`; test_version_metadata proves the
+# Windows VERSIONINFO metadata equals PROJECT_VERSION exactly.
+add_test(NAME test_cli_version COMMAND qvim --version)
+set_tests_properties(test_cli_version PROPERTIES
+    TIMEOUT 60
+    LABELS "unit"
+    PASS_REGULAR_EXPRESSION "^qvim ${PROJECT_VERSION}"
+)
+
+add_test(NAME test_version_metadata
+    COMMAND pwsh -NoProfile -ExecutionPolicy Bypass
+        -File "${CMAKE_CURRENT_SOURCE_DIR}/version_metadata_check.ps1"
+        -ExePath "$<TARGET_FILE:qvim>"
+        -ExpectedVersion "${PROJECT_VERSION}"
+)
+set_tests_properties(test_version_metadata PROPERTIES TIMEOUT 60 LABELS "unit")
