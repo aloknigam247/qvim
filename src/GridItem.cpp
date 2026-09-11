@@ -204,9 +204,11 @@ void GridItem::maybeResizeUi() {
     if(m_gridId != 1) return;
     const int cols = std::max(10, static_cast<int>(width() / m_cellWidth));
     const int rows = std::max(3, static_cast<int>(height() / m_cellHeight));
-    if(auto *g = grid(); g && (g->gridCols(1) != cols || g->gridRows(1) != rows)) {
-        m_conn->requestResize(cols, rows);
-    }
+    // Delegate dedup to ResizeCoalescer (which compares against the last emitted
+    // request). Guarding here against the grid model instead would skip the
+    // corrective resize during a font/linespace change on :restart, when the
+    // model still reads the pre-change size while an earlier resize is in flight.
+    m_conn->requestResize(cols, rows);
 }
 
 void GridItem::geometryChange(const QRectF &newGeom, const QRectF &oldGeom) {
