@@ -80,8 +80,11 @@ Window {
     Connections {
         target: $connector
         // When attach lands after Component.onCompleted (engine cold-loaded
-        // faster than nvim handshake), fire the deferred tryResize.
-        function onAttachedChanged() { _maybeResize() }
+        // faster than nvim handshake), fire the deferred tryResize — but only
+        // during the initial boot show. attachedChanged also fires on a :restart
+        // re-attach (which already re-attaches at the live size); re-running the
+        // boot resize there would clobber it with the stale boot-time request.
+        function onAttachedChanged() { if (!_shown) _maybeResize() }
         // The first flush whose grid 1 matches the requested geometry is
         // the cue: at this point nvim has resized AND repainted at the real
         // size, so the very first frame Qt swaps will be correct.
