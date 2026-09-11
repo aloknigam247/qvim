@@ -28,6 +28,7 @@
 #include "MsgpackRpc.h"
 #include "NvimConnector.h"
 #include "SessionCache.h"
+#include "VersionString.h"
 #include "WindowChrome.h"
 
 static QString locateNvim() {
@@ -75,6 +76,14 @@ struct BootProfile {
 // launch (e.g. from Explorer) has no parent console; the attach fails and is ignored.
 static void attachParentConsole() {
 #ifdef _WIN32
+    // If stdout is already wired to a pipe or file (a shell redirect or a test
+    // harness capturing output), keep that handle so output lands where the caller
+    // reads it. Only borrow the parent terminal's console when stdout has no usable
+    // redirected target — the case this function exists for under /SUBSYSTEM:WINDOWS.
+    const DWORD stdoutType = GetFileType(GetStdHandle(STD_OUTPUT_HANDLE));
+    if(stdoutType == FILE_TYPE_PIPE || stdoutType == FILE_TYPE_DISK) {
+        return;
+    }
     if(AttachConsole(ATTACH_PARENT_PROCESS)) {
         std::FILE *fp = nullptr;
         (void)freopen_s(&fp, "CONOUT$", "w", stdout);
@@ -114,7 +123,8 @@ int main(int argc, char *argv[]) {
     }
     if(cli.versionRequested) {
         attachParentConsole();
-        std::fputs("qvim 0.1.0\n", stdout);
+        std::fputs(qvim::versionString().toUtf8().constData(), stdout);
+        std::fputc('\n', stdout);
         return 0;
     }
 

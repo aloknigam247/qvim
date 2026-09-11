@@ -1,0 +1,4 @@
+#pragma once
+
+// Generated from CMake's PROJECT_VERSION via configure_file. Do not edit by hand.
+#define QVIM_VERSION "@PROJECT_VERSION@"

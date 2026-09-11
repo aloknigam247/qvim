@@ -1,0 +1,23 @@
+name: release-please
+
+# Accumulate merged conventional commits on main into a standing release PR; merging
+# that PR bumps the version files, updates CHANGELOG.md, tags v<x.y.z> and cuts the
+# GitHub Release. The release-pipeline (issue #36) uploads build assets onto that
+# existing Release and must not create it.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

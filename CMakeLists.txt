@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 4.2)
-project(qvim LANGUAGES CXX VERSION 0.1.0)
+project(qvim LANGUAGES CXX VERSION 0.1.0) # x-release-please-version
+
+# vcpkg reads vcpkg.json's version before CMake runs, so it is a second persisted copy
+# of the canonical project() version rather than a generated one. release-please bumps
+# both in the same release commit; this guard fails the configure the moment they drift.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json" QVIM_VCPKG_JSON)
+string(JSON QVIM_VCPKG_VERSION GET "${QVIM_VCPKG_JSON}" version)
+if(NOT "${QVIM_VCPKG_VERSION}" STREQUAL "${PROJECT_VERSION}")
+    message(FATAL_ERROR
+        "Version mismatch: vcpkg.json version '${QVIM_VCPKG_VERSION}' != project() VERSION "
+        "'${PROJECT_VERSION}'. Keep them in sync (release-please bumps both together).")
+endif()
+
+# Generate the single source of truth for the C++ version and the Windows exe metadata
+# from PROJECT_VERSION, into the binary tree.
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Version.h.in"
+    "${CMAKE_BINARY_DIR}/generated/Version.h" @ONLY)
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/qvim_version.rc.in"
+        "${CMAKE_BINARY_DIR}/generated/qvim_version.rc" @ONLY)
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -79,11 +101,14 @@ set(QVIM_LIB_SOURCES
     src/SessionMirrorServer.cpp include/SessionMirrorServer.h
     src/TablineModel.cpp        include/TablineModel.h
     src/TextNodePool.cpp        include/TextNodePool.h
+    src/VersionString.cpp       include/VersionString.h
     src/WindowChrome.cpp        include/WindowChrome.h
 )
 
 qt_add_library(qvim_lib STATIC ${QVIM_LIB_SOURCES} resources/qvim.qrc)
-target_include_directories(qvim_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(qvim_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/generated)
 target_link_libraries(qvim_lib
     PUBLIC
         Qt6::Core
@@ -113,7 +138,7 @@ qt_add_qml_module(qvim_lib
 )
 
 if(WIN32)
-    qt_add_executable(qvim src/main.cpp resources/qvim.rc)
+    qt_add_executable(qvim src/main.cpp resources/qvim.rc "${CMAKE_BINARY_DIR}/generated/qvim_version.rc")
 else()
     qt_add_executable(qvim src/main.cpp)
 endif()
