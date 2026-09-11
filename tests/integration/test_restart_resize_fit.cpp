@@ -42,9 +42,7 @@ namespace {
 void spin(int ms) {
     QElapsedTimer t;
     t.start();
-    while(t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
-    }
+    while(t.elapsed() < ms) { QCoreApplication::processEvents(QEventLoop::AllEvents, 25); }
 }
 
 template <typename F>
@@ -105,10 +103,8 @@ private slots:
         const int rowsLarge = std::max(3, static_cast<int>(kHeight / grid.cellHeight()));
         QVERIFY2(waitUntil(
                      [&]() {
-                         return conn.grid()->gridCols(1) == colsLarge &&
-                                conn.grid()->gridRows(1) == rowsLarge;
-                     },
-                     8000),
+            return conn.grid()->gridCols(1) == colsLarge && conn.grid()->gridRows(1) == rowsLarge;
+        }, 8000),
                  "grid never settled to the fitted large-font size");
 
         // The small font fills the same window with strictly more rows: that is
