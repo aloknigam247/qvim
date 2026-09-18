@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(qvim LANGUAGES CXX VERSION 0.1.0) # x-release-please-version
+project(qvim LANGUAGES CXX VERSION 0.2.0) # x-release-please-version
 
 # vcpkg reads vcpkg.json's version before CMake runs, so it is a second persisted copy
 # of the canonical project() version rather than a generated one. release-please bumps
