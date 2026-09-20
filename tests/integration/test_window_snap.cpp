@@ -163,15 +163,15 @@ private slots:
         const qreal expectedH = targetRows * cm.cellHeight + chromeH;
         // Precondition: on main the window stays at the boot size, so the target
         // pixel size must differ — otherwise the assertion below couldn't fail.
-        QVERIFY(std::abs(static_cast<qreal>(window->width()) - expectedW) >= 1.0
-                || std::abs(static_cast<qreal>(window->height()) - expectedH) >= 1.0);
+        QVERIFY(std::abs(static_cast<qreal>(window->width()) - expectedW) >= 1.0 ||
+                std::abs(static_cast<qreal>(window->height()) - expectedH) >= 1.0);
 
         conn.command(QStringLiteral("set columns=%1").arg(targetCols));
         conn.command(QStringLiteral("set lines=%1").arg(targetRows));
 
-        QVERIFY(waitUntil(
-            [&]() { return grid->gridCols(1) == targetCols && grid->gridRows(1) == targetRows; },
-            5000));
+        QVERIFY(waitUntil([&]() {
+            return grid->gridCols(1) == targetCols && grid->gridRows(1) == targetRows;
+        }, 5000));
 
         // Hard asserts: grid reports the requested size AND the window client
         // area is exactly targetCols*cellWidth x targetRows*cellHeight (+chrome).

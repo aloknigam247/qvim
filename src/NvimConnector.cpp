@@ -516,8 +516,8 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
                 // nvim-originated (e.g. :set columns/lines) — drive the window to
                 // match, and syncAfterDirectResize so the window's geometryChange
                 // ack doesn't bounce a redundant nvim_ui_try_resize back.
-                const auto it = std::find(m_sentUiSizes.begin(), m_sentUiSizes.end(),
-                                          std::make_pair(w, h));
+                const auto it =
+                    std::find(m_sentUiSizes.begin(), m_sentUiSizes.end(), std::make_pair(w, h));
                 if(it != m_sentUiSizes.end()) {
                     m_sentUiSizes.erase(m_sentUiSizes.begin(), std::next(it));
                 } else {
