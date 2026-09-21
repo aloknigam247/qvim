@@ -10,8 +10,10 @@
 #include <QTimer>
 #include <QVariant>
 
+#include <deque>
 #include <functional>
 #include <optional>
+#include <utility>
 
 #include "CmdlineModel.h"
 #include "GridModel.h"
@@ -130,6 +132,9 @@ signals:
     void attachComplete();
     void defaultBackgroundChanged();
     void flush(); // emitted after each redraw batch — UI should repaint here
+    // grid 1 resized by nvim itself (e.g. :set columns/lines), not by a GUI
+    // request — QML resizes the window client area to match.
+    void nvimRequestedResize(int cols, int rows);
     void bell();
     void disconnected();
     void customNotification(const qvim::Notification &note);
@@ -185,6 +190,13 @@ private:
     QString m_restartListenAddr;
     int m_currentCols = 0;
     int m_currentRows = 0;
+
+    // FIFO of (cols, rows) sizes qvim asked nvim for via attachUi/tryResize,
+    // awaiting their grid_resize ack. A grid_resize whose size is absent here
+    // is nvim-originated (e.g. :set columns) and drives a window resize. Bounded
+    // so a never-matched entry can't grow it without limit.
+    std::deque<std::pair<int, int>> m_sentUiSizes;
+    static constexpr size_t kMaxSentUiSizes = 32;
 
     // Defaults match the nvim ui-options defaults (see :h ui-options).
     bool m_arabicshape = true;

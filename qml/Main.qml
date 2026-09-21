@@ -77,6 +77,22 @@ Window {
         }
     }
 
+    // nvim changed grid 1's size itself (:set columns/lines). Resize the window
+    // client area to fit exactly, in the nvim->GUI direction — the inverse of
+    // _recomputeTarget (which derives the grid FROM the window). dockW mirrors
+    // the F11 handler: Shell ends at chatPanel.left, so the grid needs
+    // cols*cellWidth of Shell width, not window width.
+    function _applyNvimSize(cols, rows) {
+        if (!_shown) return
+        const cw = shell.cellWidth
+        const ch = shell.cellHeight
+        if (cw <= 0 || ch <= 0) return
+        const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
+        const dockW = chatPanel.visible ? chatPanel.width : 0
+        window.width  = cols * cw + dockW
+        window.height = rows * ch + chromeH
+    }
+
     Connections {
         target: $connector
         // When attach lands after Component.onCompleted (engine cold-loaded
@@ -89,6 +105,10 @@ Window {
         // the cue: at this point nvim has resized AND repainted at the real
         // size, so the very first frame Qt swaps will be correct.
         function onFlush() { _showIfReady() }
+        // nvim resized grid 1 itself (e.g. :set columns/lines) — match the
+        // window client area to it. NvimConnector only emits this for sizes it
+        // didn't request, so GUI-drag acks never reach here.
+        function onNvimRequestedResize(cols, rows) { _applyNvimSize(cols, rows) }
     }
 
     // React to cellWidthChanged (not guifontChanged) because GridItem

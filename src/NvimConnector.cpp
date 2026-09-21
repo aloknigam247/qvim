@@ -12,6 +12,8 @@
 #include <QFontDatabase>
 #include <QVariant>
 
+#include <algorithm>
+
 namespace qvim {
 
 static QString asQString(const msgpack::object &o) {
@@ -127,6 +129,8 @@ qreal NvimConnector::guifontSize() const {
 bool NvimConnector::attachUi(int cols, int rows) {
     m_currentCols = cols;
     m_currentRows = rows;
+    m_sentUiSizes.emplace_back(cols, rows);
+    if(m_sentUiSizes.size() > kMaxSentUiSizes) m_sentUiSizes.pop_front();
     m_rpc->request(QStringLiteral("nvim_ui_attach"),
                    [cols, rows](msgpack::packer<msgpack::sbuffer> &pk) {
         packAttachOptions(pk, cols, rows);
@@ -251,6 +255,8 @@ void NvimConnector::inputMouse(const QString &button, const QString &action,
 void NvimConnector::tryResize(int cols, int rows) {
     m_currentCols = cols;
     m_currentRows = rows;
+    m_sentUiSizes.emplace_back(cols, rows);
+    if(m_sentUiSizes.size() > kMaxSentUiSizes) m_sentUiSizes.pop_front();
     // Sync the coalescer so any stale pending request doesn't fire after
     // this direct resize and overwrite it with old dimensions.
     m_resizeCoalescer->syncAfterDirectResize(cols, rows);
@@ -473,6 +479,7 @@ void NvimConnector::resetUiState() {
     m_cmdline->hide();
     m_cmdline->blockHide();
     m_messages->reset();
+    m_sentUiSizes.clear();
     emit defaultBackgroundChanged();
 }
 
@@ -497,9 +504,29 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
 
     if(name == "grid_resize") {
         // [grid, width, height]
-        if(a.size >= 3)
-            m_grid->resize(static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[1])),
-                           static_cast<int>(asInt(a.ptr[2])));
+        if(a.size >= 3) {
+            const int g = static_cast<int>(asInt(a.ptr[0]));
+            const int w = static_cast<int>(asInt(a.ptr[1]));
+            const int h = static_cast<int>(asInt(a.ptr[2]));
+            m_grid->resize(g, w, h);
+            if(g == 1) {
+                // grid 1 is the global grid (ext_multigrid off). Look for this
+                // size in the FIFO of sizes WE requested; nvim acks in order, so
+                // erase the match and everything older. A size we never sent is
+                // nvim-originated (e.g. :set columns/lines) — drive the window to
+                // match, and syncAfterDirectResize so the window's geometryChange
+                // ack doesn't bounce a redundant nvim_ui_try_resize back.
+                const auto it = std::ranges::find(m_sentUiSizes, std::make_pair(w, h));
+                if(it != m_sentUiSizes.end()) {
+                    m_sentUiSizes.erase(m_sentUiSizes.begin(), std::next(it));
+                } else {
+                    m_currentCols = w;
+                    m_currentRows = h;
+                    m_resizeCoalescer->syncAfterDirectResize(w, h);
+                    emit nvimRequestedResize(w, h);
+                }
+            }
+        }
         return;
     }
     if(name == "grid_clear") {
