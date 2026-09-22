@@ -34,49 +34,51 @@ class SessionClient(
     @Volatile
     private var webSocket: WebSocket? = null
 
-    fun frames(endpoint: String): Flow<ServerFrame> = callbackFlow {
-        val gen = generation.incrementAndGet()
-        _state.value = ConnectionState.Connecting
+    fun frames(endpoint: String): Flow<ServerFrame> =
+        callbackFlow {
+            val gen = generation.incrementAndGet()
+            _state.value = ConnectionState.Connecting
 
-        val listener = object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (gen != generation.get()) return
-                _state.value = ConnectionState.Connected
-            }
+            val listener =
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        if (gen != generation.get()) return
+                        _state.value = ConnectionState.Connected
+                    }
 
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                if (gen != generation.get()) return
-                val frame = Protocol.decode(text)
-                // Protocol: server sends hello first, client replies with resume.
-                if (frame is ServerFrame.Hello) {
-                    webSocket.send(Protocol.encodeResume(lastSeq = 0, sessionId = frame.sessionId))
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        if (gen != generation.get()) return
+                        val frame = Protocol.decode(text)
+                        // Protocol: server sends hello first, client replies with resume.
+                        if (frame is ServerFrame.Hello) {
+                            webSocket.send(Protocol.encodeResume(lastSeq = 0, sessionId = frame.sessionId))
+                        }
+                        trySend(frame)
+                    }
+
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        if (gen == generation.get()) _state.value = ConnectionState.Disconnected
+                        webSocket.close(NORMAL_CLOSURE, null)
+                        close()
+                    }
+
+                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                        if (gen == generation.get()) _state.value = ConnectionState.Disconnected
+                        close(t)
+                    }
                 }
-                trySend(frame)
-            }
 
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                if (gen == generation.get()) _state.value = ConnectionState.Disconnected
-                webSocket.close(NORMAL_CLOSURE, null)
-                close()
-            }
+            val ws = client.newWebSocket(factory.requestFor(endpoint), listener)
+            webSocket = ws
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (gen == generation.get()) _state.value = ConnectionState.Disconnected
-                close(t)
+            awaitClose {
+                ws.cancel()
+                if (gen == generation.get()) {
+                    webSocket = null
+                    _state.value = ConnectionState.Disconnected
+                }
             }
         }
-
-        val ws = client.newWebSocket(factory.requestFor(endpoint), listener)
-        webSocket = ws
-
-        awaitClose {
-            ws.cancel()
-            if (gen == generation.get()) {
-                webSocket = null
-                _state.value = ConnectionState.Disconnected
-            }
-        }
-    }
 
     /** Sends a user input frame on the current socket, if connected. */
     fun send(text: String) {

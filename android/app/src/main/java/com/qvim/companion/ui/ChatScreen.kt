@@ -32,11 +32,7 @@ import com.qvim.companion.model.UiMessage
 import com.qvim.companion.net.ConnectionState
 
 @Composable
-fun ChatScreen(
-    vm: ChatViewModel,
-    onEndpointSaved: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: Modifier = Modifier) {
     val messages by vm.messages.collectAsStateWithLifecycle()
     val state by vm.connectionState.collectAsStateWithLifecycle()
     val endpoint by vm.endpoint.collectAsStateWithLifecycle()
@@ -116,8 +112,12 @@ private fun EndpointBar(
             ) { Text("Connect") }
         }
         Text(
-            text = if (discovered != null) "Found on LAN: $discovered"
-                   else "Searching for qvim on the LAN…",
+            text =
+                if (discovered != null) {
+                    "Found on LAN: $discovered"
+                } else {
+                    "Searching for qvim on the LAN…"
+                },
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -134,13 +134,15 @@ private fun MessageBubble(msg: UiMessage) {
     val isUser = msg.role == "user"
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isUser) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer
-            },
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    if (isUser) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    },
+            ),
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Text(

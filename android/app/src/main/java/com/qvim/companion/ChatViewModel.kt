@@ -26,7 +26,6 @@ class ChatViewModel(
     private val client: SessionClient = SessionClient(),
     private val discovery: MirrorDiscovery = MirrorDiscovery { emptyFlow() },
 ) : ViewModel() {
-
     private val reducer = ChatReducer()
 
     private val _messages = MutableStateFlow<List<UiMessage>>(emptyList())
@@ -57,15 +56,16 @@ class ChatViewModel(
      */
     fun startDiscovery() {
         discoveryJob?.cancel()
-        discoveryJob = viewModelScope.launch {
-            discovery.endpoints().collect { endpoint ->
-                _discovered.value = endpoint
-                if (!userEdited && _endpoint.value.isBlank()) {
-                    _endpoint.value = endpoint
-                    connect()
+        discoveryJob =
+            viewModelScope.launch {
+                discovery.endpoints().collect { endpoint ->
+                    _discovered.value = endpoint
+                    if (!userEdited && _endpoint.value.isBlank()) {
+                        _endpoint.value = endpoint
+                        connect()
+                    }
                 }
             }
-        }
     }
 
     fun stopDiscovery() {
@@ -84,11 +84,12 @@ class ChatViewModel(
         collectJob?.cancel()
         reducer.reset()
         _messages.value = emptyList()
-        collectJob = viewModelScope.launch {
-            client.frames(target).collect { frame ->
-                _messages.value = reducer.apply(frame)
+        collectJob =
+            viewModelScope.launch {
+                client.frames(target).collect { frame ->
+                    _messages.value = reducer.apply(frame)
+                }
             }
-        }
     }
 
     fun send(text: String) {

@@ -21,7 +21,6 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelDiscoveryTest {
-
     private val dispatcher = UnconfinedTestDispatcher()
 
     @Before
@@ -36,9 +35,10 @@ class ChatViewModelDiscoveryTest {
 
     @Test
     fun discoveredEndpointAutoFills() {
-        val vm = ChatViewModel(
-            discovery = MirrorDiscovery { flowOf("ws://10.0.0.5:8765") },
-        )
+        val vm =
+            ChatViewModel(
+                discovery = MirrorDiscovery { flowOf("ws://10.0.0.5:8765") },
+            )
 
         vm.startDiscovery()
 
@@ -48,9 +48,10 @@ class ChatViewModelDiscoveryTest {
 
     @Test
     fun manualEditWinsOverDiscovery() {
-        val vm = ChatViewModel(
-            discovery = MirrorDiscovery { flowOf("ws://10.0.0.5:8765") },
-        )
+        val vm =
+            ChatViewModel(
+                discovery = MirrorDiscovery { flowOf("ws://10.0.0.5:8765") },
+            )
 
         vm.setEndpoint("ws://192.168.1.50:8765")
         vm.startDiscovery()
