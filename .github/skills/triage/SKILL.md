@@ -55,7 +55,7 @@ The subagent is responsible for:
 3. Identifying the **component(s)** involved (e.g., `MsgpackRpc`, `NvimConnector`, `GridModel`, `HighlightTable`, `ModeInfo`, `GridItem`, `CursorItem`, `InputHandler`, a `*Model`, or a `qml/` component).
 4. Confirming the **root cause** (for bugs) by tracing the actual code — not guessing. Remember the redraw event stream is the single source of truth; `ext_hlstate` makes `hl_attr_define` a 4-element event; `paint()` must be a pure function of (`GridModel`, `HighlightTable`, `ModeInfo`, cursor state) and must never reach back into RPC state.
 5. Sketching a **proposed approach** consistent with existing patterns (redraw event handlers, the reactive `QObject`-proxy for Repeater delegates, `Q_PROPERTY`/`Q_SIGNAL` wiring, text-run batching by `(hl_id, font_state)`) and **without regressing per-frame redraw cost or breaking paint-path purity**.
-6. Noting **testing implications**: which test tier maps to the changed source — Tier 1 `tests/unit/` (headless, `QTEST_GUILESS_MAIN`), Tier 2 `tests/integration/` (real `nvim --embed`, `minimal` QPA + software renderer), or Tier 3 `tests/qml/` (`qmltest`) — which **existing** tests will break and must be updated, and what **new** test cases would add/validate the fix (specific test function/method names and the behavior each asserts). For visual changes, note whether `scripts/screenshot-qvim.ps1` / the `visual-validate-qvim` skill is the authoritative gate.
+6. Noting **testing implications**: which test tier maps to the changed source — Tier 1 `tests/unit/` (headless, `QTEST_GUILESS_MAIN`), Tier 2 `tests/integration/` (real `nvim --embed`, `minimal` QPA + software renderer), or Tier 3 `tests/qml/` (`qmltest`) — which **existing** tests will break and must be updated, and what **new** test cases would add/validate the fix (specific test function/method names and the behavior each asserts). For visual changes, note whether `scripts/screenshot_qvim.ps1` / the `visual-validate-qvim` skill is the authoritative gate.
 7. Flagging any ambiguity or missing information the user still needs to resolve.
 
 The subagent must **return a structured report** containing:
@@ -129,7 +129,7 @@ Pick the categories that genuinely apply (usually one primary, occasionally a se
      - **New test cases** that add/validate the fix — proposed test function/method names and the specific behavior/assertion each covers. Include a concrete **regression test code snippet** (fenced) that the future agent can drop in. Use `QSignalSpy` for redraw assertions and `dumpAscii()` for grid snapshots per repo convention.
      - **Pin the fix, not incidental state.** Each new test's assertions must fail today (before the fix) and pass only once *this specific* change is made, and must target the fixed behavior narrowly — assert the exact grid/highlight/cursor/keycode value that changes, not a broad snapshot or unrelated surrounding state — via a **hard `QVERIFY`/`QCOMPARE`**, never a `qWarning` or soft pixel-band heuristic (which respond to kerning/sub-pixel changes and produce false positives).
      - The exact command to run for validation, e.g. `ctest --preset release -R 'attach_and_render|resize|insert_and_quit'` for paint-path/redraw changes, `ctest --preset release -R test_input_handler` for `InputHandler`, `ctest --preset release -R test_qml` for QML. Note that the build must pass under `/W4 /permissive-` with warnings treated as bugs.
-     - **Visual gate.** For paint-path / font / cursor / selection / highlight changes, require capturing the rendered window via `scripts/screenshot-qvim.ps1` (or the `visual-validate-qvim` skill) and inspecting it — a green ctest run alone is not proof.
+     - **Visual gate.** For paint-path / font / cursor / selection / highlight changes, require capturing the rendered window via `scripts/screenshot_qvim.ps1` (or the `visual-validate-qvim` skill) and inspecting it — a green ctest run alone is not proof.
    - **Out of scope** — what this task must not touch.
    - Add a footer line: `Categories: <comma-separated categories>`.
 3. Write the draft to `tmp/triage-issue.md` (git-ignored) so the user can edit it directly.
@@ -157,7 +157,7 @@ Use the bundled helper script — it derives the repo root, ensures each label e
 
 ```ps1
 pwsh -NoProfile -ExecutionPolicy Bypass `
-  -File .github/skills/triage/scripts/new-issue.ps1 `
+  -File .github/skills/triage/scripts/new_issue.ps1 `
   -Draft tmp/triage-issue.md -Label <cat1> -Label <cat2>
 ```
 

@@ -86,7 +86,7 @@ Two things keep cold start down:
   launch ~10-13s → ~2s in measurement). Run this once, from an **elevated** PowerShell:
 
   ```pwsh
-  pwsh -NoProfile -File scripts\add-defender-exclusion.ps1
+  pwsh -NoProfile -File scripts\add_defender_exclusion.ps1
   ```
 
   By default it excludes the whole `build\` tree — deliberately, because the dominant cost is

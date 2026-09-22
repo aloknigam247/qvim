@@ -63,11 +63,11 @@ If the feature under test requires insert mode, append `autocmd VimEnter * start
 
 ### 3. Take the screenshot
 
-`scripts/screenshot-qvim.ps1` handles the SetForegroundWindow + `PrintWindow PW_RENDERFULLCONTENT` dance needed to capture Qt Quick's DirectComposition surface. Default settle is 5 seconds, which is enough for the attach + first paint.
+`scripts/screenshot_qvim.ps1` handles the SetForegroundWindow + `PrintWindow PW_RENDERFULLCONTENT` dance needed to capture Qt Quick's DirectComposition surface. Default settle is 5 seconds, which is enough for the attach + first paint.
 
 ```pwsh
 $out = "$tmp\shot.png"
-pwsh D:\qvim\scripts\screenshot-qvim.ps1 -File "$tmp\sample.txt" -InitFile "$tmp\init.vim" -OutPath $out
+pwsh D:\qvim\scripts\screenshot_qvim.ps1 -File "$tmp\sample.txt" -InitFile "$tmp\init.vim" -OutPath $out
 ```
 
 Use `-Exe "D:\qvim\build\dev\Debug\qvim.exe"` if you want the Debug build's render (slower animation, assert-heavy). Default targets `build\release\RelWithDebInfo\qvim.exe`.

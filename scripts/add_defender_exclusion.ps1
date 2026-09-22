@@ -28,15 +28,15 @@
 
 .EXAMPLE
     # Add an exclusion for the default build tree (run from an elevated shell):
-    pwsh -NoProfile -File scripts\add-defender-exclusion.ps1
+    pwsh -NoProfile -File scripts\add_defender_exclusion.ps1
 
 .EXAMPLE
     # Exclude a specific install directory:
-    pwsh -NoProfile -File scripts\add-defender-exclusion.ps1 -Path 'C:\Tools\qvim'
+    pwsh -NoProfile -File scripts\add_defender_exclusion.ps1 -Path 'C:\Tools\qvim'
 
 .EXAMPLE
     # Undo:
-    pwsh -NoProfile -File scripts\add-defender-exclusion.ps1 -Remove
+    pwsh -NoProfile -File scripts\add_defender_exclusion.ps1 -Remove
 #>
 [CmdletBinding()]
 param(
@@ -103,4 +103,4 @@ Add-MpPreference -ExclusionPath $Path
 Write-Host "Added Defender exclusion: $Path" -ForegroundColor Green
 Write-Host ""
 Write-Host "Cold launches of qvim from this directory will now skip Defender's real-time scan."
-Write-Host "To undo:  pwsh -NoProfile -File scripts\add-defender-exclusion.ps1 -Remove -Path '$Path'"
+Write-Host "To undo:  pwsh -NoProfile -File scripts\add_defender_exclusion.ps1 -Remove -Path '$Path'"
