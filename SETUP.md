@@ -149,11 +149,11 @@ cmake --preset dev; cmake --build --preset dev
 ```
 
 Every test executable statically links `qvim_lib`, so the report's own line-rate double-counts each
-source line once per test module. `scripts/coverage-union.ps1` collapses that into a real union
+source line once per test module. `scripts/coverage_union.ps1` collapses that into a real union
 figure over `src/` + `include/` and fails if it regresses below the floor:
 
 ```pwsh
-pwsh -NoProfile -File scripts\coverage-union.ps1 -CoberturaPath _cov\full.cobertura
+pwsh -NoProfile -File scripts\coverage_union.ps1 -CoberturaPath _cov\full.cobertura
 ```
 
 Ratchet `-MinCovered` / `-MinRatio` upward as coverage improves (issue #33 tracks the gate, #40

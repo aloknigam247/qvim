@@ -29,7 +29,7 @@ qvim is a Neovim GUI client written in C++23 / Qt 6.10 / QML, talking to an embe
 - For changes to `InputHandler`: `test_input_handler` must pass, and prefer adding a fuzz case if you touched key encoding.
 - For changes that affect QML: `test_qml` must pass.
 - Don't claim "should work" — run the test.
-- **Treat agent reports as claims, not proof.** A single green ctest run can mask: (a) flaky tests that pass intermittently — rerun any new tier-2 test 5–10× before trusting it; (b) tests using `qWarning` / soft thresholds instead of `QVERIFY` for the actual feature signal — read the test source and confirm the strong assertion is a hard fail; (c) pixel-band heuristics that respond to kerning or sub-pixel changes without proving the feature works — for visual features, capture the rendered window (`scripts/screenshot-qvim.ps1`) and inspect.
+- **Treat agent reports as claims, not proof.** A single green ctest run can mask: (a) flaky tests that pass intermittently — rerun any new tier-2 test 5–10× before trusting it; (b) tests using `qWarning` / soft thresholds instead of `QVERIFY` for the actual feature signal — read the test source and confirm the strong assertion is a hard fail; (c) pixel-band heuristics that respond to kerning or sub-pixel changes without proving the feature works — for visual features, capture the rendered window (`scripts/screenshot_qvim.ps1`) and inspect.
 
 ## Layout
 
@@ -90,6 +90,7 @@ The post-build step in `CMakeLists.txt` deploys Qt DLLs + `qt.conf` + platform p
 - **Reactive QObject-proxy for Repeater delegates.** When a `QHash<id, X>` backs Repeater delegates and the delegate needs to react to field changes on `X`, expose a `Q_INVOKABLE QObject* xFor(id)` returning a proxy whose fields are `Q_PROPERTY` with NOTIFY signals. Bindings re-evaluate in-place; the delegate is never destroyed (preserves focus, glyph cache, blink phase). **Never** use the `model = null; model = list` Repeater-rebuild antipattern — it nukes activeFocusItem and per-instance caches on every nvim window event.
 - `Component.onCompleted: forceActiveFocus()` only fires once. To survive later layout reflows, focus must be owned by an item that is itself never destroyed (e.g. the long-lived `baseGrid`, not a Repeater delegate).
 - **Keep `README.md` in sync.** When you add a feature or change information that `README.md` already describes (overview facts, architecture/data-flow, component names, versions, supported platforms), update `README.md` in the same change. Do not let the README drift from reality.
+- **File & directory naming.** General-purpose files and directories default to lowercase `snake_case` (e.g. `coverage_union.ps1`, `session_protocol.md`). Preserve established conventions instead of renaming: C++ `PascalCase` headers/sources and their exact `#include` names, C++ `snake_case` tests + generated `.moc`, QML `PascalCase` components (`QML_ELEMENT` requires an uppercase-initial filename), Python `snake_case` modules, fixed/standard names (`README.md`, `AGENTS.md`, `SETUP.md`, `SKILL.md`, `LICENSE`, `CMakeLists.txt`, `CMakePresets.json`, and tool configs such as `.clang-format`, `.clang-tidy`, `vcpkg.json`, `release-please-config.json`), the `.github/` tree's runtime-defined names (workflow/action/skill paths), vendored/third-party artifacts, and the `android/` framework tree (Gradle files, manifests, `res/` source sets, Kotlin classes, package-path directories). Never distinguish two paths only by capitalization.
 
 ## Testing
 
@@ -118,7 +119,7 @@ Three tiers (see `tests/CMakeLists.txt`):
 - The `powershell` tool runs each command in a **fresh process** — working directory, environment variables, and shell state do not persist across calls. Cherry-picking and other parent-checkout operations must `cd D:\qvim` (or use `git -C D:\qvim ...`) explicitly in the same command — otherwise you commit/build/test in the wrong tree.
 - Boot-profile instrumentation is gated behind `QVIM_BOOT_PROFILE=1`. Phase timings go to `qDebug` (invisible under `/SUBSYSTEM:WINDOWS` launched from Explorer) **and** to the path in `QVIM_BOOT_PROFILE_FILE` when set. Use the file form for windowed launches: `$env:QVIM_BOOT_PROFILE=1; $env:QVIM_BOOT_PROFILE_FILE='D:\qvim\_boot.log'; qvim.exe`.
 - Qt 6.10 on Windows: `QFont::setFeature(QFont::Tag("liga"), 1)` / `setFeature("calt", 1)` does NOT enable OpenType ligatures for monospace fonts even though the API exists. Cascadia Code / JetBrainsMono ligatures that render in VS Code and Windows Terminal will NOT form in qvim through this path. A working ligature implementation needs a different approach (custom shaping via `QRawFont` + HarfBuzz directly, or `QTextLayout` with explicit feature config) — and a test that asserts on actual ligature *glyph substitution*, not pixel-band density (which responds to kerning changes alone, producing false positives).
-- PowerShell's `Set-Content` writes CRLF on Windows. nvim's `-u init.vim` reads CRLF as a `^M` literal at the end of each line, so commands like `autocmd VimEnter * startinsert` become `startinsert^M` and fail with `E488: Trailing characters`. When generating init.vim from a script (e.g. `scripts/screenshot-qvim.ps1` test fixtures), use `[IO.File]::WriteAllText($path, "set ...`n...")` instead — backtick-n in a double-quoted PowerShell string is a single LF.
+- PowerShell's `Set-Content` writes CRLF on Windows. nvim's `-u init.vim` reads CRLF as a `^M` literal at the end of each line, so commands like `autocmd VimEnter * startinsert` become `startinsert^M` and fail with `E488: Trailing characters`. When generating init.vim from a script (e.g. `scripts/screenshot_qvim.ps1` test fixtures), use `[IO.File]::WriteAllText($path, "set ...`n...")` instead — backtick-n in a double-quoted PowerShell string is a single LF.
 
 ## Fanning out subagents
 
@@ -149,7 +150,7 @@ Agents launched with `isolation: "worktree"` get a dedicated worktree checkout b
 For paint-path / font / cursor / selection changes, the authoritative validation is a screenshot of the rendered qvim window (tests can pass while the user-visible feature is broken — see "Verify, don't assume" above). The `visual-validate-qvim` skill under `.github/skills/` automates this.
 
 ```pwsh
-pwsh scripts/screenshot-qvim.ps1 -File D:\path\to\test.txt -InitFile D:\path\to\init.vim -OutPath D:\out.png
+pwsh scripts/screenshot_qvim.ps1 -File D:\path\to\test.txt -InitFile D:\path\to\init.vim -OutPath D:\out.png
 ```
 
 Then view the PNG and inspect. Notes on the capture pipeline:

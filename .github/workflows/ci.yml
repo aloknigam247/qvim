@@ -238,4 +238,4 @@ jobs:
           $reports = (Get-ChildItem _cov\*.cobertura).FullName
           if (-not $reports) { throw "no per-tier cobertura reports found under _cov/." }
           Write-Host "unioning $($reports.Count) tier report(s):`n$($reports -join "`n")"
-          & scripts\coverage-union.ps1 -CoberturaPath $reports
+          & scripts\coverage_union.ps1 -CoberturaPath $reports

@@ -32,8 +32,8 @@
     TCP port for the echo server + adb reverse tunnel. Default 8765.
 
 .EXAMPLE
-    pwsh -NoProfile -File android\scripts\e2e-device.ps1
-    pwsh -NoProfile -File android\scripts\e2e-device.ps1 -SkipBuild
+    pwsh -NoProfile -File android\scripts\e2e_device.ps1
+    pwsh -NoProfile -File android\scripts\e2e_device.ps1 -SkipBuild
 #>
 [CmdletBinding()]
 param(
@@ -51,7 +51,7 @@ $JavaHome    = if ($env:JAVA_HOME)    { $env:JAVA_HOME }    else { "$env:LOCALAP
 $AndroidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:LOCALAPPDATA\Android\Sdk" }
 $Adb         = Join-Path $AndroidHome "platform-tools\adb.exe"
 $Apk         = Join-Path $AndroidRoot "app\build\outputs\apk\debug\app-debug.apk"
-$EchoDir     = Join-Path $AndroidRoot "tools\echo-server"
+$EchoDir     = Join-Path $AndroidRoot "tools\echo_server"
 $Package     = "com.qvim.companion"
 $Activity    = "$Package/.MainActivity"
 

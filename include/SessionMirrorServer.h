@@ -20,7 +20,7 @@ namespace qvim {
 
 // In-process plaintext WebSocket endpoint that mirrors qvim's chat session to
 // LAN subscribers, backed by SessionEventBuffer. Implements the v1 wire protocol in
-// docs/protocol/session-protocol.md: on connect the server sends `hello` first;
+// docs/protocol/session_protocol.md: on connect the server sends `hello` first;
 // the client replies `resume`; the server then streams live events.
 //
 // The mirrored session is the desktop `ChatModel` itself, not a parallel echo:

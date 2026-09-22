@@ -10,7 +10,7 @@ discovery, auth, encryption, or resume yet — those are later slices.
 - Renders the chat transcript: atomic `user` messages and streamed `assistant` replies.
 - Sends what you type as an `input` frame; the server echoes `Echo: <text>` back in chunks.
 
-The wire contract lives in [`docs/protocol/session-protocol.md`](../docs/protocol/session-protocol.md).
+The wire contract lives in [`docs/protocol/session_protocol.md`](../docs/protocol/session_protocol.md).
 
 ## Layout
 
@@ -28,8 +28,8 @@ android/
       MainActivity.kt
     src/test/java/com/qvim/companion/   # ProtocolTest, ChatReducerTest (pure JVM)
     src/debug/                # debug-only cleartext network-security config
-  scripts/e2e-device.ps1      # on-demand adb-driven device E2E suite
-  tools/echo-server/          # Python dev stand-in for the qvim session mirror
+  scripts/e2e_device.ps1      # on-demand adb-driven device E2E suite
+  tools/echo_server/          # Python dev stand-in for the qvim session mirror
 ```
 
 ## Prerequisites (headless — no Android Studio)
@@ -66,7 +66,7 @@ From `android/`:
 The real session mirror lives on the qvim desktop side; until then, use the Python stand-in. On the PC:
 
 ```pwsh
-cd android\tools\echo-server
+cd android\tools\echo_server
 pip install -r requirements.txt
 python echo_ws.py            # binds 0.0.0.0:8765
 ```
@@ -92,7 +92,7 @@ Drive it headlessly with adb if you like:
 
 ## On-demand device E2E suite
 
-`scripts/e2e-device.ps1` automates the full smoke against a **physically connected device**, driven
+`scripts/e2e_device.ps1` automates the full smoke against a **physically connected device**, driven
 entirely through adb. It builds + installs the APK, starts the Python echo server behind
 `adb reverse`, launches the app, drives the real UI, and asserts on the actual rendered view
 hierarchy via `uiautomator dump` (elements are located by text — never hardcoded pixel coordinates).
@@ -104,10 +104,10 @@ hierarchy via `uiautomator dump` (elements are located by text — never hardcod
 
 ```pwsh
 # full run (builds the APK first)
-pwsh -NoProfile -File android\scripts\e2e-device.ps1
+pwsh -NoProfile -File android\scripts\e2e_device.ps1
 
 # reuse an already-built APK
-pwsh -NoProfile -File android\scripts\e2e-device.ps1 -SkipBuild
+pwsh -NoProfile -File android\scripts\e2e_device.ps1 -SkipBuild
 ```
 
 It runs two cases and exits non-zero if any assertion fails:
@@ -118,7 +118,7 @@ It runs two cases and exits non-zero if any assertion fails:
   `Status: Disconnected` and never shows Connected or an echo.
 
 Prerequisites: an authorized device (`adb devices` shows `device`), the JDK/SDK env vars above, and
-the echo-server deps (`pip install -r tools\echo-server\requirements.txt`). The script freezes screen
+the echo_server deps (`pip install -r tools\echo_server\requirements.txt`). The script freezes screen
 rotation for the duration and restores it on exit. Pass `-DeviceSerial` when more than one device is
 attached, or `-Port` / `-PythonExe` to override defaults.
 
