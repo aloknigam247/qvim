@@ -32,10 +32,8 @@ Window {
     function _recomputeTarget() {
         const cw = Math.max(1, shell.cellWidth)
         const ch = Math.max(1, shell.cellHeight)
-        const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
-        const availH = height - chromeH
         const cols = Math.max(80, Math.floor(width  / cw))
-        const rows = Math.max(24, Math.floor(availH / ch))
+        const rows = Math.max(24, Math.floor(height / ch))
         _requestedCols = cols
         _requestedRows = rows
     }
@@ -69,9 +67,8 @@ Window {
             const cw = shell.cellWidth
             const ch = shell.cellHeight
             if (cw > 0 && ch > 0) {
-                const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
                 window.width  = _requestedCols * cw
-                window.height = _requestedRows * ch + chromeH
+                window.height = _requestedRows * ch
             }
             window.visible = true
         }
@@ -87,10 +84,9 @@ Window {
         const cw = shell.cellWidth
         const ch = shell.cellHeight
         if (cw <= 0 || ch <= 0) return
-        const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
         const dockW = chatPanel.visible ? chatPanel.width : 0
         window.width  = cols * cw + dockW
-        window.height = rows * ch + chromeH
+        window.height = rows * ch
     }
 
     Connections {
@@ -136,9 +132,8 @@ Window {
                 const cw = shell.cellWidth
                 const ch = shell.cellHeight
                 if (gc > 0 && gr > 0 && cw > 0 && ch > 0) {
-                    const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
                     window.width  = gc * cw
-                    window.height = gr * ch + chromeH
+                    window.height = gr * ch
                 }
                 window.visible = true
             }
@@ -157,22 +152,13 @@ Window {
         function onDefaultBackgroundChanged() { _syncTitleBar() }
     }
 
-    Tabline {
-        id: tabline
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        visible: $connector.tabline.rowCount() > 0
-        height: visible ? 28 : 0
-    }
-
     Shell {
         id: shell
         objectName: "shell"
         anchors.left: parent.left
         anchors.right: chatPanel.visible ? chatPanel.left : parent.right
-        anchors.top: tabline.bottom
-        anchors.bottom: cmdline.visible ? cmdline.top : parent.bottom
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
     }
 
     // Chat panel — docked on the right, hidden by default. Toggling `visible`
@@ -182,8 +168,8 @@ Window {
     // the grid to <=0 width (which would suppress the resize entirely).
     ChatPanel {
         id: chatPanel
-        anchors.top: tabline.bottom
-        anchors.bottom: cmdline.visible ? cmdline.top : parent.bottom
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
         anchors.right: parent.right
         width: visible ? Math.min(360, Math.floor(parent.width * 0.5)) : 0
         visible: false
@@ -246,29 +232,6 @@ Window {
         }
     }
 
-    Cmdline {
-        id: cmdline
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        visible: $connector.cmdline.visible
-        height: visible ? 28 : 0
-    }
-
-    PopupMenu {
-        anchorRow: $connector.popupmenu.anchorRow
-        anchorCol: $connector.popupmenu.anchorCol
-        visible: $connector.popupmenu.visible
-        cellWidth: shell.cellWidth
-        cellHeight: shell.cellHeight
-        z: 100
-    }
-
-    Messages {
-        anchors.fill: parent
-        z: 200
-    }
-
     Shortcut {
         sequence: "F11"
         context: Qt.WindowShortcut
@@ -282,10 +245,9 @@ Window {
                 if (scr) {
                     const cw = Math.max(1, shell.cellWidth)
                     const ch = Math.max(1, shell.cellHeight)
-                    const chromeH = tabline.height + (cmdline.visible ? cmdline.height : 0)
                     const dockW = chatPanel.visible ? chatPanel.width : 0
                     const cols = Math.max(1, Math.floor((scr.width - dockW) / cw))
-                    const rows = Math.max(1, Math.floor((scr.height - chromeH) / ch))
+                    const rows = Math.max(1, Math.floor(scr.height / ch))
                     $connector.tryResize(cols, rows)
                 }
                 window.visibility = Window.FullScreen

@@ -60,17 +60,13 @@ private slots:
         QVERIFY(exists);
         QCOMPARE(exists->toInt(), 0);
 
-        // Re-attach reused the single-source-of-truth options: ext_hlstate on,
-        // ext_multigrid off (see packAttachOptions). Query them as scalars — the
-        // test's getVar round-trip can't represent the nvim_list_uis() dicts.
+        // Re-attach reused the single-source-of-truth options: ext_hlstate on.
+        // Query it as a scalar — the test's getVar round-trip can't represent
+        // the nvim_list_uis() dicts.
         const auto extHl =
             evalSync(conn, QStringLiteral("get(nvim_list_uis()[0], 'ext_hlstate', v:false)"), 5000);
         QVERIFY(extHl);
         QCOMPARE(extHl->toBool(), true);
-        const auto extMg = evalSync(
-            conn, QStringLiteral("get(nvim_list_uis()[0], 'ext_multigrid', v:false)"), 5000);
-        QVERIFY(extMg);
-        QCOMPARE(extMg->toBool(), false);
 
         // The connection stayed up across the handoff and is attached again.
         QCOMPARE(disconnectedSpy.count(), 0);

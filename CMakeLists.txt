@@ -76,7 +76,6 @@ set(QVIM_LIB_SOURCES
     src/CellMetrics.cpp         include/CellMetrics.h
     src/ChatModel.cpp           include/ChatModel.h
     src/ClipboardBridge.cpp     include/ClipboardBridge.h
-    src/CmdlineModel.cpp        include/CmdlineModel.h
     src/Config.cpp              include/Config.h
     src/ConfigCliReader.cpp     include/ConfigCliReader.h
     src/ConfigGGlobalReader.cpp include/ConfigGGlobalReader.h
@@ -89,17 +88,14 @@ set(QVIM_LIB_SOURCES
     src/HighlightTable.cpp      include/HighlightTable.h
     src/InputHandler.cpp        include/InputHandler.h
     src/MdnsAdvertiser.cpp      include/MdnsAdvertiser.h
-    src/MessagesModel.cpp       include/MessagesModel.h
     src/ModeInfo.cpp            include/ModeInfo.h
     src/MsgpackRpc.cpp          include/MsgpackRpc.h
     src/NvimConnector.cpp       include/NvimConnector.h
-    src/PopupMenuModel.cpp      include/PopupMenuModel.h
     src/RectNodePool.cpp        include/RectNodePool.h
     src/ResizeCoalescer.cpp     include/ResizeCoalescer.h
     src/SessionCache.cpp        include/SessionCache.h
     src/SessionEventBuffer.cpp  include/SessionEventBuffer.h
     src/SessionMirrorServer.cpp include/SessionMirrorServer.h
-    src/TablineModel.cpp        include/TablineModel.h
     src/TextNodePool.cpp        include/TextNodePool.h
     src/VersionString.cpp       include/VersionString.h
     src/WindowChrome.cpp        include/WindowChrome.h
@@ -129,12 +125,8 @@ qt_add_qml_module(qvim_lib
     VERSION 1.0
     QML_FILES
         qml/ChatPanel.qml
-        qml/Cmdline.qml
         qml/Main.qml
-        qml/Messages.qml
-        qml/PopupMenu.qml
         qml/Shell.qml
-        qml/Tabline.qml
 )
 
 if(WIN32)

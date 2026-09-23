@@ -145,16 +145,13 @@ std::pair<bool, QPointF> CursorItem::targetCellTopLeft() const {
     const GridModel *g = grid();
     if(!g) return { false, {} };
     const int active = g->activeGrid();
-    auto *surface = g->surfaceFor(active);
-    if(!surface || !surface->visible()) return { false, {} };
     const int localRow = g->cursorRowOf(active);
     const int localCol = g->cursorColOf(active);
-    if(localRow < 0 || localRow >= surface->rows() || localCol < 0 || localCol >= surface->cols()) {
+    if(localRow < 0 || localRow >= g->gridRows(active) || localCol < 0 ||
+       localCol >= g->gridCols(active)) {
         return { false, {} };
     }
-    const int absRow = surface->y() + localRow;
-    const int absCol = surface->x() + localCol;
-    return { true, QPointF(absCol * m_cellWidth, absRow * m_cellHeight) };
+    return { true, QPointF(localCol * m_cellWidth, localRow * m_cellHeight) };
 }
 
 QRectF CursorItem::currentCursorRect() const {
@@ -186,14 +183,13 @@ void CursorItem::onCursorActivity() {
         return;
     }
 
-    // Compute absolute target row/col (same math targetCellTopLeft() uses,
-    // re-derived here so we can compare against m_prevRow/m_prevCol). Safe:
-    // targetCellTopLeft() already verified surface + bounds.
+    // Compute target row/col (same math targetCellTopLeft() uses, re-derived
+    // here so we can compare against m_prevRow/m_prevCol). Safe:
+    // targetCellTopLeft() already verified grid bounds.
     const GridModel *g = grid();
     const int active = g->activeGrid();
-    auto *surface = g->surfaceFor(active);
-    const int newRow = surface->y() + g->cursorRowOf(active);
-    const int newCol = surface->x() + g->cursorColOf(active);
+    const int newRow = g->cursorRowOf(active);
+    const int newCol = g->cursorColOf(active);
 
     // Snap (no animation) when this is the first cursor we've seen OR when
     // the underlying cells changed in the same batch — scroll / paste /
@@ -319,14 +315,10 @@ QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*d
     const ModeInfo *m = mode();
 
     const int active = g->activeGrid();
-    auto *surface = g->surfaceFor(active);
-    if(!surface || !surface->visible()) {
-        m_lastRect = {};
-        return commit();
-    }
     const int localRow = g->cursorRowOf(active);
     const int localCol = g->cursorColOf(active);
-    if(localRow < 0 || localRow >= surface->rows() || localCol < 0 || localCol >= surface->cols()) {
+    if(localRow < 0 || localRow >= g->gridRows(active) || localCol < 0 ||
+       localCol >= g->gridCols(active)) {
         m_lastRect = {};
         return commit();
     }
@@ -355,9 +347,7 @@ QSGNode *CursorItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData * /*d
     if(m_hasAnimatedPos) {
         drawPos = m_animatedPos;
     } else {
-        const int absRow = surface->y() + localRow;
-        const int absCol = surface->x() + localCol;
-        drawPos = QPointF(absCol * m_cellWidth, absRow * m_cellHeight);
+        drawPos = QPointF(localCol * m_cellWidth, localRow * m_cellHeight);
     }
     const QRectF rect = cursorRectAtPixel(drawPos, m_cellWidth, m_cellHeight, shape);
 

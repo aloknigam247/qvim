@@ -1,12 +1,8 @@
 #include "NvimConnector.h"
-#include "CmdlineModel.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
-#include "MessagesModel.h"
 #include "ModeInfo.h"
 #include "MsgpackRpc.h"
-#include "PopupMenuModel.h"
-#include "TablineModel.h"
 
 #include <QDebug>
 #include <QFontDatabase>
@@ -34,39 +30,24 @@ static int64_t asInt(const msgpack::object &o, int64_t def = 0) {
 
 // The single source of truth for the nvim_ui_attach option map. Initial attach
 // and the :restart re-attach both pack through here so their UI options can never
-// diverge. Diagnostic mode: every non-core extension is disabled to bisect the
-// residual focus-loss-after-':' bug — flip a bool back to true once the offending
-// feature is found. The C++ handlers, QML overlays, and models stay wired; nvim
-// simply won't emit the events that drive them.
+// diverge. qvim renders the single global grid: rgb + ext_linegrid + ext_hlstate.
 static void packAttachOptions(msgpack::packer<msgpack::sbuffer> &pk, int cols, int rows) {
     pk.pack_array(3);
     pk.pack(static_cast<int64_t>(cols));
     pk.pack(static_cast<int64_t>(rows));
-    pk.pack_map(8);
+    pk.pack_map(3);
     pk.pack("rgb");
     pk.pack(true);
     pk.pack("ext_linegrid");
     pk.pack(true);
     pk.pack("ext_hlstate");
     pk.pack(true);
-    pk.pack("ext_multigrid");
-    pk.pack(false);
-    pk.pack("ext_tabline");
-    pk.pack(false);
-    pk.pack("ext_popupmenu");
-    pk.pack(false);
-    pk.pack("ext_cmdline");
-    pk.pack(false);
-    pk.pack("ext_messages");
-    pk.pack(false);
 }
 
 NvimConnector::NvimConnector(QObject *parent) :
     QObject(parent), m_rpc(new MsgpackRpc(this)), m_grid(new GridModel(this)),
-    m_hl(new HighlightTable(this)), m_messages(new MessagesModel(this)), m_mode(new ModeInfo(this)),
-    m_tabline(new TablineModel(this)), m_popupmenu(new PopupMenuModel(this)),
-    m_cmdline(new CmdlineModel(this)), m_resizeCoalescer(new ResizeCoalescer(this)),
-    m_restartTimer(new QTimer(this)) {
+    m_hl(new HighlightTable(this)), m_mode(new ModeInfo(this)),
+    m_resizeCoalescer(new ResizeCoalescer(this)), m_restartTimer(new QTimer(this)) {
     m_restartTimer->setSingleShot(true);
     connect(m_rpc, &MsgpackRpc::notification, this, &NvimConnector::onNotification);
     connect(m_rpc, &MsgpackRpc::transportClosed, this, &NvimConnector::onRpcDisconnected);
@@ -237,16 +218,15 @@ void NvimConnector::input(const QString &keys) {
 
 void NvimConnector::inputMouse(const QString &button, const QString &action,
                                const QString &modifier, int grid, int row, int col) {
-    // nvim_input_mouse requires grid=0 when ext_multigrid is not active so
-    // that nvim performs its own hit-testing (e.g. floating windows overlay).
-    const int effectiveGrid = m_extMultigrid ? grid : 0;
+    Q_UNUSED(grid);
+    // nvim_input_mouse takes grid=0 so nvim performs its own hit-testing.
     m_rpc->notify(QStringLiteral("nvim_input_mouse"),
-                  [&, effectiveGrid](msgpack::packer<msgpack::sbuffer> &pk) {
+                  [&](msgpack::packer<msgpack::sbuffer> &pk) {
         pk.pack_array(6);
         pk.pack(button.toStdString());
         pk.pack(action.toStdString());
         pk.pack(modifier.toStdString());
-        pk.pack(static_cast<int64_t>(effectiveGrid));
+        pk.pack(static_cast<int64_t>(0));
         pk.pack(static_cast<int64_t>(row));
         pk.pack(static_cast<int64_t>(col));
     });
@@ -474,11 +454,6 @@ void NvimConnector::resetUiState() {
     m_grid->reset();
     m_hl->clear();
     m_mode->reset();
-    m_tabline->clear();
-    m_popupmenu->hide();
-    m_cmdline->hide();
-    m_cmdline->blockHide();
-    m_messages->reset();
     m_sentUiSizes.clear();
     emit defaultBackgroundChanged();
 }
@@ -557,57 +532,6 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
         }
         return;
     }
-    if(name == "grid_destroy") {
-        // [grid]
-        if(a.size >= 1) m_grid->destroyGrid(static_cast<int>(asInt(a.ptr[0])));
-        return;
-    }
-    if(name == "win_pos") {
-        // [grid, win, start_row, start_col, width, height]
-        if(a.size >= 6) {
-            m_grid->setPos(static_cast<int>(asInt(a.ptr[0])),
-                           static_cast<int>(asInt(a.ptr[3])),  // x = start_col
-                           static_cast<int>(asInt(a.ptr[2])),  // y = start_row
-                           static_cast<int>(asInt(a.ptr[4])),  // w
-                           static_cast<int>(asInt(a.ptr[5]))); // h
-        }
-        return;
-    }
-    if(name == "win_float_pos") {
-        // [grid, win, anchor, anchor_grid, anchor_row, anchor_col, focusable, zindex]
-        if(a.size >= 8) {
-            m_grid->setFloatPos(
-                static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[3])),
-                static_cast<int>(asInt(a.ptr[4])), static_cast<int>(asInt(a.ptr[5])),
-                asBool(a.ptr[6]), static_cast<int>(asInt(a.ptr[7])));
-        }
-        return;
-    }
-    if(name == "win_external_pos") {
-        // [grid, win]
-        if(a.size >= 1) m_grid->setExternalPos(static_cast<int>(asInt(a.ptr[0])));
-        return;
-    }
-    if(name == "win_hide") {
-        // [grid]
-        if(a.size >= 1) m_grid->setHidden(static_cast<int>(asInt(a.ptr[0])));
-        return;
-    }
-    if(name == "win_close") {
-        // [grid] — like destroy, but issued when the window is closed
-        if(a.size >= 1) m_grid->destroyGrid(static_cast<int>(asInt(a.ptr[0])));
-        return;
-    }
-    if(name == "win_viewport") {
-        // [grid, win, topline, botline, curline, curcol, line_count?, scroll_delta?]
-        if(a.size >= 6) {
-            m_grid->setViewport(
-                static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[2])),
-                static_cast<int>(asInt(a.ptr[3])), static_cast<int>(asInt(a.ptr[4])),
-                static_cast<int>(asInt(a.ptr[5])));
-        }
-        return;
-    }
     if(name == "default_colors_set") {
         if(a.size >= 4) {
             m_hl->setDefaultColors(static_cast<int>(asInt(a.ptr[0], -1)),
@@ -632,61 +556,6 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
     if(name == "mode_change") {
         if(a.size >= 2)
             m_mode->setCurrentMode(asQString(a.ptr[0]), static_cast<int>(asInt(a.ptr[1])));
-        return;
-    }
-    if(name == "tabline_update") {
-        if(a.size >= 2) m_tabline->update(a.ptr[0], a.ptr[1]);
-        return;
-    }
-    if(name == "popupmenu_show") {
-        if(a.size >= 4) {
-            m_popupmenu->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])),
-                              static_cast<int>(asInt(a.ptr[2])), static_cast<int>(asInt(a.ptr[3])));
-        }
-        return;
-    }
-    if(name == "popupmenu_select") {
-        if(a.size >= 1) m_popupmenu->select(static_cast<int>(asInt(a.ptr[0])));
-        return;
-    }
-    if(name == "popupmenu_hide") {
-        m_popupmenu->hide();
-        return;
-    }
-    if(name == "cmdline_show") {
-        if(a.size >= 6) {
-            m_cmdline->show(a.ptr[0], static_cast<int>(asInt(a.ptr[1])), asQString(a.ptr[2]),
-                            asQString(a.ptr[3]), static_cast<int>(asInt(a.ptr[4])),
-                            static_cast<int>(asInt(a.ptr[5])));
-        }
-        return;
-    }
-    if(name == "cmdline_pos") {
-        if(a.size >= 2)
-            m_cmdline->setPos(static_cast<int>(asInt(a.ptr[0])), static_cast<int>(asInt(a.ptr[1])));
-        return;
-    }
-    if(name == "cmdline_special_char") {
-        if(a.size >= 3) {
-            m_cmdline->setSpecialChar(asQString(a.ptr[0]), asBool(a.ptr[1]),
-                                      static_cast<int>(asInt(a.ptr[2])));
-        }
-        return;
-    }
-    if(name == "cmdline_hide") {
-        m_cmdline->hide();
-        return;
-    }
-    if(name == "cmdline_block_show") {
-        if(a.size >= 1) m_cmdline->blockShow(a.ptr[0]);
-        return;
-    }
-    if(name == "cmdline_block_append") {
-        if(a.size >= 1) m_cmdline->blockAppend(a.ptr[0]);
-        return;
-    }
-    if(name == "cmdline_block_hide") {
-        m_cmdline->blockHide();
         return;
     }
     if(name == "option_set") {
@@ -737,35 +606,6 @@ void NvimConnector::dispatchEvent(const std::string &name, const msgpack::object
             m_restartListenAddr = asQString(a.ptr[0]);
             m_restartPending = true;
         }
-        return;
-    }
-    if(name == "msg_show") {
-        // [kind, content, replace_last] (history flag in newer nvim, ignored)
-        if(a.size >= 3) { m_messages->msgShow(a.ptr[0], a.ptr[1], asBool(a.ptr[2])); }
-        return;
-    }
-    if(name == "msg_clear") {
-        m_messages->msgClear();
-        return;
-    }
-    if(name == "msg_history_show") {
-        if(a.size >= 1) m_messages->msgHistoryShow(a.ptr[0]);
-        return;
-    }
-    if(name == "msg_showmode") {
-        if(a.size >= 1) m_messages->msgShowMode(a.ptr[0]);
-        return;
-    }
-    if(name == "msg_showcmd") {
-        if(a.size >= 1) m_messages->msgShowCmd(a.ptr[0]);
-        return;
-    }
-    if(name == "msg_ruler") {
-        if(a.size >= 1) m_messages->msgRuler(a.ptr[0]);
-        return;
-    }
-    if(name == "msg_history_clear") {
-        // history cleared on nvim side — no UI state to update for v1.
         return;
     }
     // mouse_on, mouse_off, busy_start, busy_stop, set_icon, update_menu,

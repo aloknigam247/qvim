@@ -15,15 +15,11 @@
 #include <optional>
 #include <utility>
 
-#include "CmdlineModel.h"
 #include "GridModel.h"
 #include "HighlightTable.h"
-#include "MessagesModel.h"
 #include "ModeInfo.h"
 #include "MsgpackRpc.h"
-#include "PopupMenuModel.h"
 #include "ResizeCoalescer.h"
-#include "TablineModel.h"
 #include <msgpack.hpp>
 
 namespace qvim {
@@ -35,11 +31,7 @@ class NvimConnector : public QObject {
 
     Q_PROPERTY(qvim::GridModel *grid READ grid CONSTANT)
     Q_PROPERTY(qvim::HighlightTable *highlights READ highlights CONSTANT)
-    Q_PROPERTY(qvim::MessagesModel *messages READ messages CONSTANT)
     Q_PROPERTY(qvim::ModeInfo *modeInfo READ modeInfo CONSTANT)
-    Q_PROPERTY(qvim::TablineModel *tabline READ tabline CONSTANT)
-    Q_PROPERTY(qvim::PopupMenuModel *popupmenu READ popupmenu CONSTANT)
-    Q_PROPERTY(qvim::CmdlineModel *cmdline READ cmdline CONSTANT)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(QString guifont READ guifont NOTIFY guifontChanged)
     // Parsed convenience accessors so any QML overlay can do
@@ -80,11 +72,7 @@ public:
 
     GridModel *grid() const { return m_grid; }
     HighlightTable *highlights() const { return m_hl; }
-    MessagesModel *messages() const { return m_messages; }
     ModeInfo *modeInfo() const { return m_mode; }
-    TablineModel *tabline() const { return m_tabline; }
-    PopupMenuModel *popupmenu() const { return m_popupmenu; }
-    CmdlineModel *cmdline() const { return m_cmdline; }
     QString title() const { return m_title; }
     QString guifont() const { return m_guifont; }
     QString guifontFamily() const;
@@ -168,18 +156,13 @@ private:
     MsgpackRpc *m_rpc = nullptr;
     GridModel *m_grid = nullptr;
     HighlightTable *m_hl = nullptr;
-    MessagesModel *m_messages = nullptr;
     ModeInfo *m_mode = nullptr;
-    TablineModel *m_tabline = nullptr;
-    PopupMenuModel *m_popupmenu = nullptr;
-    CmdlineModel *m_cmdline = nullptr;
     ResizeCoalescer *m_resizeCoalescer = nullptr;
     QTimer *m_restartTimer = nullptr;
 
     QString m_title;
     QString m_guifont;
     bool m_attached = false;
-    bool m_extMultigrid = false;
 
     // :restart reconnect state. m_restartPending is set by the `restart` redraw
     // event; m_restartInProgress spans the socket-connect handshake; the two size

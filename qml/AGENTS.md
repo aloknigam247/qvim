@@ -7,7 +7,7 @@ Root `AGENTS.md` defines the reactive-proxy and focus rules. This file is the QM
 - Connect QML to `NvimConnector` signals directly (`Connections { target: $connector }`). No imperative pull.
 - Top-level scene is `Main.qml`; the grid host is `Shell.qml`. The long-lived item that owns focus is the `baseGrid` inside `Shell.qml`.
 - Repeater delegates that need to react to per-id field changes consume a `Q_INVOKABLE QObject*` proxy (e.g. `$connector.gridFor(id)`), never a re-emitted whole-list.
-- Cursor rendering is a separate `CursorItem` overlay sibling of `baseGrid` in `Shell.qml` (z=99 — above all grids including float sub-grids at z=50+zindex, below PopupMenu z=100 and Messages z=200 in Main.qml). It must NOT take focus — focus stays on the long-lived `baseGrid`. Bindings flow from `baseGrid` (cellWidth/cellHeight/cellBaseline/fontName/fontSize), so font/linespace changes propagate through one signal hop.
+- Cursor rendering is a separate `CursorItem` overlay sibling of `baseGrid` in `Shell.qml` (z=99 — above the grid). It must NOT take focus — focus stays on the long-lived `baseGrid`. Bindings flow from `baseGrid` (cellWidth/cellHeight/cellBaseline/fontName/fontSize), so font/linespace changes propagate through one signal hop.
 
 ## Why the reactive QObject-proxy rule exists
 
@@ -22,7 +22,6 @@ A `QHash<id, X>` re-emitted as a property nukes Repeater delegates on every nvim
 - `model = null; model = list` to "refresh" a Repeater. Destroys focus, glyph cache, blink phase. Use a proxy + NOTIFY.
 - `setContextProperty("foo", obj)` for a type that is already `QML_ELEMENT` — double-registers and shadows the QML import.
 - Owning focus on a Repeater delegate. It will be destroyed.
-- Layout reflows during `cmdline_show` (ext_multigrid fires `grid_resize` + `win_pos`) that destroy delegates — every grid container must survive resize.
 
 ## Build/test cheatsheet
 
@@ -34,5 +33,4 @@ ctest --preset release --output-on-failure -R '^test_qml$'
 ## Templates
 
 - Scene root + `$connector` wiring: `Main.qml`.
-- Long-lived grid host that owns focus and hosts Repeaters: `Shell.qml`.
-- Overlay backed by a model with NOTIFY proxy: `Cmdline.qml`, `PopupMenu.qml`, `Tabline.qml`, `Messages.qml`.
+- Long-lived grid host that owns focus: `Shell.qml`.
