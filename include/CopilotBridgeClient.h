@@ -19,11 +19,10 @@ namespace qvim {
 // handshake, and renders the mirror traffic from every attached Copilot CLI
 // session into the chat panel's `sink` ChatModel.
 //
-// This is a second chat backend alongside ChatModel's built-in echo. It renders
-// the mirror traffic from every session into `sink`, and inject()s user prompts
-// (from the panel or a LAN subscriber) back into a session — a pure
-// output/input relay. Tool-permission prompts are owned by the hub, so this
-// client does not handle them.
+// This is the chat panel's backend. It renders the mirror traffic from every
+// session into `sink`, and inject()s user prompts (from the panel or a LAN
+// subscriber) back into a session — a pure output/input relay. Tool-permission
+// prompts are owned by the hub, so this client does not handle them.
 //
 // Lifecycle mirrors SessionMirrorServer: `active` is the single authority, bound
 // to chat-panel visibility, so the outbound connection only exists while the

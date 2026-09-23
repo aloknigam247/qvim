@@ -1,22 +1,8 @@
 #include "ChatModel.h"
 
-#include <QTimer>
-
 namespace qvim {
 
-namespace {
-// Interval between streamed chunks. Small enough that the echo assembles
-// promptly, large enough that each chunk is a distinct model update the
-// streaming-assembly path (and its tests) actually observes.
-constexpr int kStreamIntervalMs = 16;
-constexpr int kEchoChunks = 3;
-} // namespace
-
-ChatModel::ChatModel(QObject *parent) :
-    QAbstractListModel(parent), m_streamTimer(new QTimer(this)) {
-    m_streamTimer->setInterval(kStreamIntervalMs);
-    connect(m_streamTimer, &QTimer::timeout, this, &ChatModel::streamTick);
-}
+ChatModel::ChatModel(QObject *parent) : QAbstractListModel(parent) {}
 
 int ChatModel::rowCount(const QModelIndex &parent) const {
     if(parent.isValid()) return 0;
@@ -43,54 +29,12 @@ QHash<int, QByteArray> ChatModel::roleNames() const {
     };
 }
 
-void ChatModel::submit(const QString &text) {
-    const QString trimmed = text.trimmed();
-    if(trimmed.isEmpty()) return;
-
-    ++m_turn;
-    const QString userId = QStringLiteral("u") + QString::number(m_turn);
-    const QString assistantId = QStringLiteral("a") + QString::number(m_turn);
-
-    appendMessage(Author::User, trimmed);
-    emit messageAdded(userId, QStringLiteral("user"), trimmed);
-
-    // Begin an empty assistant block, then queue the echo split into chunks
-    // targeting that specific row.
-    appendMessage(Author::Assistant, QString());
-    const int assistantRow = static_cast<int>(m_msgs.size()) - 1;
-    emit messageBegan(assistantId, QStringLiteral("assistant"));
-
-    const QString reply = QStringLiteral("Echo: ") + trimmed;
-    const QVector<QString> parts = chunkify(reply, kEchoChunks);
-    for(int i = 0; i < parts.size(); ++i) {
-        const bool last = (i == parts.size() - 1);
-        m_pending.enqueue(Chunk{ assistantRow, assistantId, parts[i], last });
-    }
-    if(!m_pending.isEmpty() && !m_streamTimer->isActive()) { m_streamTimer->start(); }
-}
-
 void ChatModel::appendBlock(const QString &author, const QString &text) {
     if(text.isEmpty()) return;
     const Author a = authorFromName(author);
     appendMessage(a, text);
     const QString id = QStringLiteral("x") + QString::number(++m_block);
     emit messageAdded(id, authorName(a), text);
-}
-
-void ChatModel::streamTick() {
-    if(m_pending.isEmpty()) {
-        m_streamTimer->stop();
-        return;
-    }
-    const Chunk chunk = m_pending.dequeue();
-    if(chunk.row >= 0 && chunk.row < m_msgs.size()) {
-        m_msgs[chunk.row].text += chunk.text;
-        const QModelIndex idx = index(chunk.row, 0);
-        emit dataChanged(idx, idx, { TextRole });
-    }
-    emit messageDelta(chunk.id, chunk.text);
-    if(chunk.last) { emit messageEnded(chunk.id); }
-    if(m_pending.isEmpty()) { m_streamTimer->stop(); }
 }
 
 QString ChatModel::textAt(int row) const {
@@ -127,16 +71,6 @@ ChatModel::Author ChatModel::authorFromName(const QString &name) {
     if(name == QStringLiteral("user")) return Author::User;
     if(name == QStringLiteral("assistant")) return Author::Assistant;
     return Author::System;
-}
-
-QVector<QString> ChatModel::chunkify(const QString &s, int parts) {
-    QVector<QString> out;
-    if(s.isEmpty()) return out;
-    const int n = qMax(1, parts);
-    const int len = static_cast<int>(s.size());
-    const int chunk = (len + n - 1) / n; // ceil division
-    for(int i = 0; i < len; i += chunk) { out.push_back(s.mid(i, chunk)); }
-    return out;
 }
 
 } // namespace qvim

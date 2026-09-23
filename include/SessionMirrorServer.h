@@ -23,15 +23,14 @@ namespace qvim {
 // docs/protocol/session_protocol.md: on connect the server sends `hello` first;
 // the client replies `resume`; the server then streams live events.
 //
-// The mirrored session is the desktop `ChatModel` itself, not a parallel echo:
-// `source` is the panel's model, and this server forwards its transcript taps
-// (messageAdded / messageBegan / messageDelta / messageEnded) verbatim as
-// `message` / `message.begin` / `message.delta` / `message.end` frames, each
-// carrying the next monotonic `seq`. Those taps fire for every message the
-// panel shows regardless of backend (local echo or copilot-bridge), so the
-// mirror always reflects the panel. A remote `input` is emitted as
-// `inputReceived`, which the panel dispatches to the active backend (echo
-// submit or copilot-bridge inject), so remote and local input share one path.
+// The mirrored session is the desktop `ChatModel` itself: `source` is the
+// panel's model, and this server forwards its transcript taps (messageAdded /
+// messageBegan / messageDelta / messageEnded) verbatim as `message` /
+// `message.begin` / `message.delta` / `message.end` frames, each carrying the
+// next monotonic `seq`. Those taps fire for every message the panel shows
+// regardless of backend, so the mirror always reflects the panel. A remote
+// `input` is emitted as `inputReceived`, which the panel injects into the
+// Copilot session via the bridge, so remote and local input share one path.
 //
 // `active` is the single lifecycle authority: it is bound to the chat panel's
 // visibility, so the port is only bound while the panel is open and is released

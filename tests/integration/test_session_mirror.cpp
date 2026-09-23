@@ -41,22 +41,28 @@ class TestSessionMirror : public QObject {
     Q_OBJECT
 
 private slots:
-    void echoMirrorsPanelSession();
+    void remoteInputMirrorsBridgeBackedPanelSession();
     void appendBlockForwardsRegardlessOfBackend();
     void activeToggleReleasesPort();
 };
 
-// The remote client drives the *real* panel model: its `input` is fed through
-// ChatModel::submit(), and the frames it receives are that model's own streamed
-// echo, proving the session the LAN sees is the desktop chat session — not a
-// parallel echo.
-void TestSessionMirror::echoMirrorsPanelSession() {
+// The remote client drives the *real* panel model: its `input` is injected into
+// the Copilot session via the bridge (simulated here by a lambda that appends
+// the returned blocks), and the frames it receives are that model's own atomic
+// `message` blocks — proving the session the LAN sees is the desktop chat
+// session, not a parallel one.
+void TestSessionMirror::remoteInputMirrorsBridgeBackedPanelSession() {
     ChatModel model;
     SessionMirrorServer server;
     server.setSource(&model);
-    // The panel routes remote input to the active backend; simulate echo mode.
-    connect(&server, &SessionMirrorServer::inputReceived, &model,
-            [&model](const QString &t) { model.submit(t); });
+    // The panel injects remote input into the bridge; the bridge's turn returns
+    // through the ChatModel as atomic appendBlock() messages. Simulate that.
+    QString injected;
+    connect(&server, &SessionMirrorServer::inputReceived, &model, [&](const QString &t) {
+        injected = t;
+        model.appendBlock(QStringLiteral("user"), t);
+        model.appendBlock(QStringLiteral("assistant"), QStringLiteral("bridge reply"));
+    });
     server.setPort(0); // OS-assigned ephemeral port — no fixed-8765 collision.
     server.setActive(true);
     QVERIFY(server.isActive());
@@ -90,13 +96,14 @@ void TestSessionMirror::echoMirrorsPanelSession() {
         { QStringLiteral("text"), QStringLiteral("hi") },
     }));
 
-    // The turn is a streamed echo, so wait for message.end to arrive (delta
-    // count is ChatModel's business — do not hard-code it).
-    QVERIFY(waitUntil([&] {
-        return frames.size() >= 2 && typeOf(frames.last()) == QStringLiteral("message.end");
-    }, 5000));
+    // The bridge turn is two atomic `message` frames: the injected user block
+    // and the assistant reply.
+    QVERIFY(waitUntil([&] { return frames.size() >= 3; }, 5000));
 
-    // frames: [hello, message(user), message.begin, delta*, message.end]
+    // The remote input was injected into the bridge.
+    QCOMPARE(injected, QStringLiteral("hi"));
+
+    // frames: [hello, message(user, "hi"), message(assistant, "bridge reply")]
     const QJsonObject userMsg = parse(frames.at(1));
     QCOMPARE(userMsg.value(QStringLiteral("type")).toString(), QStringLiteral("message"));
     QCOMPARE(userMsg.value(QStringLiteral("role")).toString(), QStringLiteral("user"));
@@ -104,28 +111,11 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     const QString userId = userMsg.value(QStringLiteral("id")).toString();
     QVERIFY(!userId.isEmpty());
 
-    const QJsonObject begin = parse(frames.at(2));
-    QCOMPARE(begin.value(QStringLiteral("type")).toString(), QStringLiteral("message.begin"));
-    QCOMPARE(begin.value(QStringLiteral("role")).toString(), QStringLiteral("assistant"));
-    const QString assistantId = begin.value(QStringLiteral("id")).toString();
-    QVERIFY(!assistantId.isEmpty());
-    QVERIFY(assistantId != userId);
-
-    const int lastIdx = frames.size() - 1;
-    const QJsonObject end = parse(frames.at(lastIdx));
-    QCOMPARE(end.value(QStringLiteral("type")).toString(), QStringLiteral("message.end"));
-    QCOMPARE(end.value(QStringLiteral("id")).toString(), assistantId);
-
-    // Middle frames are the assistant deltas; they all carry the assistant id
-    // and reassemble the echoed reply.
-    QString reply;
-    for(int i = 3; i < lastIdx; ++i) {
-        const QJsonObject d = parse(frames.at(i));
-        QCOMPARE(d.value(QStringLiteral("type")).toString(), QStringLiteral("message.delta"));
-        QCOMPARE(d.value(QStringLiteral("id")).toString(), assistantId);
-        reply += d.value(QStringLiteral("text")).toString();
-    }
-    QCOMPARE(reply, QStringLiteral("Echo: hi"));
+    const QJsonObject assistantMsg = parse(frames.at(2));
+    QCOMPARE(assistantMsg.value(QStringLiteral("type")).toString(), QStringLiteral("message"));
+    QCOMPARE(assistantMsg.value(QStringLiteral("role")).toString(), QStringLiteral("assistant"));
+    QCOMPARE(assistantMsg.value(QStringLiteral("text")).toString(), QStringLiteral("bridge reply"));
+    QVERIFY(assistantMsg.value(QStringLiteral("id")).toString() != userId);
 
     // Every non-hello frame carries a strictly increasing seq.
     quint64 prev = 0;
@@ -144,16 +134,15 @@ void TestSessionMirror::echoMirrorsPanelSession() {
     client.close();
 }
 
-// The mirror is driven by the ChatModel, not the echo backend: content added
-// via appendBlock() (the path any non-echo backend, e.g. CopilotBridgeClient,
-// uses) forwards to subscribers just the same, as atomic `message` frames that
-// preserve the block's role.
+// The mirror is driven by the ChatModel: content added via appendBlock() (the
+// path the bridge backend uses) forwards to subscribers as atomic `message`
+// frames that preserve the block's role.
 void TestSessionMirror::appendBlockForwardsRegardlessOfBackend() {
     ChatModel model;
     SessionMirrorServer server;
     server.setSource(&model);
     connect(&server, &SessionMirrorServer::inputReceived, &model,
-            [&model](const QString &t) { model.submit(t); });
+            [&model](const QString &t) { model.appendBlock(QStringLiteral("user"), t); });
     server.setPort(0);
     server.setActive(true);
     const quint16 port = server.serverPort();
@@ -167,7 +156,7 @@ void TestSessionMirror::appendBlockForwardsRegardlessOfBackend() {
     QVERIFY(waitUntil([&] { return client.state() == QAbstractSocket::ConnectedState; }, 5000));
     QVERIFY(waitUntil([&] { return frames.size() >= 1; }, 5000)); // hello
 
-    // Complete the handshake, then round-trip one echo so the server has marked
+    // Complete the handshake, then round-trip one input so the server has marked
     // this client ready (broadcast only reaches resumed clients, and there is no
     // replay) before we exercise appendBlock. Ordering over the socket
     // guarantees resume is processed first.
@@ -180,10 +169,10 @@ void TestSessionMirror::appendBlockForwardsRegardlessOfBackend() {
         { QStringLiteral("text"), QStringLiteral("sync") },
     }));
     QVERIFY(waitUntil([&] {
-        return !frames.isEmpty() && typeOf(frames.last()) == QStringLiteral("message.end");
+        return !frames.isEmpty() && typeOf(frames.last()) == QStringLiteral("message");
     }, 5000));
 
-    // Simulate a non-echo backend pushing user + assistant + system blocks.
+    // Simulate the bridge backend pushing user + assistant + system blocks.
     model.appendBlock(QStringLiteral("user"), QStringLiteral("from bridge"));
     model.appendBlock(QStringLiteral("assistant"), QStringLiteral("bridge reply"));
     model.appendBlock(QStringLiteral("system"), QStringLiteral("tool: shell"));
