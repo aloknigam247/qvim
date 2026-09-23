@@ -1,113 +1,144 @@
 <#
 .SYNOPSIS
     Enforce 100% coverage of the lines a change adds or modifies (patch / diff
-    coverage) over qvim's src/ + include/. Fails (exit 1) if any changed,
-    coverable, non-exempt line is left uncovered.
+    coverage). Fails (exit 1) if any changed, coverable, non-exempt line is left
+    uncovered. Works for both the C++ side (cobertura reports) and the Android
+    side (JaCoCo reports).
 
 .DESCRIPTION
-    The overall floor (coverage_union.ps1) guards the whole codebase; this guard
-    is per-change: every executable src/ + include/ line a PR touches must be
-    exercised by the test suite. It complements the floor — a PR can sit above
-    90% overall while still shipping untested new code, which this catches.
+    The overall floor guards the whole codebase; this guard is per-change: every
+    executable line a PR touches (under the configured diff paths) must be
+    exercised by tests. It complements the floor — a PR can sit above the floor
+    while still shipping untested new code, which this catches.
 
     Method:
       1. Diff the merge-base of -BaseRef and HEAD against HEAD, restricted to
-         src/ and include/, and collect the NEW-side line numbers of added /
-         modified lines.
-      2. Union the tier coberturas into a per-(file,line) hit map (a line is
-         covered if ANY tier hit it) exactly as coverage_union.ps1 does. Coverage
-         is collected against HEAD, so cobertura line numbers and the diff's
-         new-side line numbers refer to the same source.
+         -DiffPath, and collect the NEW-side line numbers of added / modified
+         lines per file (keyed by repo-relative path).
+      2. Union the coverage report(s) into a per-(file,line) hit map (a line is
+         covered if ANY report hit it). Coverage is collected against HEAD, so
+         report line numbers and the diff's new-side line numbers refer to the
+         same source.
       3. A changed line is CONSIDERED only if it appears as an executable line in
-         the cobertura (comments, blanks, braces, and declarations never appear,
-         so they are not counted — standard diff-coverage semantics).
-      4. Considered lines are dropped when exempted by a source marker (see
-         below). Every remaining considered line must have hits > 0.
+         a report (comments, blanks, braces, declarations, and excluded classes
+         never appear, so they are not counted — standard diff-coverage
+         semantics; JaCoCo excludes therefore pass through untouched).
+      4. Considered lines are dropped when exempted by a source marker (below).
+         Every remaining considered line must have hits > 0.
 
-    Exemption markers (read from the HEAD source, since the coverage tool has no
-    per-line C++ exclusion): a line carrying a trailing "// no-cover" is exempt;
-    a "// no-cover:start" ... "// no-cover:end" pair exempts the enclosed block.
-    Use them ONLY for genuinely uncoverable lines — SceneGraph / GUI glue that
-    needs a live render surface, platform (Win32) calls, or coverage-tool
-    artifacts (case labels, trailing returns after an exhaustive switch). Each
-    marker is visible in the diff, so an exemption is a reviewable decision.
-    The gate prints every exempted line so reviewers can audit them.
+    Exemption markers (read from the HEAD source, since neither coverage tool has
+    reliable per-line C++/Kotlin exclusion): a line carrying a trailing
+    "// no-cover" is exempt; a "// no-cover:start" ... "// no-cover:end" pair
+    exempts the enclosed block. The "//" form is valid in both C++ and Kotlin.
+    Use them ONLY for genuinely uncoverable lines — GUI / SceneGraph glue that
+    needs a live surface, platform calls, or coverage-tool artifacts. Each marker
+    is visible in the diff, so an exemption is a reviewable decision. The gate
+    prints every exempted line so reviewers can audit them.
 
-.PARAMETER CoberturaPath
-    One or more cobertura XML reports (one per tier). Unioned like the floor.
+.PARAMETER ReportPath
+    One or more coverage XML reports (cobertura or JaCoCo). Unioned per line.
 
 .PARAMETER BaseRef
     The ref the change is measured against (e.g. origin/main or the PR base sha).
     The diff runs from merge-base(BaseRef, HEAD) to HEAD.
+
+.PARAMETER Format
+    Report format: "cobertura" (default, C++) or "jacoco" (Android).
+
+.PARAMETER DiffPath
+    Pathspecs restricting the diff to production sources. Defaults to the C++
+    "src"/"include"; pass "android/app/src/main" for the Android module.
+
+.PARAMETER SourceRoot
+    JaCoCo only: repo-relative source root prepended to "<package>/<sourcefile>"
+    to reconstruct a report line's repo-relative path so it matches git's paths.
 
 .PARAMETER MinPatchRatio
     Required covered/considered ratio for changed lines. Defaults to 1.0 (100%).
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string[]]$CoberturaPath,
+    [Parameter(Mandatory)][Alias("CoberturaPath")][string[]]$ReportPath,
     [Parameter(Mandatory)][string]$BaseRef,
+    [ValidateSet("cobertura", "jacoco")][string]$Format = "cobertura",
+    [string[]]$DiffPath = @("src", "include"),
+    [string]$SourceRoot = "android/app/src/main/java",
     [double]$MinPatchRatio = 1.0
 )
 
 $ErrorActionPreference = "Stop"
 
-# Normalise a path to its src/... or include/... tail, forward-slashed and
-# lower-cased, so cobertura's absolute paths and git's repo-relative paths key
-# the same line.
-function Get-CoverageKeyPath([string]$path) {
+# Match key: repo-relative, forward-slashed, lower-cased. Both the git diff paths
+# and each report's reconstructed paths are reduced to this so they collide.
+function Get-MatchKey([string]$path) { return $path.Replace("\", "/").ToLowerInvariant() }
+
+# A cobertura class filename is an absolute build path; reduce it to its
+# repo-relative src/... or include/... tail so it matches git's paths.
+function Get-CoberturaKey([string]$path) {
     $p = $path.Replace("\", "/").ToLowerInvariant()
-    if ($p -match "(^|/)(src|include)/(.+)$") { return "$($Matches[2])/$($Matches[3])" }
+    if ($p -match "(^|/)((src|include)/.+)$") { return $Matches[2] }
     return $null
 }
 
 $mergeBase = (git merge-base $BaseRef HEAD).Trim()
 if (-not $mergeBase) { Write-Error "could not find merge-base of $BaseRef and HEAD."; exit 1 }
-Write-Host "patch coverage: diffing $mergeBase..HEAD over src/ + include/"
+Write-Host "patch coverage ($Format): diffing $mergeBase..HEAD over $($DiffPath -join ', ')"
 
-# --- 1. changed (file -> set of new-side line numbers) ----------------------
-$changed = @{}   # keyPath -> hashset of int line numbers
-$curFile = $null
+# --- 1. changed: key -> @{ Path = <original repo-rel>; Lines = <hashset int> } --
+$changed = @{}
+$curKey = $null
 $newLine = 0
-$diff = git diff --unified=0 --diff-filter=AMR $mergeBase HEAD -- src include
+$diff = git diff --unified=0 --diff-filter=AMR $mergeBase HEAD -- $DiffPath
 foreach ($line in $diff) {
     if ($line.StartsWith("+++ ")) {
-        # "+++ b/src/Foo.cpp" or "+++ /dev/null"
         $raw = $line.Substring(4).Trim()
-        if ($raw -eq "/dev/null") { $curFile = $null; continue }
-        $curFile = Get-CoverageKeyPath ($raw -replace "^b/", "")
-        if ($curFile -and -not $changed.ContainsKey($curFile)) {
-            $changed[$curFile] = [System.Collections.Generic.HashSet[int]]::new()
+        if ($raw -eq "/dev/null") { $curKey = $null; continue }
+        $orig = $raw -replace "^b/", ""
+        $curKey = Get-MatchKey $orig
+        if (-not $changed.ContainsKey($curKey)) {
+            $changed[$curKey] = @{ Path = $orig; Lines = [System.Collections.Generic.HashSet[int]]::new() }
         }
         continue
     }
     if ($line.StartsWith("@@")) {
-        # "@@ -a,b +c,d @@" — c is the new-side start line.
         if ($line -match "\+(\d+)(?:,(\d+))?") { $newLine = [int]$Matches[1] }
         continue
     }
-    if ($null -eq $curFile) { continue }
+    if ($null -eq $curKey) { continue }
     if ($line.StartsWith("+") -and -not $line.StartsWith("+++")) {
-        [void]$changed[$curFile].Add($newLine)
+        [void]$changed[$curKey].Lines.Add($newLine)
         $newLine++
     }
-    # With --unified=0 there are no context lines; "-" removed lines and diff
-    # metadata do not exist on the new side, so the cursor only advances on "+".
+    # With --unified=0 there are no context lines; "-" lines and diff metadata do
+    # not exist on the new side, so the cursor only advances on "+".
 }
 
-# --- 2. union hit map -------------------------------------------------------
-$hits = @{}   # "keyPath|line" -> summed hits
-foreach ($path in $CoberturaPath) {
-    if (-not (Test-Path -LiteralPath $path)) { Write-Error "cobertura not found: $path"; exit 1 }
+# --- 2. union hit map: "key|line" -> summed hits ----------------------------
+$hits = @{}
+foreach ($path in $ReportPath) {
+    if (-not (Test-Path -LiteralPath $path)) { Write-Error "report not found: $path"; exit 1 }
     [xml]$report = Get-Content -LiteralPath $path -Raw
-    foreach ($pkg in $report.coverage.packages.package) {
-        foreach ($cls in $pkg.classes.class) {
-            $key = Get-CoverageKeyPath ([string]$cls.filename)
-            if (-not $key) { continue }
-            foreach ($ln in $cls.lines.line) {
-                $k = "$key|$($ln.number)"
-                if (-not $hits.ContainsKey($k)) { $hits[$k] = 0 }
-                $hits[$k] += [int]$ln.hits
+    if ($Format -eq "cobertura") {
+        foreach ($pkg in $report.coverage.packages.package) {
+            foreach ($cls in $pkg.classes.class) {
+                $key = Get-CoberturaKey ([string]$cls.filename)
+                if (-not $key) { continue }
+                foreach ($ln in $cls.lines.line) {
+                    $k = "$key|$($ln.number)"
+                    if (-not $hits.ContainsKey($k)) { $hits[$k] = 0 }
+                    $hits[$k] += [int]$ln.hits
+                }
+            }
+        }
+    } else {
+        foreach ($pkg in $report.report.package) {
+            foreach ($sf in $pkg.sourcefile) {
+                $key = Get-MatchKey "$SourceRoot/$($pkg.name)/$($sf.name)"
+                foreach ($ln in $sf.line) {
+                    $k = "$key|$($ln.nr)"
+                    if (-not $hits.ContainsKey($k)) { $hits[$k] = 0 }
+                    $hits[$k] += [int]$ln.ci   # covered instructions; >0 => covered
+                }
             }
         }
     }
@@ -119,18 +150,15 @@ $coveredCnt = 0
 $uncovered = [System.Collections.Generic.List[string]]::new()
 $exempted = [System.Collections.Generic.List[string]]::new()
 
-foreach ($file in ($changed.Keys | Sort-Object)) {
-    $lineSet = $changed[$file]
-    if ($lineSet.Count -eq 0) { continue }
+foreach ($key in ($changed.Keys | Sort-Object)) {
+    $entry = $changed[$key]
+    if ($entry.Lines.Count -eq 0) { continue }
 
-    # Resolve the marker state per physical line from the HEAD source.
-    $srcPath = $file  # repo-relative, forward-slashed, lower-cased tail
-    # Recover a real on-disk path (case-insensitive match under src/ or include/).
-    $disk = Get-ChildItem -Recurse -File -Path (Split-Path $file -Parent) -ErrorAction SilentlyContinue |
-        Where-Object { (Get-CoverageKeyPath $_.FullName) -eq $file } | Select-Object -First 1
+    # Resolve exemption markers from the HEAD source (original-case path so it
+    # reads correctly on case-sensitive filesystems).
     $exemptLines = [System.Collections.Generic.HashSet[int]]::new()
-    if ($disk) {
-        $srcLines = Get-Content -LiteralPath $disk.FullName
+    if (Test-Path -LiteralPath $entry.Path) {
+        $srcLines = Get-Content -LiteralPath $entry.Path
         $inBlock = $false
         for ($i = 0; $i -lt $srcLines.Count; $i++) {
             $text = $srcLines[$i]
@@ -140,12 +168,13 @@ foreach ($file in ($changed.Keys | Sort-Object)) {
         }
     }
 
-    foreach ($ln in ($lineSet | Sort-Object)) {
-        $k = "$file|$ln"
-        if (-not $hits.ContainsKey($k)) { continue } # non-executable — not considered
-        if ($exemptLines.Contains($ln)) { $exempted.Add("${file}:$ln"); continue }
+    foreach ($ln in ($entry.Lines | Sort-Object)) {
+        $k = "$key|$ln"
+        if (-not $hits.ContainsKey($k)) { continue } # non-executable / excluded — not considered
+        $where = "$($entry.Path):$ln"
+        if ($exemptLines.Contains($ln)) { $exempted.Add($where); continue }
         $considered++
-        if ($hits[$k] -gt 0) { $coveredCnt++ } else { $uncovered.Add("${file}:$ln") }
+        if ($hits[$k] -gt 0) { $coveredCnt++ } else { $uncovered.Add($where) }
     }
 }
 
@@ -153,7 +182,7 @@ $ratio = if ($considered -gt 0) { $coveredCnt / $considered } else { 1.0 }
 $ratioPct = [math]::Round($ratio * 100, 3)
 
 Write-Host ""
-Write-Host "Patch coverage over changed src/ + include/ lines:"
+Write-Host "Patch coverage over changed lines:"
 Write-Host ("  considered lines : {0}" -f $considered)
 Write-Host ("  covered lines    : {0}" -f $coveredCnt)
 Write-Host ("  ratio            : {0}%" -f $ratioPct)

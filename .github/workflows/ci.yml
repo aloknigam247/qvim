@@ -252,4 +252,4 @@ jobs:
           if (-not $reports) { throw "no per-tier cobertura reports found under _cov/." }
           $base = "${{ github.event.pull_request.base.sha }}"
           if (-not $base) { $base = "origin/main" }
-          & scripts\coverage_patch.ps1 -CoberturaPath $reports -BaseRef $base
+          & scripts\coverage_patch.ps1 -ReportPath $reports -BaseRef $base

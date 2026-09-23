@@ -74,4 +74,17 @@ class ChatReducerTest {
         assertEquals(1, msgs.size)
         assertEquals("hi", msgs[0].text)
     }
+
+    @Test
+    fun atomicMessageReplacesExistingStreamedBlock() {
+        val r = ChatReducer()
+        r.apply(ServerFrame.Hello(protocol = 1, sessionId = "s1"))
+        r.apply(ServerFrame.MessageBegin(seq = 1, id = "a1", role = "assistant"))
+        r.apply(ServerFrame.MessageDelta(seq = 2, id = "a1", text = "partial"))
+        // A full message for the same id overwrites the streamed block in place.
+        val msgs = r.apply(ServerFrame.Message(seq = 3, id = "a1", role = "assistant", text = "final"))
+        assertEquals(1, msgs.size)
+        assertEquals("final", msgs[0].text)
+        assertEquals(false, msgs[0].streaming)
+    }
 }

@@ -3,10 +3,15 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jlleitschuh.gradle.ktlint")
+    jacoco
 }
 
 ktlint {
     version.set("1.3.1")
+}
+
+jacoco {
+    toolVersion = "0.8.12"
 }
 
 android {
@@ -22,6 +27,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
         }
@@ -71,4 +79,52 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+}
+
+// Classes that JVM unit tests (no emulator in CI) structurally cannot reach: the
+// Compose UI, the Activity bootstrap, the NsdManager/WifiManager-backed discovery,
+// and compiler-generated serializers. Excluded from both the report and the floor
+// so the measured number reflects only the logic that tests can actually exercise.
+val coverageExcludes =
+    listOf(
+        "**/MainActivity*",
+        "**/ui/**",
+        "**/NsdMirrorDiscovery*",
+        "**/*\$\$serializer*",
+        "**/ComposableSingletons*",
+    )
+
+val coverageClassDirs =
+    fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) { exclude(coverageExcludes) }
+val coverageSourceDirs = files("src/main/java")
+val coverageExecData =
+    layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+    classDirectories.setFrom(coverageClassDirs)
+    sourceDirectories.setFrom(coverageSourceDirs)
+    executionData.setFrom(coverageExecData)
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoCoverageFloor") {
+    dependsOn("jacocoTestReport")
+    classDirectories.setFrom(coverageClassDirs)
+    sourceDirectories.setFrom(coverageSourceDirs)
+    executionData.setFrom(coverageExecData)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.90".toBigDecimal()
+            }
+        }
+    }
 }
