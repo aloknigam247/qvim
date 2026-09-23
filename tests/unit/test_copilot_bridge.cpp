@@ -79,6 +79,8 @@ private slots:
     void toolRequestShowsAskOptions();
     void injectSendsPrompt();
     void inactiveNeverConnects();
+    void toolArgAndResultVariants();
+    void propertyMutatorsAndSessionFrames();
 };
 
 // Connecting sends the client `hello`, and mirror traffic lands in the sink
@@ -263,6 +265,146 @@ void TestCopilotBridge::inactiveNeverConnects() {
 
     QVERIFY(!client.isConnected());
     QVERIFY(!hub.hasClient());
+}
+
+// The tool-summary formatters cover more toolArgs / result shapes than the
+// mirror test exercises: oneOf / items schema options, command / path / pattern
+// arg keys, the compact-JSON fallback, and a non-string result.
+void TestCopilotBridge::toolArgAndResultVariants() {
+    FakeHub hub;
+    QVERIFY(hub.listen());
+
+    ChatModel model;
+    CopilotBridgeClient client;
+    client.setSink(&model);
+    client.setUrl(QStringLiteral("ws://127.0.0.1:%1").arg(hub.port()));
+    client.setActive(true);
+    QVERIFY(waitUntil([&] { return client.isConnected(); }, 5000));
+    QVERIFY(waitUntil([&] { return !hub.received.isEmpty(); }, 5000));
+
+    auto toolReq = [&](const QJsonObject &toolArgs) {
+        hub.send(
+            QJsonObject{ { QStringLiteral("type"), QStringLiteral("tool.requested") },
+                         { QStringLiteral("sessionId"), QStringLiteral("s1") },
+                         { QStringLiteral("data"),
+                           QJsonObject{ { QStringLiteral("toolName"), QStringLiteral("t") },
+                                        { QStringLiteral("toolArgs"), compact(toolArgs) } } } });
+    };
+
+    // oneOf options in the requestedSchema.
+    QJsonObject oneOfField{
+        { QStringLiteral("oneOf"),
+          QJsonArray{ QJsonObject{ { QStringLiteral("title"), QStringLiteral("Fast") } },
+                      QJsonObject{ { QStringLiteral("title"), QStringLiteral("Slow") } } } }
+    };
+    QJsonObject oneOfSchema{ { QStringLiteral("properties"),
+                               QJsonObject{ { QStringLiteral("mode"), oneOfField } } } };
+    toolReq(QJsonObject{ { QStringLiteral("message"), QStringLiteral("Pick") },
+                         { QStringLiteral("requestedSchema"), oneOfSchema } });
+
+    // items.enum and items.anyOf (array-valued fields).
+    QJsonObject itemsInner{
+        { QStringLiteral("enum"), QJsonArray{ QStringLiteral("cpp") } },
+        { QStringLiteral("anyOf"),
+          QJsonArray{ QJsonObject{ { QStringLiteral("title"), QStringLiteral("Rust") } } } },
+    };
+    QJsonObject itemsField{ { QStringLiteral("items"), itemsInner } };
+    QJsonObject itemsSchema{ { QStringLiteral("properties"),
+                               QJsonObject{ { QStringLiteral("langs"), itemsField } } } };
+    toolReq(QJsonObject{ { QStringLiteral("message"), QStringLiteral("Langs") },
+                         { QStringLiteral("requestedSchema"), itemsSchema } });
+
+    toolReq(QJsonObject{ { QStringLiteral("path"), QStringLiteral("src/main.cpp") } });
+    toolReq(QJsonObject{ { QStringLiteral("pattern"), QStringLiteral("TODO") } });
+    toolReq(QJsonObject{ { QStringLiteral("unrecognised"), QStringLiteral("blob") } });
+
+    // toolArgs that is neither a JSON object nor a JSON string: asObject() yields
+    // an empty object, so the line is just the bare tool name.
+    hub.send(QJsonObject{ { QStringLiteral("type"), QStringLiteral("tool.requested") },
+                          { QStringLiteral("sessionId"), QStringLiteral("s1") },
+                          { QStringLiteral("data"),
+                            QJsonObject{ { QStringLiteral("toolName"), QStringLiteral("bare") },
+                                         { QStringLiteral("toolArgs"), 7 } } } });
+
+    // A non-string result yields no result text; the line is just name + mark.
+    hub.send(QJsonObject{
+        { QStringLiteral("type"), QStringLiteral("tool.complete") },
+        { QStringLiteral("sessionId"), QStringLiteral("s1") },
+        { QStringLiteral("data"), QJsonObject{ { QStringLiteral("toolName"), QStringLiteral("t") },
+                                               { QStringLiteral("success"), false },
+                                               { QStringLiteral("result"), 123 } } } });
+
+    // A plain-string result (not JSON) is surfaced verbatim.
+    hub.send(
+        QJsonObject{ { QStringLiteral("type"), QStringLiteral("tool.complete") },
+                     { QStringLiteral("sessionId"), QStringLiteral("s1") },
+                     { QStringLiteral("data"),
+                       QJsonObject{ { QStringLiteral("toolName"), QStringLiteral("u") },
+                                    { QStringLiteral("success"), true },
+                                    { QStringLiteral("result"), QStringLiteral("done") } } } });
+
+    QVERIFY(waitUntil([&] { return model.count() >= 8; }, 5000));
+    QVERIFY(model.textAt(0).contains(QStringLiteral("Fast")));
+    QVERIFY(model.textAt(0).contains(QStringLiteral("Slow")));
+    QVERIFY(model.textAt(1).contains(QStringLiteral("cpp")));
+    QVERIFY(model.textAt(1).contains(QStringLiteral("Rust")));
+    QVERIFY(model.textAt(2).contains(QStringLiteral("src/main.cpp")));
+    QVERIFY(model.textAt(3).contains(QStringLiteral("TODO")));
+    QVERIFY(model.textAt(4).contains(QStringLiteral("unrecognised")));
+    QVERIFY(model.textAt(5).contains(QStringLiteral("bare")));
+    QVERIFY(model.textAt(6).contains(QStringLiteral("\u2717")));
+    QVERIFY(model.textAt(7).contains(QStringLiteral("done")));
+    QCOMPARE(client.sink(), &model);
+}
+
+// Property mutators (showTools, active, url) and the session.start / session.end
+// mirror frames.
+void TestCopilotBridge::propertyMutatorsAndSessionFrames() {
+    FakeHub hub;
+    QVERIFY(hub.listen());
+
+    ChatModel model;
+    CopilotBridgeClient client;
+    client.setSink(&model);
+
+    QSignalSpy showSpy(&client, &CopilotBridgeClient::showToolsChanged);
+    QVERIFY(client.showTools()); // default on
+    client.setShowTools(false);
+    client.setShowTools(false); // redundant — no second signal
+    QVERIFY(!client.showTools());
+    QCOMPARE(showSpy.count(), 1);
+    client.setShowTools(true);
+
+    QVERIFY(!client.isActive());
+    client.setUrl(QStringLiteral("ws://127.0.0.1:%1").arg(hub.port()));
+    QCOMPARE(client.url(), QStringLiteral("ws://127.0.0.1:%1").arg(hub.port()));
+    client.setActive(true);
+    QVERIFY(waitUntil([&] { return client.isConnected(); }, 5000));
+    QVERIFY(waitUntil([&] { return !hub.received.isEmpty(); }, 5000));
+
+    hub.send(
+        QJsonObject{ { QStringLiteral("type"), QStringLiteral("session.start") },
+                     { QStringLiteral("sessionId"), QStringLiteral("s1") },
+                     { QStringLiteral("data"),
+                       QJsonObject{ { QStringLiteral("cwd"), QStringLiteral("D:/qvim") } } } });
+    hub.send(QJsonObject{ { QStringLiteral("type"), QStringLiteral("session.end") },
+                          { QStringLiteral("sessionId"), QStringLiteral("s1") } });
+
+    QVERIFY(waitUntil([&] { return model.count() >= 2; }, 5000));
+    QVERIFY(model.textAt(0).contains(QStringLiteral("session started")));
+    QVERIFY(model.textAt(0).contains(QStringLiteral("D:/qvim")));
+    QVERIFY(model.textAt(1).contains(QStringLiteral("session ended")));
+
+    // Rebinding the URL while active tears down and reopens against the new
+    // endpoint.
+    FakeHub hub2;
+    QVERIFY(hub2.listen());
+    client.setUrl(QStringLiteral("ws://127.0.0.1:%1").arg(hub2.port()));
+    QVERIFY(waitUntil([&] { return hub2.hasClient(); }, 5000));
+
+    // Deactivating tears the socket down.
+    client.setActive(false);
+    QVERIFY(waitUntil([&] { return !client.isConnected(); }, 5000));
 }
 
 QTEST_GUILESS_MAIN(TestCopilotBridge)

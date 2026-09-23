@@ -10,11 +10,8 @@
 
 #include <optional>
 
-#include "CmdlineModel.h"
 #include "GridModel.h"
 #include "NvimConnector.h"
-#include "PopupMenuModel.h"
-#include "TablineModel.h"
 
 namespace qvim::test {
 

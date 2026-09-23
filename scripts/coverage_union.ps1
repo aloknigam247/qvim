@@ -16,10 +16,14 @@
     restricts Sources, but we re-filter defensively so a stray path can't skew
     the number).
 
-    The floor is stored as BOTH an absolute covered-line count and a ratio,
-    because the current baseline (1996 / 2595 = 76.917%) sits just under a naive
-    77% and a rounded gate would go red immediately. Ratchet -MinCovered /
-    -MinRatio upward as issue #40 raises coverage.
+    The floor is a fixed policy minimum: overall union coverage must stay at or
+    above 90% (MinRatio). The absolute covered-line count (MinCovered) is a low
+    catastrophic-drop backstop that never binds in normal operation — the ratio
+    is the rule. Coverage measured 2608 / 2877 = 90.65% in CI when the 90% floor
+    was adopted. The coverage-gate CI job prints the live covered/total/ratio
+    each run. Per-change (patch) coverage is enforced separately by
+    coverage_patch.ps1, which requires 100% coverage of changed src/ + include/
+    lines.
 
 .PARAMETER CoberturaPath
     One or more paths to cobertura XML emitted by the coverage collector. When
@@ -29,16 +33,17 @@
     whole-suite run, so the floor is identical either way.
 
 .PARAMETER MinCovered
-    Minimum number of distinct covered source lines required (floor).
+    Minimum number of distinct covered source lines required — a low
+    catastrophic-drop backstop, not the policy floor.
 
 .PARAMETER MinRatio
-    Minimum covered/total ratio required (floor), 0..1.
+    Minimum covered/total ratio required (the policy floor), 0..1.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string[]]$CoberturaPath,
-    [int]$MinCovered = 1996,
-    [double]$MinRatio = 0.769
+    [int]$MinCovered = 2400,
+    [double]$MinRatio = 0.90
 )
 
 $ErrorActionPreference = "Stop"

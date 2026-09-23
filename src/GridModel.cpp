@@ -4,42 +4,8 @@
 
 namespace qvim {
 
-void GridSurfaceProxy::setPosition(int x, int y) {
-    if(m_x == x && m_y == y) return;
-    m_x = x;
-    m_y = y;
-    emit positionChanged();
-}
-
-void GridSurfaceProxy::setSize(int cols, int rows) {
-    if(m_cols == cols && m_rows == rows) return;
-    m_cols = cols;
-    m_rows = rows;
-    emit sizeChanged();
-}
-
-void GridSurfaceProxy::setVisible(bool v) {
-    if(m_visible == v) return;
-    m_visible = v;
-    emit visibilityChanged();
-}
-
-void GridSurfaceProxy::setFloat(bool isFloat, int zindex) {
-    if(m_isFloat == isFloat && m_zindex == zindex) return;
-    m_isFloat = isFloat;
-    m_zindex = zindex;
-    emit floatChanged();
-}
-
-void GridSurfaceProxy::setFocusable(bool focusable) {
-    if(m_isFocusable == focusable) return;
-    m_isFocusable = focusable;
-    emit focusableChanged();
-}
-
 GridModel::GridModel(QObject *parent) : QObject(parent) {
-    // The global grid (id=1) always exists; its proxy is created lazily on
-    // first ensure() call to keep ctor allocation-free.
+    // The global grid (id=1) always exists.
     m_grids.insert(1, GridSurface{});
 }
 
@@ -55,35 +21,7 @@ const GridSurface *GridModel::surface(int gridId) const {
 
 GridSurface &GridModel::ensure(int gridId) {
     auto it = m_grids.find(gridId);
-    if(it == m_grids.end()) {
-        it = m_grids.insert(gridId, GridSurface{});
-        ensureProxy(gridId);
-        emit gridsChanged();
-    }
-    return it.value();
-}
-
-GridSurfaceProxy *GridModel::ensureProxy(int gridId) {
-    auto it = m_proxies.find(gridId);
-    if(it != m_proxies.end()) return it.value();
-    auto *p = new GridSurfaceProxy(gridId, this);
-    m_proxies.insert(gridId, p);
-    return p;
-}
-
-GridSurfaceProxy *GridModel::surfaceFor(int gridId) const {
-    auto it = m_proxies.constFind(gridId);
-    if(it == m_proxies.constEnd()) {
-        // Lazily materialise for any grid we already know about (e.g. grid 1
-        // before its first ensure()). Const-cast is fine: proxies are caches
-        // tied to logical grid lifetime, not part of the const-observable model
-        // state from QML's perspective.
-        if(m_grids.contains(gridId)) {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-            return const_cast<GridModel *>(this)->ensureProxy(gridId);
-        }
-        return nullptr;
-    }
+    if(it == m_grids.end()) { it = m_grids.insert(gridId, GridSurface{}); }
     return it.value();
 }
 
@@ -96,7 +34,6 @@ void GridModel::resize(int gridId, int cols, int rows) {
     s.cellRows.resize(rows);
     for(auto &row: s.cellRows) { row.assign(cols, Cell{ QStringLiteral(" "), 0, false }); }
     s.dirty = true;
-    ensureProxy(gridId)->setSize(cols, rows);
     emit sizeChanged();
 }
 
@@ -225,123 +162,14 @@ void GridModel::setCursor(int gridId, int row, int col) {
 }
 
 void GridModel::reset() {
-    // Retire every non-global grid and its proxy (mirrors destroyGrid so QML
-    // delegates unbind cleanly), then reset the global grid to an empty surface.
-    for(auto it = m_proxies.begin(); it != m_proxies.end();) {
-        if(it.key() != 1) {
-            it.value()->deleteLater();
-            it = m_proxies.erase(it);
-        } else {
-            ++it;
-        }
-    }
     for(auto it = m_grids.begin(); it != m_grids.end();) {
         if(it.key() != 1) it = m_grids.erase(it);
         else ++it;
     }
     m_grids[1] = GridSurface{};
     m_active = 1;
-    if(auto *p = surfaceFor(1)) p->setSize(0, 0);
-    emit gridsChanged();
     emit sizeChanged();
     emit cursorChanged();
-}
-
-void GridModel::destroyGrid(int gridId) {
-    if(gridId == 1) return; // never destroy the global grid
-    if(m_grids.remove(gridId)) {
-        if(m_active == gridId) m_active = 1;
-        // Schedule the proxy for deletion via the event loop so any QML
-        // delegate currently binding to it tears down its bindings first
-        // (the gridsChanged() below makes the Repeater drop the delegate).
-        if(auto it = m_proxies.find(gridId); it != m_proxies.end()) {
-            it.value()->deleteLater();
-            m_proxies.erase(it);
-        }
-        emit gridsChanged();
-    }
-}
-
-void GridModel::setPos(int gridId, int x, int y, int w, int h) {
-    GridSurface &s = ensure(gridId);
-    s.x = x;
-    s.y = y;
-    s.visible = true;
-    s.isFloat = false;
-    s.focusable = true; // non-float windows are always focusable
-    if(w > 0 && h > 0 && (w != s.cols || h != s.rows)) {
-        s.cols = w;
-        s.rows = h;
-        s.cellRows.resize(h);
-        for(auto &row: s.cellRows) { row.assign(w, Cell{ QStringLiteral(" "), 0, false }); }
-        s.dirty = true;
-        emit sizeChanged();
-    }
-    auto *p = ensureProxy(gridId);
-    p->setPosition(x, y);
-    p->setSize(s.cols, s.rows);
-    p->setFloat(false, s.zindex);
-    p->setFocusable(true);
-    p->setVisible(true);
-    emit gridGeometryChanged(gridId);
-}
-
-void GridModel::setFloatPos(int gridId, int /*anchorGrid*/, int anchorRow, int anchorCol,
-                            bool focusable, int zindex) {
-    GridSurface &s = ensure(gridId);
-    // v1: collapse anchor to global-grid coords; full anchor resolution is
-    // QML's job once it knows where the anchor grid sits.
-    s.x = anchorCol;
-    s.y = anchorRow;
-    s.zindex = zindex;
-    s.visible = true;
-    s.isFloat = true;
-    s.focusable = focusable;
-    auto *p = ensureProxy(gridId);
-    p->setPosition(anchorCol, anchorRow);
-    p->setFloat(true, zindex);
-    p->setFocusable(focusable);
-    p->setVisible(true);
-    emit gridGeometryChanged(gridId);
-}
-
-void GridModel::setExternalPos(int gridId) {
-    GridSurface &s = ensure(gridId);
-    s.visible = true;
-    s.isFloat = false;
-    auto *p = ensureProxy(gridId);
-    p->setFloat(false, s.zindex);
-    p->setVisible(true);
-    emit gridGeometryChanged(gridId);
-}
-
-void GridModel::setHidden(int gridId) {
-    GridSurface *s = surface(gridId);
-    if(!s) return;
-    if(!s->visible) return;
-    s->visible = false;
-    if(auto *p = surfaceFor(gridId)) p->setVisible(false);
-    emit gridGeometryChanged(gridId);
-}
-
-void GridModel::setViewport(int /*gridId*/, int /*topline*/, int /*botline*/, int /*curline*/,
-                            int /*curcol*/) {
-    // v1: viewport info is currently informational only. Stored slot reserved
-    // for scroll-anchored animations once we wire them up.
-}
-
-QList<int> GridModel::gridIds() const {
-    QList<int> ids;
-    ids.reserve(m_grids.size());
-    for(auto it = m_grids.constBegin(); it != m_grids.constEnd(); ++it) { ids.push_back(it.key()); }
-    std::ranges::sort(ids);
-    return ids;
-}
-
-QRect GridModel::gridGeometry(int gridId) const {
-    const GridSurface *s = surface(gridId);
-    if(!s) return {};
-    return { s->x, s->y, s->cols, s->rows };
 }
 
 int GridModel::gridCols(int gridId) const {
@@ -351,22 +179,6 @@ int GridModel::gridCols(int gridId) const {
 int GridModel::gridRows(int gridId) const {
     const auto *s = surface(gridId);
     return s ? s->rows : 0;
-}
-bool GridModel::gridVisible(int gridId) const {
-    const auto *s = surface(gridId);
-    return s ? s->visible : false;
-}
-bool GridModel::gridIsFloat(int gridId) const {
-    const auto *s = surface(gridId);
-    return s ? s->isFloat : false;
-}
-bool GridModel::gridIsFocusable(int gridId) const {
-    const auto *s = surface(gridId);
-    return s ? s->focusable : true;
-}
-int GridModel::gridZindex(int gridId) const {
-    const auto *s = surface(gridId);
-    return s ? s->zindex : 0;
 }
 
 const Cell &GridModel::cell(int gridId, int row, int col) const {

@@ -1,13 +1,12 @@
 // User-POV smoke harness: loads the real Main.qml in a QQuickWindow with the
 // production NvimConnector, then injects key events through Qt's focus chain
 // (NOT directly via NvimConnector::input) so the test exercises the exact
-// path a user's keystroke takes — including focus management, the Repeater
-// rebuild behaviour, and the cmdline/grid layout reflow.
+// path a user's keystroke takes — including focus management and grid layout.
 //
 // Specifically reproduces the bug Alok hit: after pressing ':', the very next
-// keystroke was lost because the sub-grid Repeater was destroying delegates
-// on every grid_resize, invalidating activeFocusItem. With GridSurfaceProxy
-// in place the delegate persists and focus survives.
+// keystroke was lost because focus was invalidated on a grid layout event. The
+// test drives ':<command><CR>' through the focus chain and asserts nvim
+// actually received it, so a focus regression fails hard.
 
 #include <QGuiApplication>
 #include <QImage>
@@ -21,7 +20,6 @@
 #include <QSignalSpy>
 #include <QtTest>
 
-#include "CmdlineModel.h"
 #include "IntegrationHelpers.h"
 #include "NvimConnector.h"
 
@@ -52,20 +50,6 @@ bool waitUntil(F &&predicate, int timeoutMs) {
     return true;
 }
 
-// Synchronously renders the QML subtree rooted at `item` into a QImage via
-// the scene graph software backend. Works under minimal QPA where
-// QQuickWindow::grabWindow() returns null because no real surface exists.
-QImage grabItem(QQuickItem *item, int timeoutMs = 2000) {
-    QSharedPointer<QQuickItemGrabResult> result = item->grabToImage();
-    if(!result) return {};
-    QElapsedTimer t;
-    t.start();
-    while(result->image().isNull() && t.elapsed() < timeoutMs) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
-    }
-    return result->image();
-}
-
 } // namespace
 
 class TestUserSmoke : public QObject {
@@ -83,12 +67,11 @@ private slots:
         qRegisterMetaType<qvim::ObjectHandlePtr>("qvim::ObjectHandlePtr");
     }
 
-    // Core reproduction: ':' would normally open the cmdline overlay. With
-    // ext_cmdline disabled in NvimConnector::attachUi (diagnostic mode) the
-    // overlay never fires, so we just verify the focus chain stays intact
-    // after the colon keystroke — the original "key was lost after ':'" bug
-    // was a focus problem upstream of the cmdline model. Flip the assertions
-    // back when ext_cmdline is re-enabled to also verify model + content.
+    // Core reproduction of the "keystroke lost after ':'" focus bug. Drives a
+    // full ':let ...<CR>' through Qt's focus chain (QTest::keyClick targets the
+    // window's activeFocusItem), then asserts nvim actually applied the command.
+    // A focus regression after the colon makes the trailing keys vanish and the
+    // variable never gets set — a hard failure here, not a soft focus check.
     void keypressAfterColonReachesNvim() {
         NvimConnector conn;
         QVERIFY(startTestNvim(conn));
@@ -104,74 +87,18 @@ private slots:
                  "No active focus item after attach — Shell didn't force focus");
 
         QTest::keyClick(window, Qt::Key_Colon);
-        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
-
-        // ext_cmdline is off — cmdline_show is never emitted.
-        QVERIFY2(!conn.cmdline()->visible(),
-                 "CmdlineModel reported visible — ext_cmdline may have been re-enabled");
-        QVERIFY2(window->activeFocusItem() != nullptr,
-                 "Focus lost after ':' — Repeater destroyed the delegate");
-    }
-
-    // Visual confirmation: with ext_cmdline enabled, ':' would make the
-    // Cmdline.qml overlay visible. Disabled here — verify the overlay
-    // remains hidden after a colon keystroke. Flip when ext_cmdline is
-    // re-enabled to restore the original "overlay drew" pixel check.
-    void cmdlineIsVisibleOnScreenAfterColon() {
-        NvimConnector conn;
-        QVERIFY(startTestNvim(conn));
-
-        QQmlApplicationEngine engine;
-        QQuickWindow *window = loadMainQml(engine, &conn);
-        QVERIFY(window);
-        QVERIFY(QTest::qWaitForWindowExposed(window));
-        QVERIFY(waitForAttach(&conn));
-        QVERIFY(waitForFlush(&conn));
-
-        QQuickItem *cmdlineItem = nullptr;
-        for(QQuickItem *c: window->contentItem()->childItems()) {
-            if(QString::fromLatin1(c->metaObject()->className()).contains("Cmdline")) {
-                cmdlineItem = c;
-                break;
-            }
+        for(char c: QByteArrayLiteral("let g:smoke_after_colon = 7")) {
+            QTest::keyClick(window, c);
         }
-        QVERIFY2(cmdlineItem, "Could not find Cmdline QML item in window tree");
-        QVERIFY2(!cmdlineItem->isVisible(),
-                 "Cmdline shouldn't be visible before any ':' is pressed");
+        QTest::keyClick(window, Qt::Key_Return);
 
-        QTest::keyClick(window, Qt::Key_Colon);
-        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
-
-        QVERIFY2(!conn.cmdline()->visible(),
-                 "CmdlineModel reported visible — ext_cmdline may have been re-enabled");
-        QVERIFY2(!cmdlineItem->isVisible(),
-                 "Cmdline QML item became visible — ext_cmdline may have been re-enabled");
-    }
-
-    // Originally: type ':echo' and verify cmdline content == "echo". With
-    // ext_cmdline disabled the model never receives content, so we only
-    // assert it stays empty. Flip back when ext_cmdline is re-enabled.
-    void multiKeyCommandReachesNvim() {
-        NvimConnector conn;
-        QVERIFY(startTestNvim(conn));
-
-        QQmlApplicationEngine engine;
-        QQuickWindow *window = loadMainQml(engine, &conn);
-        QVERIFY(window);
-        QVERIFY(QTest::qWaitForWindowExposed(window));
-        QVERIFY(waitForAttach(&conn));
-        QVERIFY(waitForFlush(&conn));
-
-        QTest::keyClick(window, Qt::Key_Colon);
-        for(Qt::Key k: { Qt::Key_E, Qt::Key_C, Qt::Key_H, Qt::Key_O }) {
-            QTest::keyClick(window, k);
-        }
-        for(int i = 0; i < 5; ++i) waitForFlush(&conn, 200);
-
-        QVERIFY2(conn.cmdline()->content().isEmpty(),
-                 qPrintable(QStringLiteral("CmdlineModel content was '%1' "
-                                           "— ext_cmdline may have been re-enabled")
-                                .arg(conn.cmdline()->content())));
+        const bool applied = waitUntil([&] {
+            const auto v = evalSync(conn, QStringLiteral("get(g:, 'smoke_after_colon', 0)"), 500);
+            return v && v->toInt() == 7;
+        }, 5000);
+        QVERIFY2(applied,
+                 "keystrokes after ':' never reached nvim — focus was lost after the colon");
+        QVERIFY2(window->activeFocusItem() != nullptr, "Focus lost after command entry");
     }
 };
 

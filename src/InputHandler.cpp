@@ -48,17 +48,6 @@ QString InputHandler::modString(Qt::KeyboardModifiers mods) {
     return s;
 }
 
-QString InputHandler::modPrefix(Qt::KeyboardModifiers mods) {
-    const QString m = modString(mods);
-    return m.isEmpty() ? QString() : m;
-}
-
-QString InputHandler::escapeLiteral(QChar c) {
-    if(c == QChar('<')) return QStringLiteral("<lt>");
-    if(c == QChar('\\')) return QStringLiteral("\\");
-    return { c };
-}
-
 QString InputHandler::keyToNvim(QKeyEvent *ev) {
     const int key = ev->key();
     const Qt::KeyboardModifiers mods = ev->modifiers();

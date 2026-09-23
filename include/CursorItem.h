@@ -25,13 +25,13 @@ class GridModel;
 class HighlightTable;
 
 // Cursor overlay item. Sits as a transparent sibling of the grid in Shell.qml,
-// anchored fill, so its texture composites on top of every grid. Cursor blink
+// anchored fill, so its texture composites on top of the grid. Cursor blink
 // and cursor moves invalidate only the previous + current cursor cell via
 // update(QRect), so the grid item never repaints for cursor activity alone.
 //
 // The cursor lives on exactly one grid at a time (the last grid_cursor_goto
-// target, exposed as GridModel::activeGrid()). A single CursorItem reads
-// surfaceFor(activeGrid) to find the right pixel offset for sub-grids.
+// target, exposed as GridModel::activeGrid()). A single CursorItem reads the
+// active grid's cursor directly in global-grid cell coordinates.
 class CursorItem : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
@@ -66,8 +66,7 @@ public:
 
     // Pure rect math, static so unit tests can exercise it without
     // instantiating a QQuickItem (which needs a QGuiApplication).
-    // row/col are absolute cell coordinates within the item's own coordinate
-    // space (already offset by the active grid's surface position).
+    // row/col are cell coordinates within the item's own coordinate space.
     static QRectF cursorRectFor(int row, int col, qreal cellWidth, qreal cellHeight,
                                 CursorShape shape);
     // Pixel-space variant used by paint() during cursor-move animation when
@@ -101,8 +100,7 @@ private:
 
     // Top-left pixel of the TARGET cell (where nvim says the cursor should
     // be). Used by onCursorActivity to know where to animate toward. Returns
-    // {false, {}} when the active grid is missing/hidden or the cursor is
-    // out-of-bounds (a transient state during grid destruction).
+    // {false, {}} when the active grid is missing or the cursor is out-of-bounds.
     std::pair<bool, QPointF> targetCellTopLeft() const;
 
     void scheduleRepaint(); // update(QRect) over m_lastRect.united(currentRect)
@@ -141,11 +139,10 @@ private:
     QPointF m_animatedPos;
     bool m_hasAnimatedPos = false;
 
-    // Previous absolute cell coords (row/col on the active grid plus its
-    // surface offset). Used to gate the move animation: smooth ease only on
-    // 1-cell adjacent moves (|dRow|<=1 && |dCol|<=1). Anything larger (gg, G,
-    // /search, %, H/M/L, ctrl-d/u) is a logical jump and should snap. -1
-    // sentinel means we have not seen a cursorChanged yet.
+    // Previous active-grid cell coords. Used to gate the move animation:
+    // smooth ease only on 1-cell adjacent moves (|dRow|<=1 && |dCol|<=1).
+    // Anything larger (gg, G, /search, %, H/M/L, ctrl-d/u) is a logical jump
+    // and should snap. -1 sentinel means we have not seen a cursorChanged yet.
     int m_prevRow = -1;
     int m_prevCol = -1;
 

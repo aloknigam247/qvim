@@ -221,6 +221,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download tier coverage
         uses: actions/download-artifact@v8
@@ -239,3 +241,15 @@ jobs:
           if (-not $reports) { throw "no per-tier cobertura reports found under _cov/." }
           Write-Host "unioning $($reports.Count) tier report(s):`n$($reports -join "`n")"
           & scripts\coverage_union.ps1 -CoberturaPath $reports
+
+      # Require 100% coverage of the lines this change touches (patch coverage).
+      # Only runs on pull requests, where a base ref exists to diff against.
+      - name: Enforce patch coverage
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $reports = (Get-ChildItem _cov\*.cobertura).FullName
+          if (-not $reports) { throw "no per-tier cobertura reports found under _cov/." }
+          $base = "${{ github.event.pull_request.base.sha }}"
+          if (-not $base) { $base = "origin/main" }
+          & scripts\coverage_patch.ps1 -ReportPath $reports -BaseRef $base

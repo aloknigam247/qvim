@@ -54,6 +54,52 @@ private slots:
         ConfigGGlobalReader::readFromMap(vars, cfg);
         QCOMPARE(cfg.value(QStringLiteral("frameless")).toBool(), true);
     }
+
+    void boolRejectsNonNumericString() {
+        // A non-numeric string is neither a bool nor an int, so coercion fails
+        // and the malformed-value branch leaves the default intact.
+        Config cfg;
+        cfg.registerOption(QStringLiteral("frameless"), ConfigType::Bool, false);
+        QHash<QString, QVariant> vars;
+        vars.insert(QStringLiteral("qvim_frameless"), QStringLiteral("hello"));
+        ConfigGGlobalReader::readFromMap(vars, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("frameless")).toBool(), false);
+    }
+
+    void stringOptionAcceptsScalar() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("theme"), ConfigType::String, QStringLiteral("light"));
+        QHash<QString, QVariant> vars;
+        vars.insert(QStringLiteral("qvim_theme"), QStringLiteral("dark"));
+        ConfigGGlobalReader::readFromMap(vars, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("theme")).toString(), QStringLiteral("dark"));
+    }
+
+    void stringListFromScalarWrapsInList() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("fallback"), ConfigType::StringList, QStringList{});
+        QHash<QString, QVariant> vars;
+        vars.insert(QStringLiteral("qvim_fallback"), QStringLiteral("solo"));
+        ConfigGGlobalReader::readFromMap(vars, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(),
+                 QStringList{ QStringLiteral("solo") });
+    }
+
+    void unconvertibleValuesAreIgnored() {
+        // A map converts to neither a string nor a list, so both String and
+        // StringList options must reject it and keep their defaults.
+        Config cfg;
+        cfg.registerOption(QStringLiteral("theme"), ConfigType::String, QStringLiteral("light"));
+        cfg.registerOption(QStringLiteral("fallback"), ConfigType::StringList,
+                           QStringList{ QStringLiteral("def") });
+        QHash<QString, QVariant> vars;
+        vars.insert(QStringLiteral("qvim_theme"), QVariant(QVariantMap{ { "k", 1 } }));
+        vars.insert(QStringLiteral("qvim_fallback"), QVariant(QVariantMap{ { "k", 1 } }));
+        ConfigGGlobalReader::readFromMap(vars, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("theme")).toString(), QStringLiteral("light"));
+        QCOMPARE(cfg.value(QStringLiteral("fallback")).toStringList(),
+                 QStringList{ QStringLiteral("def") });
+    }
 };
 
 QTEST_GUILESS_MAIN(TestConfigGReader)

@@ -69,6 +69,27 @@ private slots:
         const QStringList expected{ "alpha", "mu", "zeta" };
         QCOMPARE(n, expected);
     }
+
+    void duplicateRegistrationIsIgnored() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("opacity"), ConfigType::Float, 1.0);
+        // Second registration is rejected: the original type and default survive.
+        cfg.registerOption(QStringLiteral("opacity"), ConfigType::Int, 42);
+        QCOMPARE(cfg.type(QStringLiteral("opacity")), ConfigType::Float);
+        QCOMPARE(cfg.value(QStringLiteral("opacity")).toDouble(), 1.0);
+    }
+
+    void setFromDefaultUpdatesResolvedValueAndSignals() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("opacity"), ConfigType::Float, 1.0);
+        QSignalSpy spy(&cfg, &Config::changed);
+        cfg.setFromDefault(QStringLiteral("opacity"), 0.75);
+        QCOMPARE(cfg.value(QStringLiteral("opacity")).toDouble(), 0.75);
+        QCOMPARE(spy.count(), 1);
+        // Unknown names are a no-op.
+        cfg.setFromDefault(QStringLiteral("unknown"), 0.1);
+        QCOMPARE(spy.count(), 1);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestConfigRegistry)

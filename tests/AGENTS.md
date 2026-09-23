@@ -42,7 +42,6 @@ Register a new test by alphabetical insert in `tests/CMakeLists.txt` via `qvim_a
 
 - Calling `conn.input("...")` directly from a smoke test — bypasses the focus chain. Use `QTest::keyClick(window, key)` so a focus regression actually fails the test.
 - `QQuickWindow::grabWindow()` under `minimal` QPA — returns null. Use `QQuickItem::grabToImage()` on the subtree.
-- Asserting exact `rows()` against the attach size with both `ext_messages: true` AND `ext_multigrid: true` — nvim relocates the message line off-grid only in that combination, shrinking the active grid by 1 row. Either extension alone keeps the grid the full attach size.
 - Forgetting `QQuickWindow::setGraphicsApi(QSGRendererInterface::Software)` in `initTestCase()` for QML smoke tests — must be set before any window is created.
 - Linking only `qvim_lib` for QML smoke tests — also need `qvim_libplugin` + `Qt6::Quick` to register the `Qvim` QML module.
 

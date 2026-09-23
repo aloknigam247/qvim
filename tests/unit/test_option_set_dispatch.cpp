@@ -104,6 +104,70 @@ private slots:
         QCOMPARE(c.pumblend(), 30);
         QCOMPARE(spy.count(), 1);
     }
+
+    void guifontwideString() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::guifontwideChanged);
+        c.onOptionSet(QStringLiteral("guifontwide"), QStringLiteral("Noto Sans CJK:h14"));
+        QCOMPARE(c.guifontwide(), QStringLiteral("Noto Sans CJK:h14"));
+        QCOMPARE(spy.count(), 1);
+        c.onOptionSet(QStringLiteral("guifontwide"), QStringLiteral("Noto Sans CJK:h14"));
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void arabicshapeBool() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::arabicshapeChanged);
+        QCOMPARE(c.arabicshape(), true); // default
+        c.onOptionSet(QStringLiteral("arabicshape"), false);
+        QCOMPARE(c.arabicshape(), false);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void emojiBool() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::emojiChanged);
+        QCOMPARE(c.emoji(), true); // default
+        c.onOptionSet(QStringLiteral("emoji"), false);
+        QCOMPARE(c.emoji(), false);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void mousefocusBool() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::mousefocusChanged);
+        QCOMPARE(c.mousefocus(), false); // default
+        c.onOptionSet(QStringLiteral("mousefocus"), true);
+        QCOMPARE(c.mousefocus(), true);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void mousehideBool() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::mousehideChanged);
+        QCOMPARE(c.mousehide(), true); // default
+        c.onOptionSet(QStringLiteral("mousehide"), false);
+        QCOMPARE(c.mousehide(), false);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void mousemoveeventBool() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::mousemoveeventChanged);
+        QCOMPARE(c.mousemoveevent(), false); // default
+        c.onOptionSet(QStringLiteral("mousemoveevent"), true);
+        QCOMPARE(c.mousemoveevent(), true);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void showtablineInt() {
+        NvimConnector c;
+        QSignalSpy spy(&c, &NvimConnector::showtablineChanged);
+        QCOMPARE(c.showtabline(), 1); // default
+        c.onOptionSet(QStringLiteral("showtabline"), 2);
+        QCOMPARE(c.showtabline(), 2);
+        QCOMPARE(spy.count(), 1);
+    }
 };
 
 QTEST_MAIN(TestOptionSetDispatch)

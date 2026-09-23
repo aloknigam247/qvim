@@ -43,9 +43,8 @@ include/                    # all project headers, flat, included as "Foo.h"
   GridItem.h                # QQuickPaintedItem renderer (cell content only)
   CursorItem.h              # QQuickPaintedItem cursor overlay (sibling of grid)
   InputHandler.h            # QKeyEvent → nvim keycodes
-  TablineModel.h / PopupMenuModel.h / CmdlineModel.h / ...
 src/                        # implementation .cpp files
-qml/                        # UI shell (Main, Shell, Tabline, PopupMenu, Cmdline)
+qml/                        # UI shell (Main, Shell, ChatPanel)
 tests/
   unit/                     # tier 1, headless
   integration/              # tier 2, real nvim, offscreen QPA
@@ -110,9 +109,7 @@ Three tiers (see `tests/CMakeLists.txt`):
 ## Gotchas
 
 - vcpkg's Qt deploys only `minimal`, `windows`, `direct2d` QPA plugins — no `offscreen`. Smoke tests use `minimal` + software renderer.
-- `ext_messages: true` causes nvim to relocate the message line off-grid, shrinking the active grid by 1 row. Tests that assert exact `rows()` against the attach size must subtract 1.
 - Concurrent builds against `D:\qvim\build\dev` contend on `vcpkg-running.lock` and `qvim_lib.pdb`. Serialise builds when running multiple agents, or build individual `.vcxproj` targets via MSBuild to skip the vcpkg-configure step.
-- `nvim_ui_try_resize` called from `geometryChange` will fire during cmdline_show reflow. With ext_multigrid this triggers `grid_resize` + `win_pos` for every grid — make sure these don't destroy QML delegates.
 - `QQuickPaintedItem::paint()` runs on the SceneGraph **render thread**, not the GUI thread. Any `QRawFont` / `QFontEngine`-backed object must be constructed AND destroyed on the render thread (the dtor also asserts thread affinity). If you cache one, hook `QQuickWindow::sceneGraphInvalidated` with `Qt::DirectConnection` to release it before the SceneGraph tears down.
 - After merging library-only `.cpp` changes into main, the incremental linker may skip relinking `qvim.exe` — the .lib changes, the .exe doesn't. Always force-rebuild with `cmake --build --preset dev --target qvim` before asking the user to verify a fix; otherwise they're testing a stale binary. Same trap exists for an agent's worktree exe: ctest can pass against the new .lib while `<worktree>/build/dev/Debug/qvim.exe` is still from an earlier build. Before validating an agent's worktree binary, check `Get-Item <worktree>/build/dev/Debug/qvim.exe` mtime against `git log -1 --format=%ci <branch>` — if the exe is older, delete it and rerun `cmake --build --preset dev --target qvim`.
 - `Q_PROPERTY(qreal baseline ...)` on a `QQuickPaintedItem` subclass silently fails: Qt's MOC emits "Final member baseline is overridden. The override won't be used." and QML treats the property as read-only (bindings like `cursorItem.baseline: baseGrid.baseline` produce "Invalid property assignment: baseline is a read-only property"). The trap is that the warning is on the property *override*, not the original — QQuickItem has an internal FINAL `baseline` member that shadows any subclass property of the same name. Rename to anything else (`cellBaseline`, `textBaseline`) to avoid the clash. Other Qt-reserved-name candidates that should not be Q_PROPERTYs on QQuickItem subclasses include `baselineOffset` (real Q_PROPERTY), `clip`, `enabled`, `focus`, `visible`, etc. — when in doubt, prefix with a domain word.

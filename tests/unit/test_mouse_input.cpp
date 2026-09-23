@@ -90,6 +90,22 @@ private slots:
         QVERIFY(m.valid);
         QCOMPARE(m.button, QStringLiteral("left"));
     }
+
+    void unmappedButtonIsRejected() {
+        // A press of a button nvim has no name for (e.g. the browser Back
+        // button) yields no input.
+        auto ev = makeEvent(QEvent::MouseButtonPress, Qt::BackButton, Qt::BackButton);
+        const auto m = InputHandler::mouseFor(&ev, QEvent::MouseButtonPress);
+        QVERIFY(!m.valid);
+    }
+
+    void unmappedEventTypeIsRejected() {
+        // A recognised button but an event type outside press/release/drag
+        // (e.g. a double-click) carries no nvim mouse action.
+        auto ev = makeEvent(QEvent::MouseButtonDblClick, Qt::LeftButton, Qt::LeftButton);
+        const auto m = InputHandler::mouseFor(&ev, QEvent::MouseButtonDblClick);
+        QVERIFY(!m.valid);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestMouseInput)
