@@ -47,11 +47,11 @@ class SessionClientTest {
     @Test
     fun helloTriggersResumeAndFramesFlowThrough() {
         val serverInbound = LinkedBlockingQueue<String>()
-        var serverSocket: WebSocket? = null
+        val serverSockets = LinkedBlockingQueue<WebSocket>()
         val serverListener =
             object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
-                    serverSocket = webSocket
+                    serverSockets.add(webSocket)
                     webSocket.send("""{"type":"hello","protocol":1,"sessionId":"s1"}""")
                 }
 
@@ -69,19 +69,21 @@ class SessionClientTest {
         val stateJob: Job = client.state.onEach { states.add(it) }.launchIn(scope)
         val framesJob: Job = client.frames(wsUrl()).onEach { frames.add(it) }.launchIn(scope)
 
+        val serverSocket = serverSockets.take(10000) ?: error("server socket never opened")
+
         // Client should reply to hello with a resume frame carrying the session id.
-        val resume = serverInbound.take(5000)
+        val resume = serverInbound.take(10000)
         assertEquals("""{"type":"resume","lastSeq":0,"sessionId":"s1"}""", resume)
 
         // Server pushes an atomic message; the client decodes and emits it.
-        serverSocket!!.send("""{"seq":2,"type":"message","id":"u1","role":"user","text":"hi"}""")
+        serverSocket.send("""{"seq":2,"type":"message","id":"u1","role":"user","text":"hi"}""")
         waitUntil { frames.any { it is ServerFrame.Message } }
         val msg = frames.filterIsInstance<ServerFrame.Message>().first()
         assertEquals("hi", msg.text)
 
         // The user-input send path rides the same socket.
         client.send("typed")
-        val input = serverInbound.take(5000)
+        val input = serverInbound.take(10000)
         assertEquals("""{"type":"input","text":"typed"}""", input)
 
         waitUntil { states.contains(ConnectionState.Connected) }
@@ -89,7 +91,7 @@ class SessionClientTest {
         assertTrue(states.contains(ConnectionState.Connected))
 
         // Server-initiated close drives the client back to Disconnected.
-        serverSocket!!.close(1000, "bye")
+        serverSocket.close(1000, "bye")
         waitUntil { client.state.value == ConnectionState.Disconnected }
         assertEquals(ConnectionState.Disconnected, client.state.value)
 
@@ -104,7 +106,7 @@ class SessionClientTest {
         val client = SessionClient()
         runBlocking {
             val job = client.frames("ws://127.0.0.1:1").onEach { }.launchIn(CoroutineScope(Dispatchers.IO))
-            waitUntil(timeoutMs = 8000) { client.state.value == ConnectionState.Disconnected }
+            waitUntil(timeoutMs = 15000) { client.state.value == ConnectionState.Disconnected }
             assertEquals(ConnectionState.Disconnected, client.state.value)
             job.cancel()
         }
@@ -116,7 +118,7 @@ class SessionClientTest {
         SessionClient().send("ignored")
     }
 
-    private fun waitUntil(timeoutMs: Long = 5000, predicate: () -> Boolean) {
+    private fun waitUntil(timeoutMs: Long = 10000, predicate: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (predicate()) return

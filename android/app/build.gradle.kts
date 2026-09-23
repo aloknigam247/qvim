@@ -82,6 +82,13 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
 
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
+
 // Classes that JVM unit tests (no emulator in CI) structurally cannot reach: the
 // Compose UI, the Activity bootstrap, the NsdManager/WifiManager-backed discovery,
 // and compiler-generated serializers. Excluded from both the report and the floor

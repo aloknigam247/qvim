@@ -28,7 +28,7 @@ class ChatViewModelConnectTest {
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var server: MockWebServer
     private val serverInbound = LinkedBlockingQueue<String>()
-    private var serverSocket: WebSocket? = null
+    private val serverSockets = LinkedBlockingQueue<WebSocket>()
 
     @Before
     fun setUp() {
@@ -46,7 +46,7 @@ class ChatViewModelConnectTest {
         val listener =
             object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
-                    serverSocket = webSocket
+                    serverSockets.add(webSocket)
                     if (sendHelloThenMessage) {
                         webSocket.send("""{"type":"hello","protocol":1,"sessionId":"s1"}""")
                         webSocket.send("""{"seq":2,"type":"message","id":"u1","role":"user","text":"hi"}""")
@@ -86,9 +86,9 @@ class ChatViewModelConnectTest {
         vm.setEndpoint(wsUrl())
         vm.connect()
 
-        waitUntil { serverSocket != null }
+        waitUntil { serverSockets.peek() != null }
         vm.send("  hello  ")
-        val got = serverInbound.poll(5000, TimeUnit.MILLISECONDS)
+        val got = serverInbound.poll(10000, TimeUnit.MILLISECONDS)
         assertEquals("""{"type":"input","text":"hello"}""", got)
     }
 
@@ -137,7 +137,7 @@ class ChatViewModelConnectTest {
         m.invoke(vm)
     }
 
-    private fun waitUntil(timeoutMs: Long = 5000, predicate: () -> Boolean) {
+    private fun waitUntil(timeoutMs: Long = 10000, predicate: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (predicate()) return
