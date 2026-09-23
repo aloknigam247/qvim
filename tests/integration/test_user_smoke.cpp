@@ -92,13 +92,10 @@ private slots:
         }
         QTest::keyClick(window, Qt::Key_Return);
 
-        const bool applied = waitUntil(
-            [&] {
-                const auto v =
-                    evalSync(conn, QStringLiteral("get(g:, 'smoke_after_colon', 0)"), 500);
-                return v && v->toInt() == 7;
-            },
-            5000);
+        const bool applied = waitUntil([&] {
+            const auto v = evalSync(conn, QStringLiteral("get(g:, 'smoke_after_colon', 0)"), 500);
+            return v && v->toInt() == 7;
+        }, 5000);
         QVERIFY2(applied,
                  "keystrokes after ':' never reached nvim — focus was lost after the colon");
         QVERIFY2(window->activeFocusItem() != nullptr, "Focus lost after command entry");

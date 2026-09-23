@@ -152,7 +152,7 @@ private:
     GridSurface &ensure(int gridId);
 
     QHash<int, GridSurface> m_grids;
-    int m_active = 1;                         // grid id of the active cursor target
+    int m_active = 1; // grid id of the active cursor target
 };
 
 } // namespace qvim

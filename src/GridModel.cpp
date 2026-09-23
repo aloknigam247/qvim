@@ -21,9 +21,7 @@ const GridSurface *GridModel::surface(int gridId) const {
 
 GridSurface &GridModel::ensure(int gridId) {
     auto it = m_grids.find(gridId);
-    if(it == m_grids.end()) {
-        it = m_grids.insert(gridId, GridSurface{});
-    }
+    if(it == m_grids.end()) { it = m_grids.insert(gridId, GridSurface{}); }
     return it.value();
 }
 

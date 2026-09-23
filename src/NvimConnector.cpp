@@ -220,8 +220,7 @@ void NvimConnector::inputMouse(const QString &button, const QString &action,
                                const QString &modifier, int grid, int row, int col) {
     Q_UNUSED(grid);
     // nvim_input_mouse takes grid=0 so nvim performs its own hit-testing.
-    m_rpc->notify(QStringLiteral("nvim_input_mouse"),
-                  [&](msgpack::packer<msgpack::sbuffer> &pk) {
+    m_rpc->notify(QStringLiteral("nvim_input_mouse"), [&](msgpack::packer<msgpack::sbuffer> &pk) {
         pk.pack_array(6);
         pk.pack(button.toStdString());
         pk.pack(action.toStdString());
