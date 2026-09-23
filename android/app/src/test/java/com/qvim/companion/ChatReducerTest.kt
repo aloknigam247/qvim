@@ -9,7 +9,6 @@ import org.junit.Test
  * ChatModel: the user block is atomic, the assistant reply streams in via begin/delta/end.
  */
 class ChatReducerTest {
-
     private fun assistantStream(reducer: ChatReducer) {
         reducer.apply(ServerFrame.MessageBegin(seq = 3, id = "a1", role = "assistant"))
         reducer.apply(ServerFrame.MessageDelta(seq = 4, id = "a1", text = "Echo: "))
