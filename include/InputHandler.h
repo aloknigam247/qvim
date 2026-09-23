@@ -37,9 +37,7 @@ public:
     static MouseInput wheelFor(int deltaX, int deltaY, Qt::KeyboardModifiers mods);
 
 private:
-    static QString modPrefix(Qt::KeyboardModifiers mods);
     static QString modString(Qt::KeyboardModifiers mods);
-    static QString escapeLiteral(QChar c);
 };
 
 } // namespace qvim

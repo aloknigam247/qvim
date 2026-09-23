@@ -103,6 +103,79 @@ private slots:
         QCOMPARE(g.cell(1, 0).text, QStringLiteral("g"));
     }
 
+    void fullWidthScrollDown() {
+        // rows < 0 rotates the full-width row handles the other way; the real
+        // grid_line events refill the revealed row, so we only assert the shift.
+        GridModel g;
+        g.resize(3, 3);
+        auto row0 = packGridLineCells({ { "a", 1, -1 }, { "b", 1, -1 }, { "c", 1, -1 } });
+        auto row1 = packGridLineCells({ { "d", 1, -1 }, { "e", 1, -1 }, { "f", 1, -1 } });
+        auto row2 = packGridLineCells({ { "g", 1, -1 }, { "h", 1, -1 }, { "i", 1, -1 } });
+        g.applyLine(0, 0, row0.get());
+        g.applyLine(1, 0, row1.get());
+        g.applyLine(2, 0, row2.get());
+        g.scroll(0, 3, 0, 3, -1); // scroll down by 1
+        QCOMPARE(g.cell(1, 0).text, QStringLiteral("a"));
+        QCOMPARE(g.cell(2, 0).text, QStringLiteral("d"));
+    }
+
+    void partialWidthScrollDown() {
+        // A split window with a sibling column scrolls only the [left, right)
+        // band; the columns outside it must be untouched.
+        GridModel g;
+        g.resize(4, 4);
+        g.applyLine(
+            0, 0,
+            packGridLineCells({ { "A", 1, -1 }, { "B", 1, -1 }, { "C", 1, -1 }, { "D", 1, -1 } })
+                .get());
+        g.applyLine(
+            1, 0,
+            packGridLineCells({ { "E", 1, -1 }, { "F", 1, -1 }, { "G", 1, -1 }, { "H", 1, -1 } })
+                .get());
+        g.applyLine(
+            2, 0,
+            packGridLineCells({ { "I", 1, -1 }, { "J", 1, -1 }, { "K", 1, -1 }, { "L", 1, -1 } })
+                .get());
+        g.applyLine(
+            3, 0,
+            packGridLineCells({ { "M", 1, -1 }, { "N", 1, -1 }, { "O", 1, -1 }, { "P", 1, -1 } })
+                .get());
+        g.scroll(0, 4, 1, 3, 1);                          // band cols [1,3), scroll up by 1
+        QCOMPARE(g.cell(0, 1).text, QStringLiteral("F")); // pulled from row 1
+        QCOMPARE(g.cell(0, 2).text, QStringLiteral("G"));
+        QCOMPARE(g.cell(1, 1).text, QStringLiteral("J")); // pulled from row 2
+        QCOMPARE(g.cell(0, 0).text, QStringLiteral("A")); // edge column untouched
+        QCOMPARE(g.cell(0, 3).text, QStringLiteral("D")); // edge column untouched
+        QCOMPARE(g.cell(3, 1).text, QStringLiteral("N")); // last row untouched
+    }
+
+    void partialWidthScrollUp() {
+        GridModel g;
+        g.resize(4, 4);
+        g.applyLine(
+            0, 0,
+            packGridLineCells({ { "A", 1, -1 }, { "B", 1, -1 }, { "C", 1, -1 }, { "D", 1, -1 } })
+                .get());
+        g.applyLine(
+            1, 0,
+            packGridLineCells({ { "E", 1, -1 }, { "F", 1, -1 }, { "G", 1, -1 }, { "H", 1, -1 } })
+                .get());
+        g.applyLine(
+            2, 0,
+            packGridLineCells({ { "I", 1, -1 }, { "J", 1, -1 }, { "K", 1, -1 }, { "L", 1, -1 } })
+                .get());
+        g.applyLine(
+            3, 0,
+            packGridLineCells({ { "M", 1, -1 }, { "N", 1, -1 }, { "O", 1, -1 }, { "P", 1, -1 } })
+                .get());
+        g.scroll(0, 4, 1, 3, -1);                         // band cols [1,3), scroll down by 1
+        QCOMPARE(g.cell(3, 1).text, QStringLiteral("J")); // pulled from row 2
+        QCOMPARE(g.cell(1, 1).text, QStringLiteral("B")); // pulled from row 0
+        QCOMPARE(g.cell(0, 1).text, QStringLiteral("B")); // top row untouched
+        QCOMPARE(g.cell(3, 0).text, QStringLiteral("M")); // edge column untouched
+        QCOMPARE(g.cell(3, 3).text, QStringLiteral("P")); // edge column untouched
+    }
+
     void cursorSet() {
         GridModel g;
         g.resize(10, 5);

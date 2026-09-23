@@ -113,6 +113,17 @@ private slots:
         QCOMPARE(translate(Qt::Key_Up, Qt::ControlModifier, QString()), QStringLiteral("<C-Up>"));
     }
 
+    void controlCharWithoutCtrlLetterIgnored() {
+        // A sub-0x20 byte that is not Ctrl+<A-Z> carries no sendable keycode.
+        QCOMPARE(translate(Qt::Key_unknown, Qt::NoModifier, QStringLiteral("\x02")), QString());
+    }
+
+    void multiCharTextPassThrough() {
+        // Composed / IME text longer than one code unit is forwarded verbatim.
+        QCOMPARE(translate(Qt::Key_unknown, Qt::NoModifier, QStringLiteral("abc")),
+                 QStringLiteral("abc"));
+    }
+
     // --- wheelFor -----------------------------------------------------------
     // Sign convention: positive deltaX == user scrolled LEFT (Qt negates the
     // Windows WM_MOUSEHWHEEL delta), and nvim's action "left" pans the view
