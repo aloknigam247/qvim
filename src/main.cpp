@@ -20,7 +20,6 @@
 
 #include "AppIcon.h"
 #include "ArgvParser.h"
-#include "ClipboardBridge.h"
 #include "Config.h"
 #include "ConfigCliReader.h"
 #include "ConfigGGlobalReader.h"
@@ -193,7 +192,6 @@ int main(int argc, char *argv[]) {
     boot.mark("Config registered + CLI read");
 
     qvim::NvimConnector connector;
-    qvim::ClipboardBridge clipboard;
     qvim::WindowChrome windowChrome;
     boot.mark("NvimConnector ctor done");
 
@@ -202,7 +200,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     boot.mark("nvim --embed spawn returned");
-    clipboard.attachTo(&connector);
 
     // Fire nvim_ui_attach NOW with the best-known grid size so the round-trip
     // (nvim sources init, builds initial highlights + grid, responds)
@@ -262,7 +259,6 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("$config"), &cfg);
     engine.rootContext()->setContextProperty(QStringLiteral("$connector"), &connector);
-    engine.rootContext()->setContextProperty(QStringLiteral("$clipboard"), &clipboard);
     engine.rootContext()->setContextProperty(QStringLiteral("$windowChrome"), &windowChrome);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
