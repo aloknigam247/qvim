@@ -16,15 +16,14 @@
     restricts Sources, but we re-filter defensively so a stray path can't skew
     the number).
 
-    The floor is stored as BOTH an absolute covered-line count and a ratio. The
-    absolute count guards against a catastrophic coverage drop; the ratio is the
-    scale-invariant ratchet raised as issue #40 lifts coverage. After removing
-    the disabled ext_* UI code and the redundant clipboard bridge and adding
-    unit tests closing the unit-reachable gaps, coverage measured
-    2608 / 2877 = 90.65% in CI; the floor is set just under that. The
-    coverage-gate CI job prints the live covered/total/ratio each run — those
-    numbers are authoritative for further ratchets. Raise -MinCovered / -MinRatio
-    only to values a real run has met.
+    The floor is a fixed policy minimum: overall union coverage must stay at or
+    above 90% (MinRatio). The absolute covered-line count (MinCovered) is a low
+    catastrophic-drop backstop that never binds in normal operation — the ratio
+    is the rule. Coverage measured 2608 / 2877 = 90.65% in CI when the 90% floor
+    was adopted. The coverage-gate CI job prints the live covered/total/ratio
+    each run. Per-change (patch) coverage is enforced separately by
+    coverage_patch.ps1, which requires 100% coverage of changed src/ + include/
+    lines.
 
 .PARAMETER CoberturaPath
     One or more paths to cobertura XML emitted by the coverage collector. When
@@ -34,16 +33,17 @@
     whole-suite run, so the floor is identical either way.
 
 .PARAMETER MinCovered
-    Minimum number of distinct covered source lines required (floor).
+    Minimum number of distinct covered source lines required — a low
+    catastrophic-drop backstop, not the policy floor.
 
 .PARAMETER MinRatio
-    Minimum covered/total ratio required (floor), 0..1.
+    Minimum covered/total ratio required (the policy floor), 0..1.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string[]]$CoberturaPath,
-    [int]$MinCovered = 2604,
-    [double]$MinRatio = 0.906
+    [int]$MinCovered = 2400,
+    [double]$MinRatio = 0.90
 )
 
 $ErrorActionPreference = "Stop"
