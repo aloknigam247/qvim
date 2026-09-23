@@ -117,6 +117,15 @@ private slots:
         QCOMPARE(r.nvimForwardArgs, QStringList{ QStringLiteral("foo.txt") });
     }
 
+    void dashStdinConsumedAsBuffer() {
+        // A lone `-` is claimed by qvim (nvim's stdin is the RPC channel) and
+        // must not be forwarded.
+        FakeArgv av{ { QStringLiteral("qvim"), QStringLiteral("-"), QStringLiteral("foo.txt") } };
+        const auto r = parseArgv(av.argc(), av.argv());
+        QVERIFY(r.stdinAsBuffer);
+        QCOMPARE(r.nvimForwardArgs, QStringList{ QStringLiteral("foo.txt") });
+    }
+
     // PowerShell 7 leaves outer double-quotes on argv entries containing `.`,
     // so `.\tasks.md` arrives as `".\tasks.md"`. Strip the matching pair so
     // the file path forwarded to nvim is the bare path, not a quoted literal.

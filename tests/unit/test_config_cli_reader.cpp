@@ -84,6 +84,23 @@ private slots:
         ConfigCliReader::extract(args, cfg);
         QCOMPARE(cfg.value(QStringLiteral("padding")).toInt(), 7);
     }
+
+    void unrecognisedBoolWordLeavesDefault() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("frameless"), ConfigType::Bool, false);
+        QStringList args{ QStringLiteral("--qvim-frameless=maybe") };
+        ConfigCliReader::extract(args, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("frameless")).toBool(), false);
+    }
+
+    void nonBoolOptionWithoutValueIsRejected() {
+        Config cfg;
+        cfg.registerOption(QStringLiteral("padding"), ConfigType::Int, 3);
+        QStringList args{ QStringLiteral("--qvim-padding") }; // no "=value"
+        ConfigCliReader::extract(args, cfg);
+        QCOMPARE(cfg.value(QStringLiteral("padding")).toInt(), 3);
+        QVERIFY(args.isEmpty()); // still consumed, not forwarded
+    }
 };
 
 QTEST_GUILESS_MAIN(TestConfigCliReader)

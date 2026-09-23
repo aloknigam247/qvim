@@ -25,6 +25,21 @@ msgpack::object_handle packAttrMap(const std::vector<std::pair<std::string, int>
     return h;
 }
 
+// Packs the ext_hlstate `info` array as [ { "hi_name": <name> }, ... ].
+msgpack::object_handle packInfoNames(const std::vector<std::string> &names) {
+    msgpack::sbuffer buf;
+    msgpack::packer<msgpack::sbuffer> pk(&buf);
+    pk.pack_array(static_cast<uint32_t>(names.size()));
+    for(const auto &n: names) {
+        pk.pack_map(1);
+        pk.pack(std::string("hi_name"));
+        pk.pack(n);
+    }
+    msgpack::object_handle h;
+    msgpack::unpack(h, buf.data(), buf.size());
+    return h;
+}
+
 } // namespace
 
 class TestHighlightTable : public QObject {
@@ -81,6 +96,29 @@ private slots:
         HlAttr a = h.resolved(6);
         QCOMPARE(a.fg, QColor(0x88, 0x88, 0x88));
         QCOMPARE(a.bg, QColor(0x22, 0x22, 0x22));
+    }
+
+    void getIntHandlesNegativeAndNonIntValues() {
+        // A negative blend exercises the NEGATIVE_INTEGER arm; a boolean under an
+        // integer key exercises the "present but wrong type -> default" arm.
+        HighlightTable h;
+        auto m = packAttrMap({ { "blend", -5 } }, { { "background", true } });
+        h.defineAttr(9, m.get());
+        HlAttr a = h.attr(9);
+        QCOMPARE(a.blend, -5);
+        QVERIFY(!a.bg.isValid()); // background was not a usable integer
+    }
+
+    void setRoundedHighlightsRecomputesExistingAttrs() {
+        // Defining the attr before any rounded set means it starts non-rounded;
+        // a later setRoundedHighlights must walk the existing attrs and flip it.
+        HighlightTable h;
+        auto attrMap = packAttrMap({ { "background", 0x445566 } }, {});
+        auto info = packInfoNames({ "Search" });
+        h.defineAttr(4, attrMap.get(), &info.get());
+        QVERIFY(!h.isRounded(4));
+        h.setRoundedHighlights({ QStringLiteral("Search") });
+        QVERIFY(h.isRounded(4));
     }
 };
 

@@ -327,6 +327,54 @@ private slots:
         QCOMPARE(runs.pills[0].backBg, QColor(0x30, 0x60, 0xC0));
     }
 
+    // A pill that starts at column 0 has no left neighbour to sample, so the
+    // ambient background must come from the non-rounded cell on its right.
+    void pillAtRowStartInheritsFromRightNeighbour() {
+        GridModel g;
+        HighlightTable hl;
+        hl.setDefaultColors(0xFFFFFF, 0xE0E2EA, 0xFF0000);
+        hl.setRoundedHighlights({ QStringLiteral("Search") });
+        defineBgNamed(hl, 1, 0x3060C0, "CursorLine"); // ambient (non-rounded)
+        defineBgNamed(hl, 2, 0xFFD000, "Search");     // the pill
+
+        g.resize(4, 1);
+        auto cells =
+            packGridLineCells({ { "a", 2, -1 }, { "b", 2, -1 }, { "c", 1, -1 }, { "d", 1, -1 } });
+        g.applyLine(0, 0, cells.get());
+
+        QVERIFY2(hl.isRounded(2), "fixture invalid: hl 2 did not resolve as rounded");
+
+        const GridRuns runs = buildGridRuns(g, hl, 1);
+
+        QCOMPARE(runs.pills.size(), 1);
+        QCOMPARE(runs.pills[0].c0, 0);
+        QCOMPARE(runs.pills[0].c1, 2);
+        QVERIFY(runs.pills[0].backBg.isValid());
+        QCOMPARE(runs.pills[0].backBg, QColor(0x30, 0x60, 0xC0));
+    }
+
+    // A double-width right-half marker sitting inside a run of PUA icons must be
+    // absorbed into the cluster rather than splitting it.
+    void puaClusterAbsorbsDoubleWidthCell() {
+        GridModel g;
+        HighlightTable hl;
+        g.resize(3, 1);
+        // PUA icon, its double-width right-half marker, then another PUA icon —
+        // all one hl_id, so all one cluster.
+        auto cells = packGridLineCells(
+            { { "\xee\x82\xb0", 1, -1 }, { "", 1, -1 }, { "\xee\x82\xb6", 1, -1 } });
+        g.applyLine(0, 0, cells.get());
+
+        QVERIFY2(g.cell(0, 1).doubleWidth,
+                 "fixture invalid: cell 1 is not a double-width right half");
+
+        const GridRuns runs = buildGridRuns(g, hl, 1);
+
+        QCOMPARE(runs.puaClusters.size(), 1);
+        QCOMPARE(runs.puaClusters[0].c0, 0);
+        QCOMPARE(runs.puaClusters[0].c1, 3);
+    }
+
     void noPillSpansWithoutRoundedHighlights() {
         GridModel g;
         HighlightTable hl;
