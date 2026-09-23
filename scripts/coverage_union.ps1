@@ -21,7 +21,7 @@
     scale-invariant ratchet raised as issue #40 lifts coverage. After removing
     the disabled ext_* UI code and the redundant clipboard bridge and adding
     unit tests closing the unit-reachable gaps, coverage measured
-    2544 / 2877 = 88.425% in CI; the floor is set just under that. The
+    2608 / 2877 = 90.65% in CI; the floor is set just under that. The
     coverage-gate CI job prints the live covered/total/ratio each run — those
     numbers are authoritative for further ratchets. Raise -MinCovered / -MinRatio
     only to values a real run has met.
@@ -42,8 +42,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string[]]$CoberturaPath,
-    [int]$MinCovered = 2540,
-    [double]$MinRatio = 0.883
+    [int]$MinCovered = 2604,
+    [double]$MinRatio = 0.906
 )
 
 $ErrorActionPreference = "Stop"
