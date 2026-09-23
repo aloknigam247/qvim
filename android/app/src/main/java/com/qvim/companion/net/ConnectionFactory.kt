@@ -13,9 +13,10 @@ fun interface ConnectionFactory {
 
 class PlainConnectionFactory : ConnectionFactory {
     override fun requestFor(endpoint: String): Request {
-        val httpUrl = endpoint
-            .replaceFirst("wss://", "https://")
-            .replaceFirst("ws://", "http://")
+        val httpUrl =
+            endpoint
+                .replaceFirst("wss://", "https://")
+                .replaceFirst("ws://", "http://")
         return Request.Builder().url(httpUrl).build()
     }
 }

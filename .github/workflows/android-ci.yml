@@ -1,0 +1,68 @@
+name: Android CI
+
+on:
+  # Mirror of ci.yml's `paths-ignore: android/**`: that pipeline skips a run only
+  # when every changed file is under android/, so the two filters are complementary
+  # — a mixed PR runs both, a qvim-only PR runs only ci.yml, an android-only PR runs
+  # only this one. The workflow file is in its own filter so changes to it self-test.
+  #
+  # Required-check caveat: because the filters are complementary, an android-only PR
+  # never reports ci.yml's checks and a qvim-only PR never reports these. If any job
+  # here or in ci.yml is marked *required* in branch protection, a filtered-out
+  # (never-triggered) job shows as "expected but never reported" and blocks merge
+  # forever. Keep both pipelines' jobs non-required, or gate on a merge-queue /
+  # aggregator job that both workflows can satisfy.
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+
+# A newer push to the same ref cancels the in-flight run.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The committed Gradle wrapper drives everything — no Android Studio. The
+        # Android SDK is preinstalled on the ubuntu-latest image (ANDROID_HOME set),
+        # so no SDK install/cache step is needed.
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # Blocking gates, cheapest first. ktlintCheck enforces the ktlint_official
+      # style (see android/.editorconfig); lint fails on Android Lint *errors*.
+      - name: ktlint
+        run: ./gradlew --no-daemon ktlintCheck
+
+      - name: Android Lint
+        run: ./gradlew --no-daemon lint
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon test
+
+      # assembleDebug is build verification: it catches manifest/resource/AAPT
+      # packaging failures that the JVM unit tests can't. The APK is not uploaded —
+      # publishing a signed, optimized release APK belongs with the semver
+      # release-please flow, tracked separately.
+      - name: Assemble debug APK
+        run: ./gradlew --no-daemon assembleDebug

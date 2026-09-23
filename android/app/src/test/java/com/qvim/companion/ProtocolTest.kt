@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProtocolTest {
-
     @Test
     fun decodesHello() {
         val f = Protocol.decode("""{"type":"hello","protocol":1,"sessionId":"s-1"}""")
