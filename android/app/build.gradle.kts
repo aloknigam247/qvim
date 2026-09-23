@@ -130,7 +130,7 @@ tasks.register<JacocoCoverageVerification>("jacocoCoverageFloor") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.90".toBigDecimal()
+                minimum = "0.98".toBigDecimal()
             }
         }
     }

@@ -65,7 +65,7 @@ jobs:
       # JaCoCo coverage over the logic classes (Compose UI, the Activity, and the
       # NsdManager-backed discovery are excluded in app/build.gradle.kts — JVM unit
       # tests can't reach them without an emulator). jacocoCoverageFloor fails below
-      # the 90% line floor.
+      # the 98% line floor.
       - name: Coverage report + floor
         run: ./gradlew --no-daemon jacocoTestReport jacocoCoverageFloor
 
