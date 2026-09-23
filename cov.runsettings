@@ -12,7 +12,6 @@
               <Exclude>
                 <ModulePath>.*[Qq]t6.*</ModulePath>
                 <ModulePath>.*\\vcpkg_installed\\.*</ModulePath>
-                <ModulePath>.*msgpack.*</ModulePath>
               </Exclude>
             </ModulePaths>
             <Sources>
