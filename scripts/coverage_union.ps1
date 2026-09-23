@@ -19,10 +19,11 @@
     The floor is stored as BOTH an absolute covered-line count and a ratio. The
     absolute count guards against a catastrophic coverage drop; the ratio is the
     scale-invariant ratchet raised as issue #40 lifts coverage. After removing
-    the disabled ext_* UI code (dormant and only partially tested), the ratio
-    floor was ratcheted to 0.80. The coverage-gate CI job prints the live
-    covered/total/ratio each run — those numbers are authoritative for further
-    ratchets. Raise -MinCovered / -MinRatio only to values a real run has met.
+    the disabled ext_* UI code (dormant and only partially tested), coverage
+    measured 2455 / 2920 = 84.075% in CI; the floor is set just under that. The
+    coverage-gate CI job prints the live covered/total/ratio each run — those
+    numbers are authoritative for further ratchets. Raise -MinCovered / -MinRatio
+    only to values a real run has met.
 
 .PARAMETER CoberturaPath
     One or more paths to cobertura XML emitted by the coverage collector. When
@@ -40,8 +41,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string[]]$CoberturaPath,
-    [int]$MinCovered = 1700,
-    [double]$MinRatio = 0.80
+    [int]$MinCovered = 2450,
+    [double]$MinRatio = 0.838
 )
 
 $ErrorActionPreference = "Stop"
