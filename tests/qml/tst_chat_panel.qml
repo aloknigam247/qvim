@@ -47,38 +47,21 @@ TestCase {
         compare(closedSpy.count, 1)
     }
 
-    function test_submit_appends_user_then_streamed_assistant() {
+    function test_append_block_adds_external_messages() {
         var p = make()
-        p.model.submit("hello")
+        p.model.appendBlock("user", "hello")
+        p.model.appendBlock("assistant", "reply")
 
-        // user block is appended synchronously; assistant block is created
-        // empty then streamed in chunks.
-        tryCompare(p.model, "count", 2)
+        compare(p.model.count, 2)
         compare(p.model.authorAt(0), "user")
         compare(p.model.textAt(0), "hello")
         compare(p.model.authorAt(1), "assistant")
-        tryVerify(function() { return p.model.textAt(1) === "Echo: hello" })
+        compare(p.model.textAt(1), "reply")
     }
 
-    function test_empty_submit_is_ignored() {
+    function test_empty_append_block_is_ignored() {
         var p = make()
-        p.model.submit("   ")
+        p.model.appendBlock("assistant", "")
         compare(p.model.count, 0)
-    }
-
-    // Per-row streaming ownership: a second submit mid-stream must not append
-    // chunks to the first assistant block.
-    function test_rapid_double_submit_keeps_blocks_separate() {
-        var p = make()
-        p.model.submit("a")
-        p.model.submit("b")
-
-        tryCompare(p.model, "count", 4)
-        compare(p.model.authorAt(0), "user")
-        compare(p.model.textAt(0), "a")
-        compare(p.model.authorAt(2), "user")
-        compare(p.model.textAt(2), "b")
-        tryVerify(function() { return p.model.textAt(1) === "Echo: a" })
-        tryVerify(function() { return p.model.textAt(3) === "Echo: b" })
     }
 }

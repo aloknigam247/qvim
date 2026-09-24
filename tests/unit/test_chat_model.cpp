@@ -8,33 +8,31 @@ using namespace qvim;
 class TestChatModel : public QObject {
     Q_OBJECT
 private slots:
-    void submitAppendsUserBlockImmediately() {
+    void appendBlockEmitsMessageAddedWithRoleAndText() {
         ChatModel m;
         QSignalSpy added(&m, &ChatModel::messageAdded);
-        QSignalSpy began(&m, &ChatModel::messageBegan);
-        m.submit(QStringLiteral("hi"));
-        // User block lands synchronously; the assistant block begins empty and
-        // streams asynchronously.
-        QCOMPARE(m.count(), 2);
+        m.appendBlock(QStringLiteral("user"), QStringLiteral("hi"));
+        QCOMPARE(m.count(), 1);
         QCOMPARE(m.authorAt(0), QStringLiteral("user"));
         QCOMPARE(m.textAt(0), QStringLiteral("hi"));
         QCOMPARE(added.count(), 1);
-        QCOMPARE(began.count(), 1);
+        const QList<QVariant> args = added.takeFirst();
+        QVERIFY(!args.at(0).toString().isEmpty()); // stable per-block id
+        QCOMPARE(args.at(1).toString(), QStringLiteral("user"));
+        QCOMPARE(args.at(2).toString(), QStringLiteral("hi"));
     }
 
-    void whitespaceSubmitIsIgnored() {
+    void appendBlockAssignsDistinctIdsPerBlock() {
         ChatModel m;
-        m.submit(QStringLiteral("   "));
-        QCOMPARE(m.count(), 0);
-    }
-
-    void streamedReplyAssemblesEcho() {
-        ChatModel m;
-        m.submit(QStringLiteral("ping"));
-        QSignalSpy ended(&m, &ChatModel::messageEnded);
-        QVERIFY(QTest::qWaitFor([&] { return ended.count() >= 1; }, 3000));
-        QCOMPARE(m.authorAt(1), QStringLiteral("assistant"));
-        QCOMPARE(m.textAt(1), QStringLiteral("Echo: ping"));
+        QSignalSpy added(&m, &ChatModel::messageAdded);
+        m.appendBlock(QStringLiteral("user"), QStringLiteral("a"));
+        m.appendBlock(QStringLiteral("assistant"), QStringLiteral("b"));
+        QCOMPARE(added.count(), 2);
+        const QString id0 = added.at(0).at(0).toString();
+        const QString id1 = added.at(1).at(0).toString();
+        QVERIFY(!id0.isEmpty());
+        QVERIFY(id0 != id1);
+        QCOMPARE(added.at(1).at(1).toString(), QStringLiteral("assistant"));
     }
 
     void appendBlockSystemAuthor() {

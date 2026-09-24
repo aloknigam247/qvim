@@ -81,9 +81,9 @@ void SessionMirrorServer::startListening() {
 void SessionMirrorServer::stopListening() {
     m_server->close();
     // Synchronous teardown: drop each client's signal wiring before aborting so
-    // no queued frame can still call handleInput()/submit() after close, then
-    // release the sockets. abort() (not close()) tears the connection down
-    // immediately without waiting on a close handshake.
+    // no queued frame can still call handleInput() after close, then release the
+    // sockets. abort() (not close()) tears the connection down immediately
+    // without waiting on a close handshake.
     const QList<QWebSocket *> clients = m_clients.values();
     for(QWebSocket *client: clients) {
         disconnect(client, nullptr, this, nullptr);
@@ -185,10 +185,10 @@ void SessionMirrorServer::handleInput(const QString &text) {
     if(!m_active) return;
     const QString trimmed = text.trimmed();
     if(trimmed.isEmpty() || trimmed.size() > kMaxInputChars) return;
-    // Hand the remote input to the panel, which routes it to the active backend
-    // (echo submit or copilot-bridge inject). The resulting turn comes back via
-    // the ChatModel taps and broadcasts to every subscriber, so remote input
-    // mirrors exactly like local input regardless of backend.
+    // Hand the remote input to the panel, which injects it into the Copilot
+    // session via the bridge. The resulting turn comes back via the ChatModel
+    // taps and broadcasts to every subscriber, so remote input mirrors exactly
+    // like local input.
     emit inputReceived(trimmed);
 }
 
