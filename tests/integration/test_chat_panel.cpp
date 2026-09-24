@@ -29,9 +29,9 @@
 #include <QSGRendererInterface>
 #include <QSharedPointer>
 #include <QStringList>
+#include <QtTest>
 #include <QWebSocket>
 #include <QWebSocketServer>
-#include <QtTest>
 
 #include "ChatModel.h"
 #include "CopilotBridgeClient.h"
@@ -97,9 +97,8 @@ class FakeHub : public QObject {
 
 public:
     explicit FakeHub(QObject *parent = nullptr) :
-        QObject(parent),
-        m_server(new QWebSocketServer(QStringLiteral("fake-hub"), QWebSocketServer::NonSecureMode,
-                                      this)) {
+        QObject(parent), m_server(new QWebSocketServer(QStringLiteral("fake-hub"),
+                                                       QWebSocketServer::NonSecureMode, this)) {
         connect(m_server, &QWebSocketServer::newConnection, this, [this]() {
             while(m_server->hasPendingConnections()) {
                 QWebSocket *s = m_server->nextPendingConnection();
@@ -149,8 +148,7 @@ private slots:
         // constructed, so inject() has a live socket to the hub.
         FakeHub hub;
         QVERIFY(hub.listen());
-        qputenv("COPILOT_BRIDGE_URL",
-                QStringLiteral("ws://127.0.0.1:%1").arg(hub.port()).toUtf8());
+        qputenv("COPILOT_BRIDGE_URL", QStringLiteral("ws://127.0.0.1:%1").arg(hub.port()).toUtf8());
 
         QQmlApplicationEngine engine;
         QQuickWindow *window = loadMainQml(engine, &conn);
@@ -208,7 +206,7 @@ private slots:
         // echo appears): an impl that dropped input on the floor would fail here.
         QVERIFY2(waitUntil(
                      [&] {
-            for(const QString &f : hub.received) {
+            for(const QString &f: hub.received) {
                 const QJsonObject o = QJsonDocument::fromJson(f.toUtf8()).object();
                 if(o.value(QStringLiteral("type")).toString() == QStringLiteral("inject") &&
                    o.value(QStringLiteral("data"))
