@@ -27,6 +27,7 @@ import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
 import com.microsoft.agenthostprotocol.sessionReducer
 import com.qvim.companion.AhpTranscript
+import com.qvim.companion.model.SessionInfo
 import com.qvim.companion.model.UiMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,9 +56,11 @@ import java.util.concurrent.atomic.AtomicLong
  * are projected to a flat [UiMessage] transcript via [AhpTranscript].
  *
  * All inbound frame handling runs on OkHttp's single reader thread, which delivers
- * listener callbacks serially — so the state mirror ([chats] / [sessions] / [pending]
- * / [subscribedChannels]) needs no locking. Only [outboundChatUri] and the two
- * [StateFlow]s are read off-thread; those are `@Volatile` / inherently thread-safe.
+ * listener callbacks serially. Session selection ([selectSession]) can arrive on
+ * another thread, so the RPC bookkeeping shared with it ([pending] /
+ * [subscribedChannels] / [nextId]) is guarded by [ioLock]; the folded state maps
+ * ([chats] / [sessions]) are touched only on the reader thread. [outboundChatUri]
+ * and the [StateFlow]s are read off-thread; those are `@Volatile` / thread-safe.
  * There is deliberately no automatic reconnect — the owner reconnects by discarding
  * this instance and creating a new one.
  */
@@ -68,10 +71,17 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     private val _transcript = MutableStateFlow<List<UiMessage>>(emptyList())
     val transcript: StateFlow<List<UiMessage>> = _transcript.asStateFlow()
 
+    private val _availableSessions = MutableStateFlow<List<SessionInfo>>(emptyList())
+    val availableSessions: StateFlow<List<SessionInfo>> = _availableSessions.asStateFlow()
+
+    private val _selectedSession = MutableStateFlow<String?>(null)
+    val selectedSession: StateFlow<String?> = _selectedSession.asStateFlow()
+
     private val chats = LinkedHashMap<String, ChatState>()
     private val sessions = LinkedHashMap<String, SessionState>()
     private val subscribedChannels = HashSet<String>()
     private val pending = HashMap<Long, Pending>()
+    private val ioLock = Any()
 
     private val nextId = AtomicLong(1)
     private val clientSeq = AtomicLong(1)
@@ -124,6 +134,18 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         )
     }
 
+    /**
+     * Chooses which host session to observe and send to. Subscribes to that session
+     * (and, transitively, its chats); the transcript is then scoped to it because no
+     * other session is subscribed. Called at most once per connection — the picker is
+     * shown only while no session is selected. A no-op if already selected.
+     */
+    fun selectSession(resource: String) {
+        if (_selectedSession.value == resource) return
+        _selectedSession.value = resource
+        subscribeChannel(resource)
+    }
+
     private inner class Listener : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             _state.value = ConnectionState.Connected
@@ -148,7 +170,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         val obj = Ahp.json.parseToJsonElement(text).jsonObject
         val id = obj["id"]?.jsonPrimitive?.longOrNull
         if (id != null && (obj.containsKey("result") || obj.containsKey("error"))) {
-            val kind = pending.remove(id) ?: return
+            val kind = synchronized(ioLock) { pending.remove(id) } ?: return
             if (obj.containsKey("error")) return
             val result = obj["result"] ?: return
             when (kind) {
@@ -159,7 +181,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
                 }
                 Pending.ListSessions -> {
                     val list = Ahp.json.decodeFromJsonElement(ListSessionsResult.serializer(), result)
-                    list.items.forEach { subscribeChannel(it.resource) }
+                    publishSessions(list.items.map { SessionInfo(it.resource, it.title) })
                 }
                 Pending.Subscribe -> {
                     val sub = Ahp.json.decodeFromJsonElement(SubscribeResult.serializer(), result)
@@ -176,32 +198,44 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
                     )
                 }
             "root/sessionAdded" -> {
-                obj["params"]
-                    ?.jsonObject
-                    ?.get("summary")
-                    ?.jsonObject
-                    ?.get("resource")
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?.let { subscribeChannel(it) }
+                val summary = obj["params"]?.jsonObject?.get("summary")?.jsonObject
+                val resource = summary?.get("resource")?.jsonPrimitive?.contentOrNull
+                if (resource != null) {
+                    val title = summary["title"]?.jsonPrimitive?.contentOrNull ?: resource
+                    addSession(SessionInfo(resource, title))
+                }
             }
         }
     }
 
+    /** Publishes the discovered session list; auto-selects when exactly one exists. */
+    private fun publishSessions(discovered: List<SessionInfo>) {
+        _availableSessions.value = discovered
+        if (_selectedSession.value == null && discovered.size == 1) {
+            selectSession(discovered.first().resource)
+        }
+    }
+
+    /** Appends a dynamically announced session, de-duplicated by resource. */
+    private fun addSession(info: SessionInfo) {
+        val current = _availableSessions.value
+        if (current.any { it.resource == info.resource }) return
+        publishSessions(current + info)
+    }
+
     private fun applyAction(env: ActionEnvelope) {
         val channel = env.channel
-        when {
-            channel.startsWith(CHAT_PREFIX) -> {
-                val current = chats[channel] ?: return
-                chats[channel] = chatReducer(current, env.action)
-                recompute()
-            }
-            channel.startsWith(SESSION_PREFIX) -> {
-                val current = sessions[channel] ?: return
-                val next = sessionReducer(current, env.action)
-                sessions[channel] = next
-                subscribeChatsOf(next)
-            }
+        val chat = chats[channel]
+        if (chat != null) {
+            chats[channel] = chatReducer(chat, env.action)
+            recompute()
+            return
+        }
+        val session = sessions[channel]
+        if (session != null) {
+            val next = sessionReducer(session, env.action)
+            sessions[channel] = next
+            subscribeChatsOf(next)
         }
     }
 
@@ -229,7 +263,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
 
     private fun sendInitialize() {
         val id = nextId.getAndIncrement()
-        pending[id] = Pending.Initialize
+        synchronized(ioLock) { pending[id] = Pending.Initialize }
         val params =
             InitializeParams(
                 channel = ROOT_CHANNEL,
@@ -242,7 +276,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
 
     private fun sendListSessions() {
         val id = nextId.getAndIncrement()
-        pending[id] = Pending.ListSessions
+        synchronized(ioLock) { pending[id] = Pending.ListSessions }
         sendRpc(
             AhpCommands.listSessions(id, ListSessionsParams(channel = ROOT_CHANNEL)),
             ListSessionsParams.serializer(),
@@ -250,9 +284,12 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     }
 
     private fun subscribeChannel(channel: String) {
-        if (!subscribedChannels.add(channel)) return
-        val id = nextId.getAndIncrement()
-        pending[id] = Pending.Subscribe
+        val id: Long
+        synchronized(ioLock) {
+            if (!subscribedChannels.add(channel)) return
+            id = nextId.getAndIncrement()
+            pending[id] = Pending.Subscribe
+        }
         sendRpc(AhpCommands.subscribe(id, SubscribeParams(channel = channel)), SubscribeParams.serializer())
     }
 
@@ -279,7 +316,5 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     private companion object {
         const val NORMAL_CLOSURE = 1000
         const val ROOT_CHANNEL = "ahp-root://"
-        const val SESSION_PREFIX = "ahp-session:"
-        const val CHAT_PREFIX = "ahp-chat:"
     }
 }

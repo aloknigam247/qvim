@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.qvim.companion.ChatViewModel
+import com.qvim.companion.model.SessionInfo
 import com.qvim.companion.model.UiMessage
 import com.qvim.companion.net.ConnectionState
 
@@ -36,6 +37,8 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
     val messages by vm.messages.collectAsStateWithLifecycle()
     val state by vm.connectionState.collectAsStateWithLifecycle()
     val endpoint by vm.endpoint.collectAsStateWithLifecycle()
+    val sessions by vm.sessions.collectAsStateWithLifecycle()
+    val selectedSession by vm.selectedSession.collectAsStateWithLifecycle()
 
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -43,6 +46,8 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
+
+    val choosing = state == ConnectionState.Connected && selectedSession == null && sessions.size > 1
 
     Column(modifier = modifier.fillMaxSize().padding(12.dp)) {
         EndpointBar(
@@ -55,32 +60,59 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
             },
         )
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            items(messages, key = { it.id }) { msg -> MessageBubble(msg) }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                placeholder = { Text("Message") },
+        if (choosing) {
+            SessionPicker(
+                sessions = sessions,
+                onSelect = vm::selectSession,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
             )
-            Button(
-                onClick = {
-                    vm.send(draft)
-                    draft = ""
-                },
-                modifier = Modifier.padding(start = 8.dp),
-            ) { Text("Send") }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(messages, key = { it.id }) { msg -> MessageBubble(msg) }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    placeholder = { Text("Message") },
+                )
+                Button(
+                    onClick = {
+                        vm.send(draft)
+                        draft = ""
+                    },
+                    modifier = Modifier.padding(start = 8.dp),
+                ) { Text("Send") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionPicker(sessions: List<SessionInfo>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Select a session",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(sessions, key = { it.resource }) { session ->
+                OutlinedButton(
+                    onClick = { onSelect(session.resource) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(session.title) }
+            }
         }
     }
 }

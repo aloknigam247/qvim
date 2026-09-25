@@ -2,6 +2,7 @@ package com.qvim.companion
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.qvim.companion.model.SessionInfo
 import com.qvim.companion.model.UiMessage
 import com.qvim.companion.net.AhpConnection
 import com.qvim.companion.net.ConnectionState
@@ -27,9 +28,17 @@ class ChatViewModel(private val connectionFactory: (String) -> AhpConnection = {
     private val _endpoint = MutableStateFlow("")
     val endpoint: StateFlow<String> = _endpoint.asStateFlow()
 
+    private val _sessions = MutableStateFlow<List<SessionInfo>>(emptyList())
+    val sessions: StateFlow<List<SessionInfo>> = _sessions.asStateFlow()
+
+    private val _selectedSession = MutableStateFlow<String?>(null)
+    val selectedSession: StateFlow<String?> = _selectedSession.asStateFlow()
+
     private var connection: AhpConnection? = null
     private var transcriptJob: Job? = null
     private var stateJob: Job? = null
+    private var sessionsJob: Job? = null
+    private var selectedJob: Job? = null
 
     /** Sets the AHP server endpoint (`host:port`, or a full `ws://`/`wss://` URL). */
     fun setEndpoint(value: String) {
@@ -43,15 +52,26 @@ class ChatViewModel(private val connectionFactory: (String) -> AhpConnection = {
 
         transcriptJob?.cancel()
         stateJob?.cancel()
+        sessionsJob?.cancel()
+        selectedJob?.cancel()
         connection?.close()
 
         val conn = connectionFactory(target)
         connection = conn
         _messages.value = emptyList()
+        _sessions.value = emptyList()
+        _selectedSession.value = null
 
         transcriptJob = viewModelScope.launch { conn.transcript.collect { _messages.value = it } }
         stateJob = viewModelScope.launch { conn.state.collect { _connectionState.value = it } }
+        sessionsJob = viewModelScope.launch { conn.availableSessions.collect { _sessions.value = it } }
+        selectedJob = viewModelScope.launch { conn.selectedSession.collect { _selectedSession.value = it } }
         conn.start()
+    }
+
+    /** Chooses which host session to observe; shown only when more than one exists. */
+    fun selectSession(resource: String) {
+        connection?.selectSession(resource)
     }
 
     fun send(text: String) {
@@ -62,6 +82,8 @@ class ChatViewModel(private val connectionFactory: (String) -> AhpConnection = {
     override fun onCleared() {
         transcriptJob?.cancel()
         stateJob?.cancel()
+        sessionsJob?.cancel()
+        selectedJob?.cancel()
         connection?.close()
     }
 }
