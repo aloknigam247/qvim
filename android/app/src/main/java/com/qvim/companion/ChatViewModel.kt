@@ -74,6 +74,15 @@ class ChatViewModel(private val connectionFactory: (String) -> AhpConnection = {
         connection?.selectSession(resource)
     }
 
+    /**
+     * Returns to the session selector. Reconnects from scratch (the folded chat state
+     * is owned by the reader thread, so re-scoping in place would race); the fresh
+     * handshake re-lists sessions and the picker reappears when more than one exists.
+     */
+    fun switchSession() {
+        connect()
+    }
+
     fun send(text: String) {
         if (text.isBlank()) return
         connection?.send(text.trim())

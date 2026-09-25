@@ -67,6 +67,12 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
         } else {
+            if (selectedSession != null && sessions.size > 1) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    OutlinedButton(onClick = vm::switchSession) { Text("Sessions") }
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -111,7 +117,15 @@ private fun SessionPicker(sessions: List<SessionInfo>, onSelect: (String) -> Uni
                 OutlinedButton(
                     onClick = { onSelect(session.resource) },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(session.title) }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(session.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = session.resource.substringAfterLast('/'),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
         }
     }
