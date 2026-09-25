@@ -48,7 +48,9 @@ object AhpTranscript {
         }
         val assistant = assistantText(parts)
         if (assistant.isNotEmpty() || streaming) {
-            out.add(UiMessage(id = "$chatUri#$turnId:reply", role = "assistant", text = assistant, streaming = streaming))
+            out.add(
+                UiMessage(id = "$chatUri#$turnId:reply", role = "assistant", text = assistant, streaming = streaming),
+            )
         }
     }
 

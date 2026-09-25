@@ -56,9 +56,10 @@ class AhpTranscriptTest {
             ChatResponsePartAction(
                 type = ActionType.CHAT_RESPONSE_PART,
                 turnId = "t1",
-                part = ResponsePartMarkdown(
-                    MarkdownResponsePart(kind = ResponsePartKind.MARKDOWN, id = "p1", content = "Hi"),
-                ),
+                part =
+                    ResponsePartMarkdown(
+                        MarkdownResponsePart(kind = ResponsePartKind.MARKDOWN, id = "p1", content = "Hi"),
+                    ),
             ),
         )
 

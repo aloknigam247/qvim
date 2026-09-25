@@ -65,9 +65,9 @@ From `android/`:
 .\gradlew.bat assembleDebug  # -> app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The AHP client library is published for a newer Kotlin than this module's compiler, so
-`app/build.gradle.kts` passes `-Xskip-metadata-version-check` to consume it. This is the standard
-escape hatch for depending on a library built with a newer Kotlin toolchain.
+The app tracks the AHP client's Kotlin toolchain (Kotlin 2.3.21, Compose compiler applied via the
+`org.jetbrains.kotlin.plugin.compose` plugin), so the newer-Kotlin AHP artifact is consumed directly
+with no metadata-version workarounds.
 
 ## Run against an AHP host
 

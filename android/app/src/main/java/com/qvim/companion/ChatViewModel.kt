@@ -17,9 +17,7 @@ import kotlinx.coroutines.launch
  * no in-place reconnect) and re-collects the fresh connection's flows, so an explicit
  * reconnect can never duplicate history.
  */
-class ChatViewModel(
-    private val connectionFactory: (String) -> AhpConnection = { AhpConnection(it) },
-) : ViewModel() {
+class ChatViewModel(private val connectionFactory: (String) -> AhpConnection = { AhpConnection(it) }) : ViewModel() {
     private val _messages = MutableStateFlow<List<UiMessage>>(emptyList())
     val messages: StateFlow<List<UiMessage>> = _messages.asStateFlow()
 

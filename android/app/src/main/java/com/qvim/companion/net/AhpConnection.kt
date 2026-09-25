@@ -1,12 +1,13 @@
 package com.qvim.companion.net
 
+import com.microsoft.agenthostprotocol.Ahp
 import com.microsoft.agenthostprotocol.chatReducer
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
+import com.microsoft.agenthostprotocol.generated.ActionType
 import com.microsoft.agenthostprotocol.generated.AhpClientNotifications
 import com.microsoft.agenthostprotocol.generated.AhpCommands
-import com.microsoft.agenthostprotocol.generated.ChatTurnStartedAction
 import com.microsoft.agenthostprotocol.generated.ChatState
-import com.microsoft.agenthostprotocol.generated.ActionType
+import com.microsoft.agenthostprotocol.generated.ChatTurnStartedAction
 import com.microsoft.agenthostprotocol.generated.DispatchActionParams
 import com.microsoft.agenthostprotocol.generated.InitializeParams
 import com.microsoft.agenthostprotocol.generated.InitializeResult
@@ -19,12 +20,11 @@ import com.microsoft.agenthostprotocol.generated.MessageKind
 import com.microsoft.agenthostprotocol.generated.MessageOrigin
 import com.microsoft.agenthostprotocol.generated.SUPPORTED_PROTOCOL_VERSIONS
 import com.microsoft.agenthostprotocol.generated.SessionState
+import com.microsoft.agenthostprotocol.generated.Snapshot
 import com.microsoft.agenthostprotocol.generated.SnapshotState
 import com.microsoft.agenthostprotocol.generated.StateActionChatTurnStarted
 import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
-import com.microsoft.agenthostprotocol.generated.Snapshot
-import com.microsoft.agenthostprotocol.Ahp
 import com.microsoft.agenthostprotocol.sessionReducer
 import com.qvim.companion.AhpTranscript
 import com.qvim.companion.model.UiMessage
@@ -61,10 +61,7 @@ import java.util.concurrent.atomic.AtomicLong
  * There is deliberately no automatic reconnect — the owner reconnects by discarding
  * this instance and creating a new one.
  */
-class AhpConnection(
-    private val endpoint: String,
-    private val client: OkHttpClient = OkHttpClient(),
-) {
+class AhpConnection(private val endpoint: String, private val client: OkHttpClient = OkHttpClient()) {
     private val _state = MutableStateFlow(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state.asStateFlow()
 
@@ -172,11 +169,20 @@ class AhpConnection(
             return
         }
         when (obj["method"]?.jsonPrimitive?.contentOrNull) {
-            "action" -> obj["params"]?.let { applyAction(Ahp.json.decodeFromJsonElement(ActionEnvelope.serializer(), it)) }
+            "action" ->
+                obj["params"]?.let {
+                    applyAction(
+                        Ahp.json.decodeFromJsonElement(ActionEnvelope.serializer(), it),
+                    )
+                }
             "root/sessionAdded" -> {
-                obj["params"]?.jsonObject
-                    ?.get("summary")?.jsonObject
-                    ?.get("resource")?.jsonPrimitive?.contentOrNull
+                obj["params"]
+                    ?.jsonObject
+                    ?.get("summary")
+                    ?.jsonObject
+                    ?.get("resource")
+                    ?.jsonPrimitive
+                    ?.contentOrNull
                     ?.let { subscribeChannel(it) }
             }
         }
@@ -237,7 +243,10 @@ class AhpConnection(
     private fun sendListSessions() {
         val id = nextId.getAndIncrement()
         pending[id] = Pending.ListSessions
-        sendRpc(AhpCommands.listSessions(id, ListSessionsParams(channel = ROOT_CHANNEL)), ListSessionsParams.serializer())
+        sendRpc(
+            AhpCommands.listSessions(id, ListSessionsParams(channel = ROOT_CHANNEL)),
+            ListSessionsParams.serializer(),
+        )
     }
 
     private fun subscribeChannel(channel: String) {
