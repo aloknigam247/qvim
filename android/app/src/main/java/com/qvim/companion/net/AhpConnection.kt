@@ -1,11 +1,13 @@
 package com.qvim.companion.net
 
+import android.util.Log
 import com.microsoft.agenthostprotocol.Ahp
 import com.microsoft.agenthostprotocol.chatReducer
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
 import com.microsoft.agenthostprotocol.generated.ActionType
 import com.microsoft.agenthostprotocol.generated.AhpClientNotifications
 import com.microsoft.agenthostprotocol.generated.AhpCommands
+import com.microsoft.agenthostprotocol.generated.ChatDeltaAction
 import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.ChatTurnStartedAction
 import com.microsoft.agenthostprotocol.generated.DispatchActionParams
@@ -15,13 +17,17 @@ import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
 import com.microsoft.agenthostprotocol.generated.ListSessionsParams
 import com.microsoft.agenthostprotocol.generated.ListSessionsResult
+import com.microsoft.agenthostprotocol.generated.MarkdownResponsePart
 import com.microsoft.agenthostprotocol.generated.Message
 import com.microsoft.agenthostprotocol.generated.MessageKind
 import com.microsoft.agenthostprotocol.generated.MessageOrigin
+import com.microsoft.agenthostprotocol.generated.ResponsePartKind
+import com.microsoft.agenthostprotocol.generated.ResponsePartMarkdown
 import com.microsoft.agenthostprotocol.generated.SUPPORTED_PROTOCOL_VERSIONS
 import com.microsoft.agenthostprotocol.generated.SessionState
 import com.microsoft.agenthostprotocol.generated.Snapshot
 import com.microsoft.agenthostprotocol.generated.SnapshotState
+import com.microsoft.agenthostprotocol.generated.StateActionChatDelta
 import com.microsoft.agenthostprotocol.generated.StateActionChatTurnStarted
 import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
@@ -192,10 +198,12 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         }
         when (obj["method"]?.jsonPrimitive?.contentOrNull) {
             "action" ->
-                obj["params"]?.let {
-                    applyAction(
-                        Ahp.json.decodeFromJsonElement(ActionEnvelope.serializer(), it),
-                    )
+                obj["params"]?.let { params ->
+                    try {
+                        applyAction(Ahp.json.decodeFromJsonElement(ActionEnvelope.serializer(), params))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "dropped malformed action: ${e.message}", e)
+                    }
                 }
             "root/sessionAdded" -> {
                 val summary = obj["params"]?.jsonObject?.get("summary")?.jsonObject
@@ -227,7 +235,9 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         val channel = env.channel
         val chat = chats[channel]
         if (chat != null) {
-            chats[channel] = chatReducer(chat, env.action)
+            val action = env.action
+            chats[channel] =
+                if (action is StateActionChatDelta) foldChatDelta(chat, action.value) else chatReducer(chat, action)
             recompute()
             return
         }
@@ -237,6 +247,35 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
             sessions[channel] = next
             subscribeChatsOf(next)
         }
+    }
+
+    /**
+     * Folds a `chat/delta` chunk into the active turn. The host streams markdown as a
+     * sequence of deltas keyed by [ChatDeltaAction.partId] without a preceding
+     * `chat/responsePart`, so the canonical reducer never materialises the part; we
+     * append the chunk to the matching markdown part here (creating it on first sight)
+     * so streaming text renders live instead of only after a resubscribe snapshot.
+     */
+    private fun foldChatDelta(chat: ChatState, delta: ChatDeltaAction): ChatState {
+        val active = chat.activeTurn ?: return chat
+        val parts = active.responseParts
+        val index = parts.indexOfFirst { it is ResponsePartMarkdown && it.value.id == delta.partId }
+        val nextParts =
+            if (index >= 0) {
+                val existing = parts[index] as ResponsePartMarkdown
+                val merged = existing.value.copy(content = existing.value.content + delta.content)
+                parts.toMutableList().also { it[index] = ResponsePartMarkdown(merged) }
+            } else {
+                parts +
+                    ResponsePartMarkdown(
+                        MarkdownResponsePart(
+                            kind = ResponsePartKind.MARKDOWN,
+                            id = delta.partId,
+                            content = delta.content,
+                        ),
+                    )
+            }
+        return chat.copy(activeTurn = active.copy(responseParts = nextParts))
     }
 
     private fun applySnapshot(snapshot: Snapshot) {
@@ -316,5 +355,6 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     private companion object {
         const val NORMAL_CLOSURE = 1000
         const val ROOT_CHANNEL = "ahp-root://"
+        const val TAG = "AhpConn"
     }
 }
