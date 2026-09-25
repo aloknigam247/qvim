@@ -1,16 +1,21 @@
 # qvim companion (Android)
 
-A minimal Android client that mirrors a qvim chat session over a plaintext WebSocket. This is the
-skeleton slice: connect, see the transcript, send input, watch the echo reply stream back. No
-discovery, auth, encryption, or resume yet — those are later slices.
+A minimal Android client that connects to a Microsoft [Agent Host Protocol](https://microsoft.github.io/agent-host-protocol/)
+(AHP) server over a WebSocket and mirrors its chat sessions: it subscribes to every session and chat
+on the host, renders the transcript, and streams assistant replies live as they arrive.
 
 ## What it does
 
-- Connects to a session mirror endpoint (`ws://host:port`) you type into the top bar.
-- Renders the chat transcript: atomic `user` messages and streamed `assistant` replies.
-- Sends what you type as an `input` frame; the server echoes `Echo: <text>` back in chunks.
+- Connects to an AHP server (`host:port`, or a full `ws://` / `wss://` URL) you type into the top bar.
+- Runs the AHP handshake — `initialize` → `listSessions` → `subscribe` to each session, then to each
+  of its chats — and folds the `chat` action stream through the canonical AHP reducers.
+- Renders the transcript for every chat: the user prompt that started each turn, followed by the
+  assistant reply assembled from the turn's markdown response parts (streamed deltas included).
+- Sends what you type as a new turn (`chat/turnStarted` dispatched to the default chat).
 
-The wire contract lives in [`docs/protocol/session_protocol.md`](../docs/protocol/session_protocol.md).
+The wire types, reducers, and JSON-RPC helpers come from the official Kotlin client
+(`com.microsoft.agenthostprotocol:agent-host-protocol`); this app supplies only the OkHttp WebSocket
+transport, the reactive handshake/subscription driver, and the transcript projection.
 
 ## Layout
 
@@ -20,16 +25,15 @@ android/
   app/
     build.gradle.kts
     src/main/java/com/qvim/companion/
-      model/        Protocol.kt, UiMessage.kt      # wire types + decode/encode
-      net/          SessionClient.kt, ConnectionFactory.kt  # OkHttp WebSocket
-      ChatReducer.kt          # pure frame -> transcript fold (JVM-unit-testable)
-      ChatViewModel.kt        # single-collector wiring, immutable StateFlow
-      ui/ChatScreen.kt        # Compose transcript + input + endpoint bar
+      model/UiMessage.kt              # one rendered transcript row
+      net/  ConnectionState.kt        # Disconnected / Connecting / Connected
+            AhpConnection.kt          # OkHttp WebSocket + JSON-RPC driver + AHP state mirror
+      AhpTranscript.kt                # pure ChatState -> transcript projection (JVM-unit-testable)
+      ChatViewModel.kt                # owns the connection, mirrors its flows
+      ui/ChatScreen.kt                # Compose transcript + input + endpoint bar
       MainActivity.kt
-    src/test/java/com/qvim/companion/   # ProtocolTest, ChatReducerTest (pure JVM)
-    src/debug/                # debug-only cleartext network-security config
-  scripts/e2e_device.ps1      # on-demand adb-driven device E2E suite
-  tools/echo_server/          # Python dev stand-in for the qvim session mirror
+    src/test/java/com/qvim/companion/AhpTranscriptTest.kt   # reducer fold + projection (pure JVM)
+    src/debug/                        # debug-only cleartext network-security config
 ```
 
 ## Prerequisites (headless — no Android Studio)
@@ -41,14 +45,14 @@ android/
 
 Example (PowerShell, matching this repo's dev setup):
 
-```pwsh
+```ps1
 $env:JAVA_HOME    = "$env:LOCALAPPDATA\Java\jdk-17"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 ```
 
 `local.properties` is git-ignored (it holds a machine-specific absolute path). Create it once:
 
-```pwsh
+```ps1
 "sdk.dir=$($env:ANDROID_HOME -replace '\\','\\\\')" | Set-Content android\local.properties
 ```
 
@@ -56,74 +60,33 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 
 From `android/`:
 
-```pwsh
-.\gradlew.bat test           # JVM unit tests (Protocol + reducer)
+```ps1
+.\gradlew.bat test           # JVM unit tests (reducer fold + transcript projection)
 .\gradlew.bat assembleDebug  # -> app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Run against the dev echo server
+The AHP client library is published for a newer Kotlin than this module's compiler, so
+`app/build.gradle.kts` passes `-Xskip-metadata-version-check` to consume it. This is the standard
+escape hatch for depending on a library built with a newer Kotlin toolchain.
 
-The real session mirror lives on the qvim desktop side; until then, use the Python stand-in. On the PC:
+## Run against an AHP host
 
-```pwsh
-cd android\tools\echo_server
-pip install -r requirements.txt
-python echo_ws.py            # binds 0.0.0.0:8765
-```
+Point the app at any AHP server reachable over the LAN (e.g. the VS Code built-in agent host, or an
+open-source host such as `pi-ahp` / `ahpd` — see the
+[protocol README](https://github.com/microsoft/agent-host-protocol)). Install and launch on a
+USB-debugging device on the same network:
 
-Install and launch on a USB-debugging device on the same LAN:
-
-```pwsh
+```ps1
 $adb = "$env:ANDROID_HOME\platform-tools\adb.exe"
 & $adb install -r app\build\outputs\apk\debug\app-debug.apk
 & $adb shell am start -n com.qvim.companion/.MainActivity
 ```
 
-In the app, set the endpoint to `ws://<PC-LAN-IP>:8765`, type a message, and Send. You should see your
-message as a `user` bubble followed by an `assistant` `Echo: <text>` reply. With the server stopped,
-sending should surface a disconnected state (negative check).
-
-Drive it headlessly with adb if you like:
-
-```pwsh
-& $adb shell input text "hi"
-& $adb exec-out screencap -p > shot.png
-```
-
-## On-demand device E2E suite
-
-`scripts/e2e_device.ps1` automates the full smoke against a **physically connected device**, driven
-entirely through adb. It builds + installs the APK, starts the Python echo server behind
-`adb reverse`, launches the app, drives the real UI, and asserts on the actual rendered view
-hierarchy via `uiautomator dump` (elements are located by text — never hardcoded pixel coordinates).
-
-> **Local-only gate.** This needs a physical device on USB, so it **cannot run on GitHub-hosted CI**.
-> The exit code (0 pass / 1 fail) is for local scripting, not a PR gate. CI-gating output validation
-> lives in the JVM unit tests (`ProtocolTest`, `ChatReducerTest`), which pin the protocol frames and
-> the `Echo: hi` streaming assembly. Treat this script as a manual smoke, not a proof.
-
-```pwsh
-# full run (builds the APK first)
-pwsh -NoProfile -File android\scripts\e2e_device.ps1
-
-# reuse an already-built APK
-pwsh -NoProfile -File android\scripts\e2e_device.ps1 -SkipBuild
-```
-
-It runs two cases and exits non-zero if any assertion fails:
-
-- **Positive** — Connect reaches `Status: Connected`; sending `hi` yields a `you: hi` bubble and a
-  streamed `assistant: Echo: hi` bubble.
-- **Negative** — with the echo server stopped, a fresh launch + Connect settles on
-  `Status: Disconnected` and never shows Connected or an echo.
-
-Prerequisites: an authorized device (`adb devices` shows `device`), the JDK/SDK env vars above, and
-the echo_server deps (`pip install -r tools\echo_server\requirements.txt`). The script freezes screen
-rotation for the duration and restores it on exit. Pass `-DeviceSerial` when more than one device is
-attached, or `-Port` / `-PythonExe` to override defaults.
+In the app, set the endpoint to `ws://<HOST-LAN-IP>:<PORT>` and Connect. The transcript of every
+session/chat on the host appears and updates live; typing a message and Send starts a new turn.
 
 ## Cleartext note
 
-The app talks plaintext `ws://` on purpose for this slice. Cleartext is enabled **only** in the debug
-manifest (`src/debug`) via a network-security config; the release manifest has no such allowance.
-Encryption (`wss://`) is a later slice.
+The app talks plaintext `ws://` for LAN use. Cleartext is enabled **only** in the debug manifest
+(`src/debug`) via a network-security config; the release manifest has no such allowance. Use `wss://`
+against a TLS-terminating host for encrypted transport.

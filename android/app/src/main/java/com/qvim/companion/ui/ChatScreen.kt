@@ -36,7 +36,6 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
     val messages by vm.messages.collectAsStateWithLifecycle()
     val state by vm.connectionState.collectAsStateWithLifecycle()
     val endpoint by vm.endpoint.collectAsStateWithLifecycle()
-    val discovered by vm.discovered.collectAsStateWithLifecycle()
 
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -49,7 +48,6 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
         EndpointBar(
             endpoint = endpoint,
             state = state,
-            discovered = discovered,
             onEndpointChange = vm::setEndpoint,
             onConnect = {
                 onEndpointSaved(endpoint)
@@ -91,7 +89,6 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
 private fun EndpointBar(
     endpoint: String,
     state: ConnectionState,
-    discovered: String?,
     onEndpointChange: (String) -> Unit,
     onConnect: () -> Unit,
 ) {
@@ -102,8 +99,8 @@ private fun EndpointBar(
                 onValueChange = onEndpointChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                label = { Text("Endpoint") },
-                placeholder = { Text("Discovering on LAN…") },
+                label = { Text("AHP server") },
+                placeholder = { Text("host:port") },
             )
             OutlinedButton(
                 onClick = onConnect,
@@ -111,16 +108,6 @@ private fun EndpointBar(
                 modifier = Modifier.padding(start = 8.dp),
             ) { Text("Connect") }
         }
-        Text(
-            text =
-                if (discovered != null) {
-                    "Found on LAN: $discovered"
-                } else {
-                    "Searching for qvim on the LAN…"
-                },
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(top = 4.dp),
-        )
         Text(
             text = "Status: ${state.name}",
             style = MaterialTheme.typography.labelMedium,
