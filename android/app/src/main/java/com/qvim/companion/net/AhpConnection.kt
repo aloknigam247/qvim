@@ -50,6 +50,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -70,7 +71,7 @@ import java.util.concurrent.atomic.AtomicLong
  * There is deliberately no automatic reconnect — the owner reconnects by discarding
  * this instance and creating a new one.
  */
-class AhpConnection(private val endpoint: String, private val client: OkHttpClient = OkHttpClient()) {
+class AhpConnection(private val endpoint: String, private val client: OkHttpClient = defaultClient()) {
     private val _state = MutableStateFlow(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state.asStateFlow()
 
@@ -354,7 +355,23 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
 
     private companion object {
         const val NORMAL_CLOSURE = 1000
+        const val PING_INTERVAL_SECONDS = 15L
         const val ROOT_CHANNEL = "ahp-root://"
         const val TAG = "AhpConn"
+
+        /**
+         * OkHttp keeps a WebSocket that lost its peer (host restart, sleep, NAT drop)
+         * in a half-open state indefinitely without keepalive, so the UI would stay
+         * "connected" against a dead socket and never re-list sessions. A ping interval
+         * makes OkHttp detect the dead peer and fire onFailure, flipping state to
+         * Disconnected so the owner can reconnect.
+         */
+        fun defaultClient(): OkHttpClient =
+            OkHttpClient
+                .Builder()
+                .pingInterval(
+                    PING_INTERVAL_SECONDS,
+                    TimeUnit.SECONDS,
+                ).build()
     }
 }
