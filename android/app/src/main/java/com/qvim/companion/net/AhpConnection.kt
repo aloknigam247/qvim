@@ -71,15 +71,16 @@ import java.util.concurrent.atomic.AtomicLong
  * There is deliberately no automatic reconnect — the owner reconnects by discarding
  * this instance and creating a new one.
  */
-class AhpConnection(private val endpoint: String, private val client: OkHttpClient = defaultClient()) {
+class AhpConnection(private val endpoint: String, private val client: OkHttpClient = defaultClient()) :
+    HostConnection {
     private val _state = MutableStateFlow(ConnectionState.Disconnected)
-    val state: StateFlow<ConnectionState> = _state.asStateFlow()
+    override val state: StateFlow<ConnectionState> = _state.asStateFlow()
 
     private val _transcript = MutableStateFlow<List<UiMessage>>(emptyList())
-    val transcript: StateFlow<List<UiMessage>> = _transcript.asStateFlow()
+    override val transcript: StateFlow<List<UiMessage>> = _transcript.asStateFlow()
 
     private val _availableSessions = MutableStateFlow<List<SessionInfo>>(emptyList())
-    val availableSessions: StateFlow<List<SessionInfo>> = _availableSessions.asStateFlow()
+    override val availableSessions: StateFlow<List<SessionInfo>> = _availableSessions.asStateFlow()
 
     private val _selectedSession = MutableStateFlow<String?>(null)
     val selectedSession: StateFlow<String?> = _selectedSession.asStateFlow()
@@ -105,13 +106,13 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     private data class Pending(val kind: PendingKind, val channel: String? = null)
 
     /** Opens the socket. Callbacks drive the rest of the lifecycle. */
-    fun start() {
+    override fun start() {
         _state.value = ConnectionState.Connecting
         webSocket = client.newWebSocket(requestFor(endpoint), Listener())
     }
 
     /** Releases the socket; the mirror is discarded with this instance. */
-    fun close() {
+    override fun close() {
         webSocket?.cancel()
         webSocket = null
         _state.value = ConnectionState.Disconnected
@@ -121,7 +122,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
      * Starts a new turn on the default chat by dispatching a `chat/turnStarted`
      * action. Returns false when not connected or no chat is available yet.
      */
-    fun send(text: String): Boolean {
+    override fun send(text: String): Boolean {
         val ws = webSocket ?: return false
         val chat = outboundChatUri ?: return false
         val action =
@@ -149,7 +150,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
      * other session is subscribed. Called at most once per connection — the picker is
      * shown only while no session is selected. A no-op if already selected.
      */
-    fun selectSession(resource: String) {
+    override fun selectSession(resource: String) {
         if (_selectedSession.value == resource) return
         _selectedSession.value = resource
         subscribeChannel(resource)

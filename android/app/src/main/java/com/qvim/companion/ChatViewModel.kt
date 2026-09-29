@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.qvim.companion.model.SessionInfo
 import com.qvim.companion.model.UiMessage
 import com.qvim.companion.net.AhpConnection
+import com.qvim.companion.net.CatalogHost
 import com.qvim.companion.net.ConnectionState
 import com.qvim.companion.net.HostCatalog
+import com.qvim.companion.net.HostConnection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +29,8 @@ import kotlinx.coroutines.launch
  * duplicate history. Only the selected session's connection feeds the transcript.
  */
 class ChatViewModel(
-    private val connectionFactory: (String) -> AhpConnection = { AhpConnection(it) },
-    private val catalog: HostCatalog = HostCatalog(),
+    private val connectionFactory: (String) -> HostConnection = { AhpConnection(it) },
+    private val fetchHosts: suspend (String) -> List<CatalogHost> = { HostCatalog().fetch(it) },
 ) : ViewModel() {
     private val _messages = MutableStateFlow<List<UiMessage>>(emptyList())
     val messages: StateFlow<List<UiMessage>> = _messages.asStateFlow()
@@ -44,13 +47,13 @@ class ChatViewModel(
     private val _selectedSession = MutableStateFlow<String?>(null)
     val selectedSession: StateFlow<String?> = _selectedSession.asStateFlow()
 
-    private val connections = LinkedHashMap<String, AhpConnection>()
+    private val connections = LinkedHashMap<String, HostConnection>()
     private val hostSessions = LinkedHashMap<String, List<SessionInfo>>()
     private val hostStates = LinkedHashMap<String, ConnectionState>()
     private val jobs = mutableListOf<Job>()
     private var connectJob: Job? = null
     private var transcriptJob: Job? = null
-    private var active: AhpConnection? = null
+    private var active: HostConnection? = null
     private var generation = 0
 
     /** Sets the cptower endpoint (`host:port`, or a full `ws://`/`wss://` URL). */
@@ -72,24 +75,27 @@ class ChatViewModel(
 
         connectJob =
             viewModelScope.launch {
-                val result = runCatching { catalog.fetch(target) }
+                val hosts =
+                    try {
+                        fetchHosts(target)
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        if (gen == generation) openConnection(id = target, label = "", endpoint = target)
+                        return@launch
+                    }
                 if (gen != generation) return@launch
-                result.fold(
-                    onSuccess = { hosts ->
-                        if (hosts.isEmpty()) {
-                            _connectionState.value = ConnectionState.Disconnected
-                        } else {
-                            hosts.forEach { host ->
-                                openConnection(
-                                    id = host.id,
-                                    label = host.label,
-                                    endpoint = wsEndpoint(target, host.port),
-                                )
-                            }
-                        }
-                    },
-                    onFailure = { openConnection(id = target, label = "", endpoint = target) },
-                )
+                if (hosts.isEmpty()) {
+                    _connectionState.value = ConnectionState.Disconnected
+                } else {
+                    hosts.forEach { host ->
+                        openConnection(
+                            id = host.id,
+                            label = host.label,
+                            endpoint = wsEndpoint(target, host.port),
+                        )
+                    }
+                }
             }
     }
 

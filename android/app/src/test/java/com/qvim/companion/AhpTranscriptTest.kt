@@ -11,8 +11,10 @@ import com.microsoft.agenthostprotocol.generated.MarkdownResponsePart
 import com.microsoft.agenthostprotocol.generated.Message
 import com.microsoft.agenthostprotocol.generated.MessageKind
 import com.microsoft.agenthostprotocol.generated.MessageOrigin
+import com.microsoft.agenthostprotocol.generated.ReasoningResponsePart
 import com.microsoft.agenthostprotocol.generated.ResponsePartKind
 import com.microsoft.agenthostprotocol.generated.ResponsePartMarkdown
+import com.microsoft.agenthostprotocol.generated.ResponsePartReasoning
 import com.microsoft.agenthostprotocol.generated.SessionStatus
 import com.microsoft.agenthostprotocol.generated.StateActionChatDelta
 import com.microsoft.agenthostprotocol.generated.StateActionChatResponsePart
@@ -68,6 +70,18 @@ class AhpTranscriptTest {
             ChatDeltaAction(type = ActionType.CHAT_DELTA, turnId = "t1", partId = "p1", content = " there"),
         )
 
+    private fun reasoningPart(): StateActionChatResponsePart =
+        StateActionChatResponsePart(
+            ChatResponsePartAction(
+                type = ActionType.CHAT_RESPONSE_PART,
+                turnId = "t1",
+                part =
+                    ResponsePartReasoning(
+                        ReasoningResponsePart(kind = ResponsePartKind.REASONING, id = "r1", content = "pondering"),
+                    ),
+            ),
+        )
+
     private fun turnComplete(): StateActionChatTurnComplete =
         StateActionChatTurnComplete(
             ChatTurnCompleteAction(type = ActionType.CHAT_TURN_COMPLETE, turnId = "t1", duration = 5L),
@@ -98,5 +112,18 @@ class AhpTranscriptTest {
         assertEquals("hello", rows[0].text)
         assertEquals("Hi there", rows[1].text)
         assertFalse(rows[1].streaming)
+    }
+
+    @Test
+    fun nonMarkdownPartIsTaggedByKindAndDumpedAsJson() {
+        var chat = baseChat()
+        chat = chatReducer(chat, turnStarted())
+        chat = chatReducer(chat, reasoningPart())
+        chat = chatReducer(chat, turnComplete())
+
+        val rows = AhpTranscript.fromChats(listOf(chat))
+        val reasoning = rows.single { it.kind == "reasoning" }
+        assertTrue(reasoning.text.contains("pondering"))
+        assertFalse(reasoning.streaming)
     }
 }
