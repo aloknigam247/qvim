@@ -47,7 +47,7 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    val choosing = state == ConnectionState.Connected && selectedSession == null && sessions.size > 1
+    val choosing = state == ConnectionState.Connected && selectedSession == null && sessions.isNotEmpty()
 
     Column(modifier = modifier.fillMaxSize().padding(12.dp)) {
         EndpointBar(
@@ -67,7 +67,7 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
         } else {
-            if (selectedSession != null && sessions.size > 1) {
+            if (selectedSession != null && sessions.isNotEmpty()) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                     OutlinedButton(onClick = vm::switchSession) { Text("Sessions") }
                 }
@@ -105,7 +105,7 @@ fun ChatScreen(vm: ChatViewModel, onEndpointSaved: (String) -> Unit, modifier: M
 }
 
 @Composable
-private fun SessionPicker(sessions: List<SessionInfo>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun SessionPicker(sessions: List<SessionInfo>, onSelect: (SessionInfo) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = "Select a session",
@@ -113,12 +113,15 @@ private fun SessionPicker(sessions: List<SessionInfo>, onSelect: (String) -> Uni
             modifier = Modifier.padding(bottom = 4.dp),
         )
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(sessions, key = { it.resource }) { session ->
+            items(sessions, key = { "${it.hostId}|${it.resource}" }) { session ->
                 OutlinedButton(
-                    onClick = { onSelect(session.resource) },
+                    onClick = { onSelect(session) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
+                        if (session.hostLabel.isNotEmpty()) {
+                            Text(session.hostLabel, style = MaterialTheme.typography.labelSmall)
+                        }
                         Text(session.title, style = MaterialTheme.typography.bodyLarge)
                         Text(
                             text = session.resource.substringAfterLast('/'),

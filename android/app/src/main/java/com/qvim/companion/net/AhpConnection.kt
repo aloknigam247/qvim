@@ -178,7 +178,10 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         val id = obj["id"]?.jsonPrimitive?.longOrNull
         if (id != null && (obj.containsKey("result") || obj.containsKey("error"))) {
             val kind = synchronized(ioLock) { pending.remove(id) } ?: return
-            if (obj.containsKey("error")) return
+            if (obj.containsKey("error")) {
+                Log.e(TAG, "rpc error id=$id kind=$kind err=${obj["error"]}")
+                return
+            }
             val result = obj["result"] ?: return
             when (kind) {
                 Pending.Initialize -> {
@@ -217,12 +220,9 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         }
     }
 
-    /** Publishes the discovered session list; auto-selects when exactly one exists. */
+    /** Publishes the discovered session list. Selection is always an explicit user choice. */
     private fun publishSessions(discovered: List<SessionInfo>) {
         _availableSessions.value = discovered
-        if (_selectedSession.value == null && discovered.size == 1) {
-            selectSession(discovered.first().resource)
-        }
     }
 
     /** Appends a dynamically announced session, de-duplicated by resource. */
