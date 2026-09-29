@@ -9,7 +9,7 @@ import okhttp3.Request
 
 /** One AHP host advertised by cptower's `/hosts` discovery endpoint. */
 @Serializable
-data class CamHost(
+data class CatalogHost(
     val id: String,
     val port: Int,
     val label: String = "",
@@ -27,7 +27,7 @@ data class CamHost(
  * host), which the caller treats as "connect directly" rather than an error.
  */
 class HostCatalog(private val client: OkHttpClient = OkHttpClient()) {
-    suspend fun fetch(base: String): List<CamHost> =
+    suspend fun fetch(base: String): List<CatalogHost> =
         withContext(Dispatchers.IO) {
             val request = Request.Builder().url(hostsUrl(base)).build()
             client.newCall(request).execute().use { response ->
@@ -35,7 +35,7 @@ class HostCatalog(private val client: OkHttpClient = OkHttpClient()) {
                 if (!response.isSuccessful || body.isNullOrBlank()) {
                     throw IllegalStateException("no host catalog at $base (${response.code})")
                 }
-                json.decodeFromString<List<CamHost>>(body)
+                json.decodeFromString<List<CatalogHost>>(body)
             }
         }
 
