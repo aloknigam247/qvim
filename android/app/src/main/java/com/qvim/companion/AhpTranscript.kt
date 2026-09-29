@@ -17,10 +17,10 @@ import com.qvim.companion.model.UiMessage
  *
  * For each chat, every completed turn and the in-progress `activeTurn` (rendered
  * last, flagged [UiMessage.streaming]) contribute the initiating message bubble
- * followed by the assistant bubble. Markdown parts render as their text; every other
- * response-part kind (reasoning, tool calls, input requests, errors, notifications,
- * resources) is dumped as a labeled JSON block so its raw content is visible pending
- * dedicated UI.
+ * followed by one bubble per response part, each tagged with its AHP kind
+ * ([UiMessage.kind]) so the UI can colour and label it. Markdown parts render as their
+ * text; every other kind (reasoning, tool calls, input requests, errors,
+ * notifications, resources) is dumped as its raw JSON pending dedicated UI.
  */
 object AhpTranscript {
     fun fromChats(chats: Collection<ChatState>): List<UiMessage> {
@@ -46,34 +46,50 @@ object AhpTranscript {
     ) {
         if (message.text.isNotEmpty()) {
             val role = if (message.origin.kind == MessageKind.USER) "user" else "assistant"
-            out.add(UiMessage(id = "$chatUri#$turnId:msg", role = role, text = message.text, streaming = false))
-        }
-        val assistant = assistantText(parts)
-        if (assistant.isNotEmpty() || streaming) {
             out.add(
-                UiMessage(id = "$chatUri#$turnId:reply", role = "assistant", text = assistant, streaming = streaming),
+                UiMessage(
+                    id = "$chatUri#$turnId:msg",
+                    role = role,
+                    text = message.text,
+                    streaming = false,
+                    kind = "message",
+                ),
+            )
+        }
+        parts.forEachIndexed { index, part ->
+            out.add(
+                UiMessage(
+                    id = "$chatUri#$turnId:part$index",
+                    role = "assistant",
+                    text = partText(part),
+                    streaming = streaming,
+                    kind = partKind(part),
+                ),
+            )
+        }
+        if (streaming && parts.isEmpty()) {
+            out.add(
+                UiMessage(
+                    id = "$chatUri#$turnId:reply",
+                    role = "assistant",
+                    text = "",
+                    streaming = true,
+                    kind = "markdown",
+                ),
             )
         }
     }
 
-    private fun assistantText(parts: List<ResponsePart>): String =
-        buildString {
-            for (part in parts) {
-                if (part is ResponsePartMarkdown) {
-                    append(part.value.content)
-                } else {
-                    if (isNotEmpty()) append("\n\n")
-                    append(renderPart(part))
-                }
-            }
-        }
+    private fun partKind(part: ResponsePart): String =
+        (part::class.simpleName?.removePrefix("ResponsePart") ?: "unknown")
+            .replaceFirstChar { it.lowercaseChar() }
 
-    private fun renderPart(part: ResponsePart): String {
-        val label = part::class.simpleName?.removePrefix("ResponsePart") ?: "Part"
-        val json =
+    private fun partText(part: ResponsePart): String =
+        if (part is ResponsePartMarkdown) {
+            part.value.content
+        } else {
             runCatching {
                 Ahp.json.encodeToString(ResponsePart.serializer(), part)
             }.getOrElse { part.toString() }
-        return "[$label] $json"
-    }
+        }
 }

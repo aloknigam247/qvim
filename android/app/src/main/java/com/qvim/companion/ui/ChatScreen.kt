@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -168,21 +169,23 @@ private fun EndpointBar(
 @Composable
 private fun MessageBubble(msg: UiMessage) {
     val isUser = msg.role == "user"
+    val header =
+        when {
+            isUser -> "you"
+            msg.kind == "message" -> "assistant"
+            else -> msg.kind
+        }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor =
-                    if (isUser) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    },
+                containerColor = bubbleColor(msg),
+                contentColor = Color(0xFF101010),
             ),
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Text(
-                text = if (isUser) "you" else "assistant",
+                text = header,
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(
@@ -193,3 +196,22 @@ private fun MessageBubble(msg: UiMessage) {
         }
     }
 }
+
+/** Distinct background per AHP part kind so each box is visually separable. */
+private fun bubbleColor(msg: UiMessage): Color =
+    when {
+        msg.role == "user" -> Color(0xFFBBDEFB)
+        else ->
+            when (msg.kind) {
+                "markdown" -> Color(0xFFC8E6C9)
+                "reasoning" -> Color(0xFFE1BEE7)
+                "toolCall" -> Color(0xFFB2DFDB)
+                "inputRequest" -> Color(0xFFFFE0B2)
+                "error" -> Color(0xFFFFCDD2)
+                "systemNotification" -> Color(0xFFCFD8DC)
+                "contentRef" -> Color(0xFFB3E5FC)
+                "resource" -> Color(0xFFDCEDC8)
+                "message" -> Color(0xFFECEFF1)
+                else -> Color(0xFFEEEEEE)
+            }
+    }
