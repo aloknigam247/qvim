@@ -1,5 +1,6 @@
 package com.qvim.companion
 
+import com.microsoft.agenthostprotocol.Ahp
 import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.Message
 import com.microsoft.agenthostprotocol.generated.MessageKind
@@ -16,9 +17,10 @@ import com.qvim.companion.model.UiMessage
  *
  * For each chat, every completed turn and the in-progress `activeTurn` (rendered
  * last, flagged [UiMessage.streaming]) contribute the initiating message bubble
- * followed by the assistant bubble — the concatenation of the turn's markdown
- * response parts, per the protocol's "derive display text by concatenating markdown
- * parts" contract. Non-markdown parts (tool calls, reasoning, errors) are omitted.
+ * followed by the assistant bubble. Markdown parts render as their text; every other
+ * response-part kind (reasoning, tool calls, input requests, errors, notifications,
+ * resources) is dumped as a labeled JSON block so its raw content is visible pending
+ * dedicated UI.
  */
 object AhpTranscript {
     fun fromChats(chats: Collection<ChatState>): List<UiMessage> {
@@ -57,7 +59,21 @@ object AhpTranscript {
     private fun assistantText(parts: List<ResponsePart>): String =
         buildString {
             for (part in parts) {
-                if (part is ResponsePartMarkdown) append(part.value.content)
+                if (part is ResponsePartMarkdown) {
+                    append(part.value.content)
+                } else {
+                    if (isNotEmpty()) append("\n\n")
+                    append(renderPart(part))
+                }
             }
         }
+
+    private fun renderPart(part: ResponsePart): String {
+        val label = part::class.simpleName?.removePrefix("ResponsePart") ?: "Part"
+        val json =
+            runCatching {
+                Ahp.json.encodeToString(ResponsePart.serializer(), part)
+            }.getOrElse { part.toString() }
+        return "[$label] $json"
+    }
 }

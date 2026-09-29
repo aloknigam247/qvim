@@ -20,7 +20,9 @@ merges all of their sessions into one picker.
 - Merges every host's sessions into one picker, each entry tagged with its host label; selecting one
   scopes the transcript to that host's session.
 - Renders the transcript for the selected chat: the user prompt that started each turn, followed by
-  the assistant reply assembled from the turn's markdown response parts (streamed deltas included).
+  the assistant reply. Markdown response parts render as text; every other AHP part kind (reasoning,
+  tool calls, input requests, errors, notifications, resources) is currently dumped as a labeled JSON
+  block so its raw content is visible pending dedicated UI.
 - Sends what you type as a new turn (`chat/turnStarted` dispatched to the default chat).
 
 The wire types, reducers, and JSON-RPC helpers come from the official Kotlin client

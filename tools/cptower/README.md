@@ -16,7 +16,7 @@ session from a single endpoint.
 - **Routes** WebSocket traffic: a client connecting to `ws://<cptower>:8770/ws/<port>` is bridged to
   the loopback AHP host on `<port>` via a YARP reverse proxy with dynamic in-memory routes.
 - **Advertises** the catalog at `GET /hosts` — a JSON array of `{ id, port, label, protocol,
-  sessions, alive }`, one entry per live host.
+  sessions }`, one entry per live host.
 - **Manages its own firewall rule** ("cptower", inbound TCP on the chosen port), self-elevating once
   via UAC if the rule is missing.
 

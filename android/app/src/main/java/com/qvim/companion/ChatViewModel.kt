@@ -72,7 +72,7 @@ class ChatViewModel(
             if (hosts.isNullOrEmpty()) {
                 openConnection(id = target, label = "", endpoint = target)
             } else {
-                hosts.filter { it.alive }.forEach { host ->
+                hosts.forEach { host ->
                     openConnection(id = host.id, label = host.label, endpoint = wsEndpoint(target, host.port))
                 }
             }

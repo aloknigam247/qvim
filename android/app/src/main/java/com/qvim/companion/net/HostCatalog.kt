@@ -15,7 +15,6 @@ data class CamHost(
     val label: String = "",
     val protocol: String? = null,
     val sessions: Int = 0,
-    val alive: Boolean = true,
 )
 
 /**

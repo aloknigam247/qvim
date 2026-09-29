@@ -45,7 +45,6 @@ app.MapGet("/hosts", async (HostRegistry registry, DiscoveryService discovery, C
         label = h.Label,
         protocol = h.Protocol,
         sessions = h.Sessions,
-        alive = true,
     }));
 });
 
