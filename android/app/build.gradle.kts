@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jlleitschuh.gradle.ktlint")
     jacoco
@@ -40,22 +41,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -73,13 +72,13 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    implementation("com.microsoft.agenthostprotocol:agent-host-protocol:0.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
 
 tasks.withType<Test>().configureEach {
@@ -90,14 +89,14 @@ tasks.withType<Test>().configureEach {
 }
 
 // Classes that JVM unit tests (no emulator in CI) structurally cannot reach: the
-// Compose UI, the Activity bootstrap, the NsdManager/WifiManager-backed discovery,
-// and compiler-generated serializers. Excluded from both the report and the floor
+// Compose UI, the Activity bootstrap, the OkHttp WebSocket transport, and
+// compiler-generated serializers. Excluded from both the report and the floor
 // so the measured number reflects only the logic that tests can actually exercise.
 val coverageExcludes =
     listOf(
         "**/MainActivity*",
         "**/ui/**",
-        "**/NsdMirrorDiscovery*",
+        "**/net/**",
         "**/*\$\$serializer*",
         "**/ComposableSingletons*",
     )
