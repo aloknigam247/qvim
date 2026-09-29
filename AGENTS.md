@@ -2,6 +2,13 @@
 
 qvim is a Neovim GUI client written in C++23 / Qt 6.10 / QML, talking to an embedded `nvim --embed` process over msgpack-rpc. The shell is QML, the grid renderer is a `QQuickPaintedItem`, and tests run against a real `nvim` binary through the offscreen QPA.
 
+## Compatibility
+
+This project has no backward-compatibility concerns. There are no external consumers pinned to its
+APIs, on-disk formats, or CLI surface, so you may refactor, rename, or remove existing code freely
+when it makes the change cleaner — do not add compatibility shims or preserve deprecated paths for
+their own sake.
+
 ## Top priorities
 
 **Correctness and performance are the utmost priorities — over readability, terseness, or stylistic preferences.** When the two are in tension, correctness wins; when correctness is settled, the implementation must not regress per-frame redraw cost.

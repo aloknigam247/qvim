@@ -4,7 +4,7 @@ A minimal Android client that connects to Microsoft [Agent Host Protocol](https:
 (AHP) servers over a WebSocket and mirrors their chat sessions: it subscribes to every session and
 chat on each host, renders the transcript, and streams assistant replies live as they arrive.
 
-It points at a **cptower** multiplexer (`tools/cptower/`) rather than a single AHP host: cptower
+It points at a **cptower** multiplexer rather than a single AHP host: cptower
 discovers every live Copilot AHP host on a machine and exposes them behind one port, and the app
 merges all of their sessions into one picker.
 
@@ -85,7 +85,7 @@ with no metadata-version workarounds.
 
 ## Run against cptower
 
-Start the cptower multiplexer on the host machine (see `tools/cptower/README.md`); it listens on
+Start the cptower multiplexer on the host machine (a separate host-side tool); it listens on
 `0.0.0.0:8770` by default and discovers every live Copilot AHP host. Install and launch the app on a
 USB-debugging device on the same network:
 
