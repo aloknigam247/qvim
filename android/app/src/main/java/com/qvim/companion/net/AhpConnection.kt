@@ -100,7 +100,9 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     @Volatile
     private var webSocket: WebSocket? = null
 
-    private enum class Pending { Initialize, ListSessions, Subscribe }
+    private enum class PendingKind { Initialize, ListSessions, Subscribe }
+
+    private data class Pending(val kind: PendingKind, val channel: String? = null)
 
     /** Opens the socket. Callbacks drive the rest of the lifecycle. */
     fun start() {
@@ -174,26 +176,43 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
     }
 
     private fun handleFrame(text: String) {
+        try {
+            dispatchFrame(text)
+        } catch (e: Exception) {
+            Log.e(TAG, "dropped malformed frame: ${e.message}", e)
+        }
+    }
+
+    /** Fails initialize/listSessions permanently; frees a subscribe channel so it can be retried. */
+    private fun onRpcError(pending: Pending) {
+        when (pending.kind) {
+            PendingKind.Initialize, PendingKind.ListSessions -> close()
+            PendingKind.Subscribe -> pending.channel?.let { synchronized(ioLock) { subscribedChannels.remove(it) } }
+        }
+    }
+
+    private fun dispatchFrame(text: String) {
         val obj = Ahp.json.parseToJsonElement(text).jsonObject
         val id = obj["id"]?.jsonPrimitive?.longOrNull
         if (id != null && (obj.containsKey("result") || obj.containsKey("error"))) {
-            val kind = synchronized(ioLock) { pending.remove(id) } ?: return
+            val pending = synchronized(ioLock) { pending.remove(id) } ?: return
             if (obj.containsKey("error")) {
-                Log.e(TAG, "rpc error id=$id kind=$kind err=${obj["error"]}")
+                Log.e(TAG, "rpc error id=$id kind=${pending.kind} err=${obj["error"]}")
+                onRpcError(pending)
                 return
             }
             val result = obj["result"] ?: return
-            when (kind) {
-                Pending.Initialize -> {
+            when (pending.kind) {
+                PendingKind.Initialize -> {
                     val init = Ahp.json.decodeFromJsonElement(InitializeResult.serializer(), result)
                     init.snapshots.forEach(::applySnapshot)
                     sendListSessions()
                 }
-                Pending.ListSessions -> {
+                PendingKind.ListSessions -> {
                     val list = Ahp.json.decodeFromJsonElement(ListSessionsResult.serializer(), result)
                     publishSessions(list.items.map { SessionInfo(it.resource, it.title) })
                 }
-                Pending.Subscribe -> {
+                PendingKind.Subscribe -> {
                     val sub = Ahp.json.decodeFromJsonElement(SubscribeResult.serializer(), result)
                     sub.snapshot?.let(::applySnapshot)
                 }
@@ -303,7 +322,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
 
     private fun sendInitialize() {
         val id = nextId.getAndIncrement()
-        synchronized(ioLock) { pending[id] = Pending.Initialize }
+        synchronized(ioLock) { pending[id] = Pending(PendingKind.Initialize) }
         val params =
             InitializeParams(
                 channel = ROOT_CHANNEL,
@@ -316,7 +335,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
 
     private fun sendListSessions() {
         val id = nextId.getAndIncrement()
-        synchronized(ioLock) { pending[id] = Pending.ListSessions }
+        synchronized(ioLock) { pending[id] = Pending(PendingKind.ListSessions) }
         sendRpc(
             AhpCommands.listSessions(id, ListSessionsParams(channel = ROOT_CHANNEL)),
             ListSessionsParams.serializer(),
@@ -328,7 +347,7 @@ class AhpConnection(private val endpoint: String, private val client: OkHttpClie
         synchronized(ioLock) {
             if (!subscribedChannels.add(channel)) return
             id = nextId.getAndIncrement()
-            pending[id] = Pending.Subscribe
+            pending[id] = Pending(PendingKind.Subscribe, channel)
         }
         sendRpc(AhpCommands.subscribe(id, SubscribeParams(channel = channel)), SubscribeParams.serializer())
     }

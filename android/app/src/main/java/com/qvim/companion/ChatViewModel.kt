@@ -48,8 +48,10 @@ class ChatViewModel(
     private val hostSessions = LinkedHashMap<String, List<SessionInfo>>()
     private val hostStates = LinkedHashMap<String, ConnectionState>()
     private val jobs = mutableListOf<Job>()
+    private var connectJob: Job? = null
     private var transcriptJob: Job? = null
     private var active: AhpConnection? = null
+    private var generation = 0
 
     /** Sets the cptower endpoint (`host:port`, or a full `ws://`/`wss://` URL). */
     fun setEndpoint(value: String) {
@@ -66,17 +68,29 @@ class ChatViewModel(
         _sessions.value = emptyList()
         _selectedSession.value = null
         _connectionState.value = ConnectionState.Connecting
+        val gen = ++generation
 
-        viewModelScope.launch {
-            val hosts = runCatching { catalog.fetch(target) }.getOrNull()
-            if (hosts.isNullOrEmpty()) {
-                openConnection(id = target, label = "", endpoint = target)
-            } else {
-                hosts.forEach { host ->
-                    openConnection(id = host.id, label = host.label, endpoint = wsEndpoint(target, host.port))
-                }
+        connectJob =
+            viewModelScope.launch {
+                val result = runCatching { catalog.fetch(target) }
+                if (gen != generation) return@launch
+                result.fold(
+                    onSuccess = { hosts ->
+                        if (hosts.isEmpty()) {
+                            _connectionState.value = ConnectionState.Disconnected
+                        } else {
+                            hosts.forEach { host ->
+                                openConnection(
+                                    id = host.id,
+                                    label = host.label,
+                                    endpoint = wsEndpoint(target, host.port),
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { openConnection(id = target, label = "", endpoint = target) },
+                )
             }
-        }
     }
 
     /** Chooses which host session to observe and send to; scopes the transcript to it. */
@@ -145,6 +159,8 @@ class ChatViewModel(
     }
 
     private fun teardown() {
+        connectJob?.cancel()
+        connectJob = null
         transcriptJob?.cancel()
         transcriptJob = null
         jobs.forEach { it.cancel() }
