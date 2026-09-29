@@ -7,10 +7,12 @@ session from a single endpoint.
 
 ## What it does
 
-- **Discovers** live AHP hosts every 3s by enumerating loopback TCP listeners owned by `copilot`
-  processes and confirming each with an AHP `initialize` handshake. This is authoritative — the
-  lingering `~/.copilot/logs/ahp-host-*.log` files are not (they outlive dead hosts and miss
-  interactively-started ones), so they are used only to enrich a host's label.
+- **Discovers** live AHP hosts **when `/hosts` is requested** by enumerating loopback TCP listeners
+  owned by `copilot` processes and confirming each with an AHP `initialize` handshake. The app hits
+  `/hosts` right before it connects, so this point-in-time scan is enough and cptower does not probe
+  ports in the background. This is authoritative — the lingering `~/.copilot/logs/ahp-host-*.log`
+  files are not (they outlive dead hosts and miss interactively-started ones), so they are used only
+  to enrich a host's label.
 - **Routes** WebSocket traffic: a client connecting to `ws://<cptower>:8770/ws/<port>` is bridged to
   the loopback AHP host on `<port>` via a YARP reverse proxy with dynamic in-memory routes.
 - **Advertises** the catalog at `GET /hosts` — a JSON array of `{ id, port, label, protocol,
@@ -51,7 +53,7 @@ avoids a repeated UAC prompt if the firewall rule already exists).
 | `TcpTable.cs`         | P/Invoke `GetExtendedTcpTable` → loopback listeners with owning PID. |
 | `AhpProbe.cs`         | AHP `initialize` + `listSessions` handshake to confirm a host.      |
 | `HostRegistry.cs`     | Thread-safe registry of live hosts with a change event.             |
-| `DiscoveryService.cs` | Background reconcile loop (enumerate → probe → register).           |
+| `DiscoveryService.cs` | On-demand reconcile (enumerate → probe → register), run from `/hosts`.    |
 | `ProxyRoutes.cs`      | Keeps YARP's in-memory routes in sync with the registry.            |
 | `FirewallManager.cs`  | Idempotent, self-elevating inbound firewall rule.                   |
 

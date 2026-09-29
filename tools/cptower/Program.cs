@@ -27,7 +27,7 @@ builder.Logging.AddSimpleConsole(o => o.TimestampFormat = "HH:mm:ss ");
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddSingleton<HostRegistry>();
-builder.Services.AddHostedService<DiscoveryService>();
+builder.Services.AddSingleton<DiscoveryService>();
 builder.Services.AddHostedService<ProxyRoutes>();
 builder.Services.AddReverseProxy().LoadFromMemory(new List<RouteConfig>(), new List<ClusterConfig>());
 
@@ -35,8 +35,10 @@ var app = builder.Build();
 
 FirewallManager.Ensure(port, app.Logger);
 
-app.MapGet("/hosts", (HostRegistry registry) =>
-    Results.Json(registry.Snapshot().Select(h => new
+app.MapGet("/hosts", async (HostRegistry registry, DiscoveryService discovery, CancellationToken ct) =>
+{
+    await discovery.RefreshAsync(ct);
+    return Results.Json(registry.Snapshot().Select(h => new
     {
         id = h.Id,
         port = h.Port,
@@ -44,7 +46,8 @@ app.MapGet("/hosts", (HostRegistry registry) =>
         protocol = h.Protocol,
         sessions = h.Sessions,
         alive = true,
-    })));
+    }));
+});
 
 app.MapReverseProxy();
 

@@ -4,32 +4,35 @@ using System.Net;
 namespace CpTower;
 
 /// <summary>
-/// Periodically reconciles the live host set: enumerate loopback listeners owned by the copilot
+/// Reconciles the live host set on demand: enumerate loopback listeners owned by the copilot
 /// process, probe newly seen ports for AHP, and drop hosts whose listener has gone away. Enriches
 /// labels from the `ahp-host-{port}.log` files when the probe did not report a working directory.
+/// Discovery runs only when <see cref="RefreshAsync"/> is called (the app hits `/hosts` right before
+/// it connects), so cptower does not probe ports in the background.
 /// </summary>
-public sealed class DiscoveryService(HostRegistry registry, ILogger<DiscoveryService> log) : BackgroundService
+public sealed class DiscoveryService(HostRegistry registry, ILogger<DiscoveryService> log)
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(3);
-
     private static readonly string LogDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".copilot", "logs");
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    private readonly SemaphoreSlim gate = new(1, 1);
+
+    /// <summary>Runs one reconciliation pass, serialized so concurrent `/hosts` calls share the work.</summary>
+    public async Task RefreshAsync(CancellationToken token)
     {
-        using var timer = new PeriodicTimer(Interval);
-        do
+        await gate.WaitAsync(token);
+        try
         {
-            try
-            {
-                await ReconcileAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                log.LogWarning(ex, "discovery tick failed");
-            }
+            await ReconcileAsync(token);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            log.LogWarning(ex, "discovery refresh failed");
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     private async Task ReconcileAsync(CancellationToken token)
